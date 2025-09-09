@@ -1,0 +1,10 @@
+// Chỉ là bản tối thiểu, cần siết chặt hơn cho production
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read, update, delete: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "574694385709",
+    "project_id": "attendify-dc44d",
+    "storage_bucket": "attendify-dc44d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:574694385709:android:14a156da8c9869520bb0a4",
+        "android_client_info": {
+          "package_name": "com.attendify"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "574694385709-161i0mhjo2oe5ha8f38aejofh61f6ao9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBG0XWU4XF6VRAYrNCqSOKIyIBpFYQt68Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "574694385709-161i0mhjo2oe5ha8f38aejofh61f6ao9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "574694385709-dtaefa4gt44v2jnamcb3t09ll9lharrh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.attendify"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:574694385709:android:c4d4ca1cbf749d820bb0a4",
+        "android_client_info": {
+          "package_name": "com.example.attendify"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "574694385709-g6gp8a04bib29o1pt2ohnpklr3dhab9j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.attendify",
+            "certificate_hash": "20cb1da6073fad9f3b1f473adeacb28c02873d4e"
+          }
+        },
+        {
+          "client_id": "574694385709-161i0mhjo2oe5ha8f38aejofh61f6ao9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBG0XWU4XF6VRAYrNCqSOKIyIBpFYQt68Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "574694385709-161i0mhjo2oe5ha8f38aejofh61f6ao9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "574694385709-dtaefa4gt44v2jnamcb3t09ll9lharrh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.attendify"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
