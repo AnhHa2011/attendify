@@ -43,7 +43,7 @@ class ClassService {
   Stream<List<ClassModel>> allClasses() {
     return _db
         .collection('classes')
-        .orderBy('createdAt', descending: true)
+        // .orderBy('createdAt', descending: true)
         .snapshots()
         .map((s) => s.docs.map((d) => ClassModel.fromDoc(d)).toList());
   }
@@ -52,7 +52,7 @@ class ClassService {
     return _db
         .collection('classes')
         .where('lecturerId', isEqualTo: lecturerUid)
-        .orderBy('createdAt', descending: true)
+        // .orderBy('createdAt', descending: true)
         .snapshots()
         .map((s) => s.docs.map((d) => ClassModel.fromDoc(d)).toList());
   }
@@ -88,7 +88,7 @@ class ClassService {
         .collection('classes')
         .doc(classId)
         .collection('members')
-        .orderBy('joinedAt')
+        // .orderBy('joinedAt')
         .snapshots()
         .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
