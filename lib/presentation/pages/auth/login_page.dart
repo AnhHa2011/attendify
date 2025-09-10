@@ -1,330 +1,183 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/providers/auth_provider.dart';
-import '../../../services/firebase/firebase_auth_service.dart';
-import '../../utils/auth_error.dart';
+import '../../widgets/role_picker_dialog.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _email = TextEditingController();
-  final _pass = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
   bool _obscure = true;
-  bool _loading = false;
-  bool _loadingGoogle = false;
+  bool _submitting = false;
 
   @override
   void dispose() {
-    _email.dispose();
-    _pass.dispose();
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _onLogin() async {
+  Future<void> _signInEmail() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
+
+    setState(() => _submitting = true);
+    final auth = context.read<AuthProvider>();
+
     try {
-      await context.read<AuthProvider>().login(_email.text.trim(), _pass.text);
+      await auth.login(_emailCtrl.text.trim(), _passCtrl.text);
       if (!mounted) return;
-      context.go('/home');
-    } catch (e) {
+      // GoRouter sẽ tự redirect theo role trong app.dart
+    } on Object catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(authErrorText(e))));
+      ).showSnackBar(SnackBar(content: Text('Đăng nhập thất bại: $e')));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
-  Future<void> _onGoogle() async {
-    setState(() => _loadingGoogle = true);
+  Future<void> _signInGoogle() async {
+    setState(() => _submitting = true);
+    final auth = context.read<AuthProvider>();
     try {
-      await context.read<FirebaseAuthService>().signInWithGoogle();
+      await auth.loginWithGoogleAndPickRole(
+        () => showRolePickerDialog(context),
+      );
       if (!mounted) return;
-      context.go('/home');
-    } catch (e) {
+      // Router sẽ tự redirect theo role
+    } on Object catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(authErrorText(e))));
+      ).showSnackBar(SnackBar(content: Text('Google Sign-In lỗi: $e')));
     } finally {
-      if (mounted) setState(() => _loadingGoogle = false);
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Logo tròn
-                  Container(
-                    width: 160,
-                    height: 160,
-                    decoration: BoxDecoration(
-                      color: color.primaryContainer.withOpacity(.25),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Image.asset(
-                      'assets/icons/app_icon.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Title
-                  Text(
-                    'Attendify',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
-                      color: color.primary,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Hệ thống điểm danh thông minh',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: color.onSurfaceVariant,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 28),
+    final isLoadingGlobal = context.watch<AuthProvider>().isLoading;
+    final isBusy = _submitting || isLoadingGlobal;
 
-                  // Form
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        _LabeledField(
-                          controller: _email,
-                          label: 'Email',
-                          keyboardType: TextInputType.emailAddress,
-                          prefixIcon: Icons.mail_outline_rounded,
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Vui lòng nhập email';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 14),
-                        _LabeledField(
-                          controller: _pass,
-                          label: 'Mật khẩu',
-                          obscureText: _obscure,
-                          prefixIcon: Icons.lock_outline_rounded,
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscure
-                                  ? Icons.visibility_rounded
-                                  : Icons.visibility_off_rounded,
-                            ),
-                            onPressed: () =>
-                                setState(() => _obscure = !_obscure),
-                            tooltip: _obscure ? 'Hiện mật khẩu' : 'Ẩn mật khẩu',
+    return Scaffold(
+      appBar: AppBar(title: const Text('Đăng nhập')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: AutofillGroup(
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _emailCtrl,
+                      autofillHints: const [
+                        AutofillHints.username,
+                        AutofillHints.email,
+                      ],
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Vui lòng nhập email';
+                        }
+                        final email = v.trim();
+                        if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+                          return 'Email không hợp lệ';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _passCtrl,
+                      autofillHints: const [AutofillHints.password],
+                      obscureText: _obscure,
+                      decoration: InputDecoration(
+                        labelText: 'Mật khẩu',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          onPressed: () => setState(() => _obscure = !_obscure),
+                          icon: Icon(
+                            _obscure ? Icons.visibility_off : Icons.visibility,
                           ),
-                          validator: (v) {
-                            if (v == null || v.isEmpty) {
-                              return 'Vui lòng nhập mật khẩu';
-                            }
-                            if (v.length < 6) {
-                              return 'Mật khẩu tối thiểu 6 ký tự';
-                            }
-                            return null;
-                          },
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty)
+                          return 'Vui lòng nhập mật khẩu';
+                        if (v.length < 6) return 'Mật khẩu tối thiểu 6 ký tự';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: isBusy ? null : _signInEmail,
+                      child: isBusy
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Đăng nhập'),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: isBusy ? null : () => context.push('/reset'),
+                        child: const Text('Quên mật khẩu?'),
+                      ),
+                    ),
+                    const Divider(height: 32),
+                    OutlinedButton.icon(
+                      onPressed: isBusy ? null : _signInGoogle,
+                      icon: Image.asset(
+                        'assets/icons/google_logo.png',
+                        width: 24,
+                        height: 24,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.g_mobiledata),
+                      ),
+                      label: const Text('Đăng nhập/đăng ký với Google'),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('Chưa có tài khoản?'),
+                        TextButton(
+                          onPressed: isBusy
+                              ? null
+                              : () => context.go('/register'),
+                          child: const Text('Đăng ký'),
                         ),
                       ],
                     ),
-                  ),
-
-                  const SizedBox(height: 10),
-                  // Quên mật khẩu?
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => context.go('/reset'),
-                      child: const Text('Quên mật khẩu?'),
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-                  // Nút Đăng nhập
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _loading ? null : _onLogin,
-                      icon: _loading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.login_rounded),
-                      label: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                        child: Text(
-                          'Đăng nhập',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      ),
-                      style: FilledButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 18),
-                  // Divider "HOẶC"
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Divider(
-                          color: color.outlineVariant,
-                          thickness: 1,
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'HOẶC',
-                          style: TextStyle(
-                            color: color.onSurfaceVariant,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Divider(
-                          color: color.outlineVariant,
-                          thickness: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-
-                  // Nút Google
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _loadingGoogle ? null : _onGoogle,
-                      icon: _loadingGoogle
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Image.asset(
-                              'assets/icons/google_logo.png',
-                              height: 24,
-                              width: 24,
-                            ),
-                      label: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                        child: Text(
-                          'Đăng nhập với Google',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: color.outlineVariant),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 28),
-                  // Chưa có tài khoản? Đăng ký ngay
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 6,
-                    children: [
-                      Text(
-                        'Chưa có tài khoản?',
-                        style: TextStyle(color: color.onSurfaceVariant),
-                      ),
-                      InkWell(
-                        onTap: () => context.go('/register'),
-                        child: Text(
-                          'Đăng ký ngay',
-                          style: TextStyle(
-                            color: color.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _LabeledField extends StatelessWidget {
-  const _LabeledField({
-    required this.controller,
-    required this.label,
-    this.obscureText = false,
-    this.keyboardType,
-    this.prefixIcon,
-    this.suffixIcon,
-    this.validator,
-  });
-
-  final TextEditingController controller;
-  final String label;
-  final bool obscureText;
-  final TextInputType? keyboardType;
-  final IconData? prefixIcon;
-  final Widget? suffixIcon;
-  final String? Function(String?)? validator;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme;
-    return TextFormField(
-      controller: controller,
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: prefixIcon == null
-            ? null
-            : Icon(prefixIcon, color: color.onSurfaceVariant),
-        suffixIcon: suffixIcon,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
