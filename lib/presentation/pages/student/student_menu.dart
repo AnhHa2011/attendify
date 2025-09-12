@@ -8,6 +8,7 @@ import '../../../app/providers/auth_provider.dart';
 import '../../../services/firebase/class_service.dart';
 import '../../widgets/role_drawer_scaffold.dart';
 import 'qr_scanner_page.dart';
+import 'join_class_scanner_page.dart';
 
 class StudentMenuPage extends StatelessWidget {
   const StudentMenuPage({super.key});
@@ -67,9 +68,9 @@ class _JoinClassPageState extends State<_JoinClassPage> {
   final _codeController = TextEditingController();
   bool _isLoading = false;
 
-  Future<void> _submitJoinClass() async {
-    if (!_formKey.currentState!.validate()) return;
-
+  // === THAY ĐỔI 1: TÁCH LOGIC SUBMIT RA ĐỂ TÁI SỬ DỤNG ===
+  // Hàm này giờ nhận mã tham gia làm tham số
+  Future<void> _submitJoinClass({required String joinCode}) async {
     setState(() => _isLoading = true);
 
     try {
@@ -78,7 +79,7 @@ class _JoinClassPageState extends State<_JoinClassPage> {
       final user = auth.user!;
 
       await classService.enrollStudent(
-        joinCode: _codeController.text,
+        joinCode: joinCode, // Sử dụng tham số
         studentUid: user.uid,
         studentName: user.displayName ?? 'N/A',
         studentEmail: user.email ?? 'N/A',
@@ -96,14 +97,28 @@ class _JoinClassPageState extends State<_JoinClassPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Lỗi: ${e.toString().replaceFirst("Exception: ", "")}',
-          ), // Hiển thị thông báo lỗi gọn hơn
+          content: Text('Lỗi: ${e.toString().replaceFirst("Exception: ", "")}'),
           backgroundColor: Colors.red,
         ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // === THÊM MỚI 2: HÀM ĐỂ MỞ CAMERA VÀ XỬ LÝ KẾT QUẢ ===
+  Future<void> _scanAndJoin() async {
+    // Đẩy trang scanner lên và đợi kết quả trả về (await)
+    final scannedCode = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (context) => const JoinClassScannerPage()),
+    );
+
+    // Nếu người dùng quay lại mà không quét, scannedCode sẽ là null
+    if (scannedCode != null && scannedCode.isNotEmpty) {
+      // Tự động điền mã vào ô text và gọi hàm tham gia
+      _codeController.text = scannedCode;
+      await _submitJoinClass(joinCode: scannedCode);
     }
   }
 
@@ -149,7 +164,14 @@ class _JoinClassPageState extends State<_JoinClassPage> {
                   ),
                   const SizedBox(height: 16),
                   FilledButton.icon(
-                    onPressed: _isLoading ? null : _submitJoinClass,
+                    // Gọi hàm submit với mã từ controller
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            if (_formKey.currentState!.validate()) {
+                              _submitJoinClass(joinCode: _codeController.text);
+                            }
+                          },
                     icon: _isLoading
                         ? const SizedBox.shrink()
                         : const Icon(Icons.login),
@@ -157,13 +179,21 @@ class _JoinClassPageState extends State<_JoinClassPage> {
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Text('Tham gia'),
                     style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+
+                  // === THÊM MỚI 3: NÚT QUÉT MÃ QR ===
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _scanAndJoin,
+                    icon: const Icon(Icons.qr_code_scanner),
+                    label: const Text('Quét mã QR để tham gia'),
+                    style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),

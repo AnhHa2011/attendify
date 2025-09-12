@@ -4,13 +4,52 @@ import '../../data/models/session_model.dart';
 class SessionService {
   final _db = FirebaseFirestore.instance;
 
+  // // Tạo buổi học mới
+  // Future<String> createSession({
+  //   required String classId,
+  //   required String className,
+  //   required String classCode,
+  //   required String lecturerId,
+  //   required String lecturerName,
+  //   required String title,
+  //   String? description,
+  //   required DateTime startTime,
+  //   required DateTime endTime,
+  //   required String location,
+  //   required SessionType type,
+  // }) async {
+  //   final now = DateTime.now();
+
+  //   final ref = await _db.collection('sessions').add({
+  //     'classId': classId,
+  //     'className': className,
+  //     'classCode': classCode,
+  //     'lecturerId': lecturerId,
+  //     'lecturerName': lecturerName,
+  //     'title': title,
+  //     'description': description,
+  //     'startTime': Timestamp.fromDate(startTime),
+  //     'endTime': Timestamp.fromDate(endTime),
+  //     'location': location,
+  //     'type': type.name,
+  //     'status': SessionStatus.upcoming.name,
+  //     'createdAt': Timestamp.fromDate(now),
+  //     'totalStudents': 0,
+  //     'attendedStudents': 0,
+  //     'isAttendanceOpen': false,
+  //   });
+
+  //   return ref.id;
+  // }
+
   // Tạo buổi học mới
   Future<String> createSession({
     required String classId,
-    required String className,
-    required String classCode,
-    required String lecturerId,
-    required String lecturerName,
+    // === LOẠI BỎ CÁC TRƯỜNG DƯ THỪA ===
+    // required String className,
+    // required String classCode,
+    // required String lecturerId,
+    // required String lecturerName,
     required String title,
     String? description,
     required DateTime startTime,
@@ -22,10 +61,7 @@ class SessionService {
 
     final ref = await _db.collection('sessions').add({
       'classId': classId,
-      'className': className,
-      'classCode': classCode,
-      'lecturerId': lecturerId,
-      'lecturerName': lecturerName,
+      // === CÁC TRƯỜNG BỊ LOẠI BỎ ===
       'title': title,
       'description': description,
       'startTime': Timestamp.fromDate(startTime),
@@ -34,8 +70,6 @@ class SessionService {
       'type': type.name,
       'status': SessionStatus.upcoming.name,
       'createdAt': Timestamp.fromDate(now),
-      'totalStudents': 0,
-      'attendedStudents': 0,
       'isAttendanceOpen': false,
     });
 
