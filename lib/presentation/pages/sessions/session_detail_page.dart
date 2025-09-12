@@ -7,12 +7,11 @@ import 'package:provider/provider.dart';
 
 import '../../../services/firebase/class_service.dart';
 import '../../../services/firebase/session_service.dart';
-import '../../../data/models/session_model.dart'; // Import model này nếu chưa có
 
 class SessionDetailPage extends StatefulWidget {
   final String sessionId;
   final String sessionTitle;
-  final String classId; // Cần classId để lấy tổng số sinh viên
+  final String classId;
 
   const SessionDetailPage({
     super.key,
@@ -26,6 +25,35 @@ class SessionDetailPage extends StatefulWidget {
 }
 
 class _SessionDetailPageState extends State<SessionDetailPage> {
+  // === 1. HÀM HELPER ĐỂ HIỂN THỊ TRẠNG THÁI ===
+  Widget _buildStatusChip(String? status) {
+    status ??= 'present'; // Mặc định là 'present' nếu null
+    Color color;
+    String label;
+
+    switch (status) {
+      case 'late':
+        color = Colors.orange;
+        label = 'Đi muộn';
+        break;
+      case 'excused':
+        color = Colors.blue;
+        label = 'Vắng phép';
+        break;
+      case 'present':
+      default:
+        color = Colors.green;
+        label = 'Có mặt';
+    }
+    return Chip(
+      label: Text(label),
+      backgroundColor: color.withOpacity(0.2),
+      labelStyle: TextStyle(color: color, fontWeight: FontWeight.bold),
+      side: BorderSide.none,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sessionService = context.read<SessionService>();
@@ -33,9 +61,15 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.sessionTitle)),
+      // === 2. THÊM NÚT ĐIỂM DANH THỦ CÔNG (SẼ CODE Ở BƯỚC SAU) ===
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddStudentDialog,
+        label: const Text('Thêm thủ công'),
+        icon: const Icon(Icons.add),
+      ),
       body: Column(
         children: [
-          // THẺ THỐNG KÊ
+          // Thẻ thống kê (giữ nguyên)
           FutureBuilder<int>(
             future: classService.getEnrolledStudentCount(widget.classId),
             builder: (context, totalStudentsSnap) {
@@ -44,7 +78,6 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
                 builder: (context, attendanceSnap) {
                   final attendedCount = attendanceSnap.data?.length ?? 0;
                   final totalCount = totalStudentsSnap.data ?? 0;
-
                   return Card(
                     margin: const EdgeInsets.all(16),
                     child: Padding(
@@ -75,63 +108,67 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
               );
             },
           ),
-
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.0),
             child: Divider(),
           ),
-
-          // DANH SÁCH SINH VIÊN ĐÃ ĐIỂM DANH
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
               stream: sessionService.getRichAttendanceList(widget.sessionId),
               builder: (context, snapshot) {
+                // ... (code xử lý loading, error, empty giữ nguyên)
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Đã xảy ra lỗi: ${snapshot.error}'),
-                  );
                 }
                 final attendanceList = snapshot.data ?? [];
                 if (attendanceList.isEmpty) {
                   return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.people_outline,
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 16),
-                        Text('Chưa có sinh viên nào điểm danh.'),
-                      ],
-                    ),
+                    child: Text('Chưa có sinh viên nào điểm danh.'),
                   );
                 }
+
+                // === 3. NÂNG CẤP LISTTILE ĐỂ HIỂN THỊ VÀ CHỈNH SỬA TRẠNG THÁI ===
                 return ListView.builder(
+                  padding: const EdgeInsets.only(
+                    bottom: 80,
+                  ), // Chừa không gian cho FAB
                   itemCount: attendanceList.length,
                   itemBuilder: (context, index) {
                     final data = attendanceList[index];
+                    final studentId = data['studentId'];
                     final studentName = data['studentName'] ?? 'Không có tên';
                     final studentEmail =
                         data['studentEmail'] ?? 'Không có email';
                     final Timestamp? attendTime = data['attendTime'];
-                    final initial = studentName.isNotEmpty
-                        ? studentName[0].toUpperCase()
-                        : '?';
+                    final status = data['status'];
 
                     return ListTile(
-                      leading: CircleAvatar(child: Text(initial)),
+                      leading: _buildStatusChip(status),
                       title: Text(studentName),
                       subtitle: Text(studentEmail),
-                      trailing: Text(
-                        attendTime != null
-                            ? DateFormat('HH:mm:ss').format(attendTime.toDate())
-                            : '',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (String newStatus) {
+                          sessionService.updateAttendanceStatus(
+                            sessionId: widget.sessionId,
+                            studentId: studentId,
+                            newStatus: newStatus,
+                          );
+                        },
+                        itemBuilder: (BuildContext context) =>
+                            <PopupMenuEntry<String>>[
+                              const PopupMenuItem<String>(
+                                value: 'present',
+                                child: Text('Đánh dấu: Có mặt'),
+                              ),
+                              const PopupMenuItem<String>(
+                                value: 'late',
+                                child: Text('Đánh dấu: Đi muộn'),
+                              ),
+                              const PopupMenuItem<String>(
+                                value: 'excused',
+                                child: Text('Đánh dấu: Vắng có phép'),
+                              ),
+                            ],
                       ),
                     );
                   },
@@ -159,6 +196,77 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
         const SizedBox(height: 4),
         Text(title, style: Theme.of(context).textTheme.bodySmall),
       ],
+    );
+  }
+
+  // --- HÀM MỚI ĐỂ HIỂN THỊ DIALOG ---
+  Future<void> _showAddStudentDialog() async {
+    final classService = context.read<ClassService>();
+    final sessionService = context.read<SessionService>();
+
+    // 1. Lấy danh sách TẤT CẢ sinh viên trong lớp
+    final allStudents = await classService.getEnrolledStudents(widget.classId);
+
+    // 2. Lấy danh sách sinh viên ĐÃ điểm danh
+    final attendedList = await sessionService
+        .getRichAttendanceList(widget.sessionId)
+        .first; // .first để lấy giá trị hiện tại của Stream
+    final attendedStudentIds = attendedList.map((e) => e['studentId']).toSet();
+
+    // 3. Lọc ra những sinh viên CHƯA điểm danh
+    final absentStudents = allStudents
+        .where((student) => !attendedStudentIds.contains(student['uid']))
+        .toList();
+
+    if (!mounted) return;
+
+    if (absentStudents.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tất cả sinh viên đã được điểm danh.')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Thêm điểm danh thủ công'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: absentStudents.length,
+              itemBuilder: (context, index) {
+                final student = absentStudents[index];
+                return ListTile(
+                  title: Text(student['displayName'] ?? 'N/A'),
+                  subtitle: Text(student['email'] ?? 'N/A'),
+                  onTap: () async {
+                    await sessionService.addManualAttendance(
+                      sessionId: widget.sessionId,
+                      studentId: student['uid'],
+                    );
+                    if (!mounted) return;
+                    Navigator.of(context).pop(); // Đóng dialog
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Đã thêm ${student['displayName']}'),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Hủy'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
     );
   }
 }

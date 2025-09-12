@@ -87,6 +87,27 @@ class ClassService {
     }
   }
 
+  // Lấy danh sách chi tiết các sinh viên đã tham gia lớp
+  Future<List<Map<String, dynamic>>> getEnrolledStudents(String classId) async {
+    final enrollmentSnap = await _db
+        .collection('enrollments')
+        .where('classId', isEqualTo: classId)
+        .get();
+    if (enrollmentSnap.docs.isEmpty) return [];
+
+    final userFutures = enrollmentSnap.docs.map((doc) async {
+      final studentId = doc.data()['studentUid'];
+      final userDoc = await _db.collection('users').doc(studentId).get();
+      return userDoc.exists ? userDoc.data()! : null;
+    }).toList();
+
+    final users = await Future.wait(userFutures);
+    return users
+        .where((user) => user != null)
+        .cast<Map<String, dynamic>>()
+        .toList();
+  }
+
   // === Streams cho Admin/Lecturer/Student ===
   Stream<List<ClassModel>> allClasses() {
     return _db

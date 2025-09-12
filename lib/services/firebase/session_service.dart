@@ -78,11 +78,43 @@ class SessionService {
       await sessionRef.collection('attendances').doc(studentId).set({
         'studentId': studentId,
         'attendTime': FieldValue.serverTimestamp(),
+        'status': 'present',
       });
     } catch (e) {
       // Ném lại lỗi để UI có thể bắt và hiển thị
       rethrow;
     }
+  }
+
+  /// Cập nhật trạng thái điểm danh của một sinh viên
+  Future<void> updateAttendanceStatus({
+    required String sessionId,
+    required String studentId,
+    required String newStatus,
+  }) {
+    return _db
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('attendances')
+        .doc(studentId)
+        .update({'status': newStatus});
+  }
+
+  // Thêm hàm điểm danh thủ công
+  Future<void> addManualAttendance({
+    required String sessionId,
+    required String studentId,
+  }) {
+    return _db
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('attendances')
+        .doc(studentId)
+        .set({
+          'studentId': studentId,
+          'attendTime': FieldValue.serverTimestamp(),
+          'status': 'present', // Mặc định là có mặt
+        }, SetOptions(merge: true));
   }
 
   // Lấy tất cả buổi học
