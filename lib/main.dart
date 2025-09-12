@@ -15,10 +15,13 @@ import 'services/firebase/class_service.dart';
 import 'services/firebase/firebase_auth_service.dart';
 import 'package:attendify/services/firebase/session_service.dart';
 import 'package:attendify/services/firebase/admin_service.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Khởi tạo dữ liệu định dạng ngày tháng cho ngôn ngữ Tiếng Việt
+  await initializeDateFormatting('vi_VN', null);
 
   runApp(
     MultiProvider(

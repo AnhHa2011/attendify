@@ -779,19 +779,17 @@ class _SessionListPage extends StatefulWidget {
   State<_SessionListPage> createState() => _SessionListPageState();
 }
 
+// THAY THẾ TOÀN BỘ CLASS _SessionListPageState BẰNG CODE NÀY
 class _SessionListPageState extends State<_SessionListPage> {
   bool _isCreatingSession = false;
 
-  // === THAY ĐỔI 1: CẬP NHẬT HÀM TẠO BUỔI HỌC ===
+  // Hàm tạo buổi học không thay đổi, nó đã đúng logic
   Future<void> _startNewAttendanceSession(ClassModel c) async {
     setState(() => _isCreatingSession = true);
-
     try {
       final sessionService = context.read<SessionService>();
-
-      // Hàm createSession bây giờ đã gọn gàng hơn rất nhiều
       final String sessionId = await sessionService.createSession(
-        classId: c.id, // Chỉ cần classId
+        classId: c.id,
         title:
             'Buổi học ngày ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
         startTime: DateTime.now(),
@@ -799,13 +797,10 @@ class _SessionListPageState extends State<_SessionListPage> {
         location: 'Tại lớp',
         type: SessionType.lecture,
       );
-
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      // Dữ liệu QR cũng được đơn giản hóa
       final qrData = '${c.id}|$sessionId||$timestamp';
 
       if (!mounted) return;
-
       await sessionService.toggleAttendance(sessionId, true);
 
       showDialog(
@@ -816,7 +811,7 @@ class _SessionListPageState extends State<_SessionListPage> {
           content: SizedBox(
             width: 250,
             height: 250,
-            child: QrImageView(data: qrData, version: QrVersions.auto),
+            child: QrImageView(data: qrData),
           ),
           actions: [
             TextButton(
@@ -845,33 +840,31 @@ class _SessionListPageState extends State<_SessionListPage> {
     final sessionService = context.read<SessionService>();
 
     return Scaffold(
-      body: Column(
-        children: [
-          // === THAY ĐỔI 2: SỬ DỤNG STREAM "LÀM GIÀU" DỮ LIỆU ===
-          StreamBuilder<ClassModel>(
-            stream: classService.getRichClassStream(
-              widget.classId,
-            ), // Gọi hàm mới
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                // Hiển thị một header tạm thời trong khi chờ
-                return const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              if (snapshot.hasError || !snapshot.hasData) {
-                return Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    snapshot.error?.toString() ??
-                        'Không tải được thông tin lớp',
-                  ),
-                );
-              }
+      // === CẤU TRÚC LẠI HOÀN TOÀN HÀM BUILD ===
+      // StreamBuilder lấy thông tin lớp học sẽ bao bọc toàn bộ nội dung
+      body: StreamBuilder<ClassModel>(
+        stream: classService.getRichClassStream(widget.classId),
+        builder: (context, classSnapshot) {
+          // Xử lý trạng thái tải và lỗi của thông tin lớp học trước
+          if (classSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (classSnapshot.hasError || !classSnapshot.hasData) {
+            return Center(
+              child: Text(
+                classSnapshot.error?.toString() ??
+                    'Không tải được thông tin lớp',
+              ),
+            );
+          }
+          // Khi đã có thông tin lớp, ta lưu vào biến classData
+          final classData = classSnapshot.data!;
 
-              final classData = snapshot.data!;
-              return Padding(
+          // Bây giờ, ta xây dựng giao diện dựa trên classData đã có
+          return Column(
+            children: [
+              // --- PHẦN HEADER THÔNG TIN LỚP VÀ NÚT TẠO BUỔI HỌC ---
+              Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
@@ -902,7 +895,6 @@ class _SessionListPageState extends State<_SessionListPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // === THAY ĐỔI 3: HIỂN THỊ DỮ LIỆU "LÀM GIÀU" ===
                     Card(
                       margin: EdgeInsets.zero,
                       child: ListTile(
@@ -915,86 +907,62 @@ class _SessionListPageState extends State<_SessionListPage> {
                     ),
                   ],
                 ),
-              );
-            },
-          ),
+              ),
 
-          // StreamBuilder để hiển thị danh sách các buổi học đã tạo
-          // PHẦN NÀY KHÔNG CẦN THAY ĐỔI VÌ ĐÃ ĐÚNG TỪ TRƯỚC
-          // StreamBuilder để hiển thị danh sách các buổi học đã tạo
-          Expanded(
-            child: StreamBuilder<List<SessionModel>>(
-              // 1. Stream này lắng nghe các buổi học của classId hiện tại
-              stream: sessionService.sessionsOfClass(widget.classId),
-              builder: (context, sessionSnap) {
-                if (sessionSnap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final sessions = sessionSnap.data ?? [];
+              // --- PHẦN DANH SÁCH CÁC BUỔI HỌC ---
+              Expanded(
+                child: StreamBuilder<List<SessionModel>>(
+                  stream: sessionService.sessionsOfClass(widget.classId),
+                  builder: (context, sessionSnap) {
+                    if (sessionSnap.connectionState ==
+                        ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final sessions = sessionSnap.data ?? [];
+                    if (sessions.isEmpty) {
+                      return const Center(
+                        child: Text('Chưa có buổi học nào được tạo.'),
+                      );
+                    }
 
-                // 2. Nếu không có session nào, hiển thị thông báo
-                if (sessions.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.event_note_outlined,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Chưa có buổi học nào',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Nhấn "Tạo buổi học" để bắt đầu',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                // 3. Nếu có session, hiển thị danh sách
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: sessions.length,
-                  itemBuilder: (context, index) {
-                    final session = sessions[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: const Icon(Icons.event_available),
-                        title: Text(session.title),
-                        subtitle: Text(
-                          'Bắt đầu: ${DateFormat.yMd().add_Hm().format(session.startTime)}',
-                        ),
-                        trailing: const Icon(Icons.chevron_right),
-                        // THÊM HÀNH ĐỘNG onTap VÀO ĐÂY
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SessionDetailPage(
-                                sessionId: session.id, // Truyền ID của buổi học
-                                sessionTitle:
-                                    session.title, // Truyền tiêu đề để hiển thị
-                                classId: widget.classId,
-                              ),
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: sessions.length,
+                      itemBuilder: (context, index) {
+                        final session = sessions[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: const Icon(Icons.event_available),
+                            title: Text(session.title),
+                            subtitle: Text(
+                              'Bắt đầu: ${DateFormat.yMd().add_Hm().format(session.startTime)}',
                             ),
-                          );
-                        },
-                      ),
+                            trailing: const Icon(Icons.chevron_right),
+                            // === THAY ĐỔI QUAN TRỌNG NHẤT: TRUYỀN CÁC ĐỐI TƯỢNG ĐẦY ĐỦ ===
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => SessionDetailPage(
+                                    session:
+                                        session, // Truyền cả đối tượng session
+                                    classInfo:
+                                        classData, // Truyền đối tượng classData từ StreamBuilder cha
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
                     );
                   },
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
