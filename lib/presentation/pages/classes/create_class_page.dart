@@ -167,7 +167,9 @@ class _CreateClassPageState extends State<CreateClassPage> {
                   ),
                   const SizedBox(height: 12),
 
-                  Row(
+                  Wrap(
+                    spacing: 12, // khoảng cách ngang
+                    runSpacing: 12, // khoảng cách dọc khi xuống dòng
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<int>(
