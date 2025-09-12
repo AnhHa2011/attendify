@@ -8,6 +8,13 @@ import '../../data/models/user_model.dart';
 import '../../services/firebase/class_service.dart';
 import '../pages/classes/create_class_page.dart';
 
+// Thêm các import này ở đầu file hierarchical_menu_scaffold.dart
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:intl/intl.dart';
+import '../../data/models/session_model.dart';
+import '../../services/firebase/session_service.dart';
+import '../pages/sessions/session_detail_page.dart';
+
 class HierarchicalMenuScaffold extends StatelessWidget {
   const HierarchicalMenuScaffold({super.key});
 
@@ -790,85 +797,214 @@ class _ProfilePage extends StatelessWidget {
 }
 
 // Class context pages với ClassService
-class _SessionListPage extends StatelessWidget {
+// 1. CHUYỂN THÀNH STATEFULWIDGET
+class _SessionListPage extends StatefulWidget {
   final String classId;
   const _SessionListPage({required this.classId});
 
   @override
+  State<_SessionListPage> createState() => _SessionListPageState();
+}
+
+class _SessionListPageState extends State<_SessionListPage> {
+  bool _isCreatingSession = false;
+
+  // 2. THÊM HÀM LOGIC TẠO BUỔI HỌC VÀ HIỂN THỊ QR
+  Future<void> _startNewAttendanceSession(ClassModel c) async {
+    setState(() => _isCreatingSession = true);
+
+    try {
+      final sessionService = context.read<SessionService>();
+      final authProvider = context.read<AuthProvider>();
+      final lecturer = authProvider.user!;
+
+      final String sessionId = await sessionService.createSession(
+        classId: c.id,
+        className: c.className,
+        classCode: c.classCode,
+        lecturerId: lecturer.uid,
+        lecturerName: c.lecturerName,
+        title:
+            'Buổi học ngày ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+        startTime: DateTime.now(),
+        endTime: DateTime.now().add(const Duration(minutes: 90)),
+        location: 'Tại lớp',
+        type: SessionType.lecture,
+      );
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final qrData = '${c.id}|${sessionId}|${lecturer.uid}|${timestamp}';
+
+      if (!mounted) return;
+
+      await sessionService.toggleAttendance(sessionId, true);
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Điểm danh bằng mã QR'),
+          content: SizedBox(
+            width: 250,
+            height: 250,
+            child: QrImageView(data: qrData, version: QrVersions.auto),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await sessionService.toggleAttendance(sessionId, false);
+                Navigator.of(context).pop();
+              },
+              child: const Text('ĐÓNG ĐIỂM DANH'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lỗi tạo buổi học: $e')));
+    } finally {
+      if (mounted) setState(() => _isCreatingSession = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final classService = context.read<ClassService>();
+    final sessionService = context.read<SessionService>();
 
     return Scaffold(
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Buổi học',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Tính năng đang phát triển'),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Tạo buổi học'),
-                ),
-              ],
-            ),
-          ),
-
-          // Class info
+          // StreamBuilder để lấy thông tin lớp học (cần cho việc tạo buổi học)
           StreamBuilder<ClassModel>(
-            stream: classService.classStream(classId),
+            stream: classService.classStream(widget.classId),
             builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                final classData = snapshot.data!;
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  child: ListTile(
-                    leading: const Icon(Icons.class_),
-                    title: Text(classData.className),
-                    subtitle: Text(
-                      'Mã: ${classData.classCode} • GV: ${classData.lecturerName}',
+              final classData = snapshot.data;
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Buổi học',
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                        ),
+                        // 3. CẬP NHẬT LẠI NÚT 'TẠO BUỔI HỌC'
+                        FilledButton.icon(
+                          onPressed: (classData == null || _isCreatingSession)
+                              ? null // Vô hiệu hóa nút nếu chưa có data lớp hoặc đang tạo
+                              : () => _startNewAttendanceSession(classData),
+                          icon: _isCreatingSession
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.add),
+                          label: const Text('Tạo buổi học'),
+                        ),
+                      ],
                     ),
-                  ),
-                );
-              }
-              return const SizedBox.shrink();
+                    const SizedBox(height: 16),
+                    if (classData != null)
+                      Card(
+                        margin: EdgeInsets.zero,
+                        child: ListTile(
+                          leading: const Icon(Icons.class_),
+                          title: Text(classData.className),
+                          subtitle: Text(
+                            'Mã: ${classData.classCode} • GV: ${classData.lecturerName}',
+                          ),
+                        ),
+                      )
+                    else
+                      const Center(child: CircularProgressIndicator()),
+                  ],
+                ),
+              );
             },
           ),
 
+          // StreamBuilder để hiển thị danh sách các buổi học đã tạo
           Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.event_note_outlined,
-                    size: 64,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Chưa có buổi học nào',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Nhấn "Tạo buổi học" để bắt đầu',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
+            child: StreamBuilder<List<SessionModel>>(
+              // 1. Stream này lắng nghe các buổi học của classId hiện tại
+              stream: sessionService.sessionsOfClass(widget.classId),
+              builder: (context, sessionSnap) {
+                if (sessionSnap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final sessions = sessionSnap.data ?? [];
+
+                // 2. Nếu không có session nào, hiển thị thông báo
+                if (sessions.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.event_note_outlined,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Chưa có buổi học nào',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Nhấn "Tạo buổi học" để bắt đầu',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                // 3. Nếu có session, hiển thị danh sách
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: sessions.length,
+                  itemBuilder: (context, index) {
+                    final session = sessions[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: const Icon(Icons.event_available),
+                        title: Text(session.title),
+                        subtitle: Text(
+                          'Bắt đầu: ${DateFormat.yMd().add_Hm().format(session.startTime)}',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        // THÊM HÀNH ĐỘNG onTap VÀO ĐÂY
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SessionDetailPage(
+                                sessionId: session.id, // Truyền ID của buổi học
+                                sessionTitle:
+                                    session.title, // Truyền tiêu đề để hiển thị
+                                classId: widget.classId,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],

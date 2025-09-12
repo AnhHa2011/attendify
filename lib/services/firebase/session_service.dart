@@ -42,6 +42,49 @@ class SessionService {
     return ref.id;
   }
 
+  /// Ghi nhận điểm danh cho sinh viên
+  Future<void> markAttendance({
+    required String
+    classId, // Vẫn cần classId để kiểm tra logic sau này nếu muốn
+    required String sessionId,
+    required String studentId,
+  }) async {
+    try {
+      // SỬA LỖI: Đường dẫn đúng là collection 'sessions' ở cấp cao nhất
+      final sessionRef = _db.collection('sessions').doc(sessionId);
+
+      final sessionSnap = await sessionRef.get();
+
+      if (!sessionSnap.exists) {
+        throw Exception("Buổi học không tồn tại!");
+      }
+
+      final data = sessionSnap.data() as Map<String, dynamic>;
+
+      // Kiểm tra xem điểm danh có đang mở không
+      if (data['isAttendanceOpen'] != true) {
+        throw Exception("Giảng viên chưa mở điểm danh cho buổi học này.");
+      }
+
+      // (Tùy chọn) Kiểm tra buổi học còn hiệu lực
+      if (data.containsKey('endTime')) {
+        final endTime = (data['endTime'] as Timestamp).toDate();
+        if (DateTime.now().isAfter(endTime)) {
+          throw Exception("Đã hết thời gian điểm danh!");
+        }
+      }
+
+      // Lưu điểm danh vào sub-collection 'attendances' của buổi học
+      await sessionRef.collection('attendances').doc(studentId).set({
+        'studentId': studentId,
+        'attendTime': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      // Ném lại lỗi để UI có thể bắt và hiển thị
+      rethrow;
+    }
+  }
+
   // Lấy tất cả buổi học
   Stream<List<SessionModel>> allSessions() {
     return _db
@@ -52,6 +95,74 @@ class SessionService {
           (snapshot) =>
               snapshot.docs.map((doc) => SessionModel.fromDoc(doc)).toList(),
         );
+  }
+
+  /// Lấy danh sách sinh viên đã điểm danh cho một buổi học cụ thể
+  Stream<List<Map<String, dynamic>>> getAttendanceList(String sessionId) {
+    return _db
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('attendances')
+        .orderBy(
+          'attendTime',
+          descending: false,
+        ) // Sắp xếp theo thời gian điểm danh
+        .snapshots()
+        .map((snapshot) {
+          // Lấy dữ liệu từ mỗi document điểm danh
+          return snapshot.docs.map((doc) {
+            final data = doc.data();
+            // THÊM THÔNG TIN CỦA SINH VIÊN VÀO ĐÂY (SẼ LÀM Ở BƯỚC NÂNG CẤP)
+            // Hiện tại, chúng ta chỉ lấy dữ liệu gốc
+            return data;
+          }).toList();
+        });
+  }
+
+  /// Lấy danh sách sinh viên đã điểm danh (kèm thông tin chi tiết của sinh viên)
+  Stream<List<Map<String, dynamic>>> getRichAttendanceList(String sessionId) {
+    return _db
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('attendances')
+        .orderBy('attendTime', descending: false)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          if (snapshot.docs.isEmpty) {
+            return []; // Trả về danh sách rỗng nếu chưa có ai điểm danh
+          }
+
+          // Tạo một danh sách các "công việc" cần làm: lấy thông tin user cho mỗi studentId
+          final userFutures = snapshot.docs.map((doc) async {
+            final attendanceData = doc.data();
+            final studentId = attendanceData['studentId'];
+
+            try {
+              // Lấy thông tin từ collection 'users'
+              final userDoc = await _db
+                  .collection('users')
+                  .doc(studentId)
+                  .get();
+              if (userDoc.exists) {
+                final userData = userDoc.data()!;
+                // Gộp thông tin điểm danh và thông tin user lại với nhau
+                return {
+                  ...attendanceData,
+                  'studentName': userData['displayName'],
+                  'studentEmail': userData['email'],
+                };
+              }
+            } catch (e) {
+              // Bỏ qua nếu không tìm thấy user, tránh làm crash cả stream
+              print('Error fetching user $studentId: $e');
+            }
+            // Trả về dữ liệu gốc nếu không tìm thấy user
+            return attendanceData;
+          }).toList();
+
+          // Chạy tất cả các "công việc" song song và đợi kết quả
+          return await Future.wait(userFutures);
+        });
   }
 
   // Lấy buổi học của giảng viên

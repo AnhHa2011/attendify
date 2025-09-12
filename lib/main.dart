@@ -14,6 +14,7 @@ import 'app/providers/auth_provider.dart';
 import 'firebase_options.dart';
 import 'services/firebase/class_service.dart';
 import 'services/firebase/firebase_auth_service.dart';
+import 'package:attendify/services/firebase/session_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +25,7 @@ Future<void> main() async {
       providers: [
         // Service thuần (không notify)
         Provider<FirebaseAuthService>(create: (_) => FirebaseAuthService()),
+        Provider<SessionService>(create: (_) => SessionService()),
 
         // Navigation Provider (thêm mới)
         ChangeNotifierProvider<NavigationProvider>(

@@ -39,6 +39,54 @@ class ClassService {
     return ref.id;
   }
 
+  Future<void> enrollStudent({
+    required String joinCode,
+    required String studentUid,
+    required String studentName,
+    required String studentEmail,
+  }) async {
+    // 1. Tìm lớp học có mã tham gia tương ứng
+    final classQuery = await _db
+        .collection('classes')
+        .where('joinCode', isEqualTo: joinCode.trim())
+        .limit(1)
+        .get();
+
+    if (classQuery.docs.isEmpty) {
+      throw Exception('Mã tham gia không hợp lệ hoặc lớp học không tồn tại.');
+    }
+
+    final classDoc = classQuery.docs.first;
+    final classId = classDoc.id;
+
+    // 2. Tạo một bản ghi trong collection 'enrollments'
+    // Đường dẫn: enrollments/{enrollment_id}
+    // Dùng doc().set() để tự sinh ID cho bản ghi enrollment
+    await _db.collection('enrollments').add({
+      'classId': classId,
+      'className': classDoc
+          .data()['className'], // Lưu thêm thông tin lớp để dễ truy vấn
+      'studentUid': studentUid,
+      'studentName': studentName,
+      'studentEmail': studentEmail,
+      'joinDate': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Lấy tổng số sinh viên đã tham gia một lớp học
+  Future<int> getEnrolledStudentCount(String classId) async {
+    try {
+      final snapshot = await _db
+          .collection('enrollments')
+          .where('classId', isEqualTo: classId)
+          .get();
+      return snapshot.docs.length;
+    } catch (e) {
+      print('Error getting student count: $e');
+      return 0;
+    }
+  }
+
   // === Streams cho Admin/Lecturer/Student ===
   Stream<List<ClassModel>> allClasses() {
     return _db
