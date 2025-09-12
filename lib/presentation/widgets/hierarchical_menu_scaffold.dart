@@ -14,6 +14,7 @@ import '../../data/models/session_model.dart';
 import '../../services/firebase/session_service.dart';
 import '../pages/sessions/session_detail_page.dart';
 import '../pages/admin/course_management_page.dart';
+import '../pages/classes/class_detail_page.dart';
 
 class HierarchicalMenuScaffold extends StatelessWidget {
   const HierarchicalMenuScaffold({super.key});
@@ -615,10 +616,17 @@ class _AdminClassListState extends State<_AdminClassList> {
                       trailing: const Icon(Icons.chevron_right),
                       isThreeLine: true,
                       onTap: () {
-                        navProvider.navigateToClassContext(
-                          classId: classItem.id,
-                          className:
-                              '${classItem.courseCode} - ${classItem.courseName}',
+                        // navProvider.navigateToClassContext(
+                        //   classId: classItem.id,
+                        //   className:
+                        //       '${classItem.courseCode} - ${classItem.courseName}',
+                        // );
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ClassDetailPage(classId: classItem.id),
+                          ),
                         );
                       },
                     ),
@@ -685,10 +693,16 @@ class _LecturerClassList extends StatelessWidget {
                 subtitle: Text('Học kỳ: ${classItem.semester}'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
-                  navProvider.navigateToClassContext(
-                    classId: classItem.id,
-                    className:
-                        '${classItem.courseCode} - ${classItem.courseName}',
+                  // navProvider.navigateToClassContext(
+                  //   classId: classItem.id,
+                  //   className:
+                  //       '${classItem.courseCode} - ${classItem.courseName}',
+                  // );
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ClassDetailPage(classId: classItem.id),
+                    ),
                   );
                 },
               ),

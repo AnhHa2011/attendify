@@ -5,10 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
 
-// Import các model và service cần thiết
 import '../../../data/models/class_model.dart';
 import '../../../data/models/session_model.dart';
-import '../../../data/models/user_model.dart'; // <-- QUAN TRỌNG: Cần để so sánh UserRole
+import '../../../data/models/user_model.dart';
 import '../../../services/firebase/class_service.dart';
 import '../../../services/firebase/session_service.dart';
 import '../../../app/providers/auth_provider.dart';
@@ -25,44 +24,87 @@ class ClassDetailPage extends StatefulWidget {
 class _ClassDetailPageState extends State<ClassDetailPage> {
   bool _isCreatingSession = false;
 
-  // Hàm tạo buổi học không thay đổi
+  // Hàm tạo buổi học & QR
   Future<void> _startNewAttendanceSession() async {
-    // ... (Giữ nguyên toàn bộ code của hàm này)
+    setState(() => _isCreatingSession = true);
+    try {
+      final sessionService = context.read<SessionService>();
+
+      final String sessionId = await sessionService.createSession(
+        classId: widget.classId, // Lấy trực tiếp từ widget
+        title:
+            'Buổi học ngày ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+        startTime: DateTime.now(),
+        endTime: DateTime.now().add(const Duration(minutes: 90)),
+        location: 'Tại lớp',
+        type: SessionType.lecture,
+      );
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final qrData = '${widget.classId}|$sessionId||$timestamp';
+
+      if (!mounted) return;
+      await sessionService.toggleAttendance(sessionId, true);
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Điểm danh bằng mã QR'),
+          content: SizedBox(
+            width: 250,
+            height: 250,
+            child: QrImageView(data: qrData),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('ĐÓNG'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+    } finally {
+      if (mounted) setState(() => _isCreatingSession = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final classSvc = context.read<ClassService>();
     final sessionSvc = context.read<SessionService>();
-
-    // === BƯỚC 1: LẤY VAI TRÒ NGƯỜI DÙNG ===
     final auth = context.watch<AuthProvider>();
     final isLecturer = auth.role == UserRole.lecture;
 
     return StreamBuilder<ClassModel>(
       stream: classSvc.getRichClassStream(widget.classId),
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
+      builder: (context, classSnap) {
+        if (classSnap.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        if (snap.hasError || !snap.hasData) {
+        if (classSnap.hasError || !classSnap.hasData) {
           return Scaffold(
             body: Center(
-              child: Text(snap.error?.toString() ?? 'Không tìm thấy lớp'),
+              child: Text(classSnap.error?.toString() ?? 'Không tìm thấy lớp'),
             ),
           );
         }
 
-        final c = snap.data!;
+        // Luôn có sẵn thông tin lớp đã được làm giàu
+        final classInfo = classSnap.data!;
 
         return Scaffold(
           appBar: AppBar(
-            title: Text('${c.courseCode ?? ""} - ${c.courseName ?? "..."}'),
+            title: Text(
+              '${classInfo.courseCode ?? ""} - ${classInfo.courseName ?? "..."}',
+            ),
           ),
-
-          // === BƯỚC 2: PHÂN QUYỀN CHO FLOATINGACTIONBUTTON ===
           floatingActionButton: isLecturer
               ? FloatingActionButton.extended(
                   onPressed: _isCreatingSession
@@ -70,47 +112,51 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                       : _startNewAttendanceSession,
                   label: const Text('Tạo buổi học & QR'),
                   icon: _isCreatingSession
-                      ? const CircularProgressIndicator(color: Colors.white)
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Icon(Icons.qr_code_scanner),
                 )
-              : null, // Nếu không phải giảng viên, ẩn nút này đi
-
+              : null,
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
             children: [
-              // Thẻ thông tin lớp học (hiển thị cho cả 2)
+              // --- THẺ THÔNG TIN LỚP ---
               Card(
                 child: ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.class_)),
-                  title: Text(c.courseName ?? 'Đang tải...'),
+                  title: Text(classInfo.courseName ?? 'Đang tải...'),
                   subtitle: Text(
-                    'Mã môn: ${c.courseCode ?? "..."}\nGV: ${c.lecturerName ?? "..."}\nHọc kỳ: ${c.semester}',
+                    'Mã môn: ${classInfo.courseCode ?? "..."}\nGV: ${classInfo.lecturerName ?? "..."}\nHọc kỳ: ${classInfo.semester}',
                   ),
                   isThreeLine: true,
                 ),
               ),
               const SizedBox(height: 16),
 
-              // Thẻ Mã tham gia lớp
+              // --- THẺ MÃ THAM GIA LỚP ---
               Card(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Column(
                     children: [
                       Text(
-                        'Mã tham gia lớp: ${c.joinCode}',
+                        'Mã tham gia lớp: ${classInfo.joinCode}',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
-                      QrImageView(data: c.joinCode, size: 180),
-
-                      // === BƯỚC 3: PHÂN QUYỀN CHO NÚT "TẠO MÃ MỚI" ===
+                      QrImageView(data: classInfo.joinCode, size: 180),
                       if (isLecturer)
                         TextButton.icon(
                           icon: const Icon(Icons.refresh, size: 20),
                           label: const Text('Tạo mã mới'),
                           onPressed: () async =>
-                              await classSvc.regenerateJoinCode(c.id),
+                              await classSvc.regenerateJoinCode(classInfo.id),
                         ),
                     ],
                   ),
@@ -118,10 +164,13 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
               ),
               const SizedBox(height: 24),
 
-              // Danh sách buổi học (hiển thị cho cả 2)
-              Text(
-                'Các buổi học',
-                style: Theme.of(context).textTheme.titleLarge,
+              // --- DANH SÁCH BUỔI HỌC ---
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(
+                  'Các buổi học',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
               ),
               const SizedBox(height: 8),
               StreamBuilder<List<SessionModel>>(
@@ -134,11 +183,14 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                   if (sessions.isEmpty) {
                     return const Card(
                       child: Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Text('Chưa có buổi học nào được tạo.'),
+                        padding: EdgeInsets.all(16),
+                        child: Center(
+                          child: Text('Chưa có buổi học nào được tạo.'),
+                        ),
                       ),
                     );
                   }
+
                   return ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -146,17 +198,27 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                     itemBuilder: (context, index) {
                       final session = sessions[index];
                       return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
+                        margin: const EdgeInsets.only(bottom: 6),
                         child: ListTile(
-                          leading: const Icon(Icons.event_available),
+                          leading: const Icon(Icons.event_note),
                           title: Text(session.title),
                           subtitle: Text(
-                            '${DateFormat.yMd().add_Hm().format(session.startTime)} - Trạng thái: ${session.status.name}',
+                            '${DateFormat('dd/MM/yyyy HH:mm').format(session.startTime)} - Trạng thái: ${session.status.name}',
                           ),
-                          // Bạn có thể thêm các hành động khác ở đây, ví dụ xem chi tiết điểm danh
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () {
-                            // TODO: Điều hướng đến trang chi tiết buổi học (nếu có)
+                            // SỬA LỖI ĐIỀU HƯỚNG TẠI ĐÂY
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => SessionDetailPage(
+                                  session:
+                                      session, // Truyền cả đối tượng session
+                                  classInfo:
+                                      classInfo, // Truyền đối tượng classInfo từ StreamBuilder cha
+                                ),
+                              ),
+                            );
                           },
                         ),
                       );
@@ -167,21 +229,32 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
 
               const SizedBox(height: 24),
 
-              // Danh sách Sinh viên (hiển thị cho cả 2)
-              Text(
-                'Danh sách sinh viên',
-                style: Theme.of(context).textTheme.titleLarge,
+              // --- DANH SÁCH SINH VIÊN ---
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(
+                  'Danh sách sinh viên',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
               ),
               const SizedBox(height: 8),
               FutureBuilder<List<Map<String, dynamic>>>(
-                future: classSvc.getEnrolledStudents(c.id),
+                future: classSvc.getEnrolledStudents(classInfo.id),
                 builder: (context, ms) {
                   if (ms.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
                   final members = ms.data ?? [];
-                  if (members.isEmpty)
-                    return const Text('Chưa có sinh viên tham gia');
+                  if (members.isEmpty) {
+                    return const Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(
+                          child: Text('Chưa có sinh viên nào tham gia.'),
+                        ),
+                      ),
+                    );
+                  }
 
                   return Card(
                     clipBehavior: Clip.antiAlias,
@@ -196,27 +269,17 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                           leading: const Icon(Icons.person_outline),
                           title: Text(m['displayName'] ?? 'N/A'),
                           subtitle: Text(m['email'] ?? 'N/A'),
-
-                          // === BƯỚC 4: PHÂN QUYỀN CHO NÚT XÓA SINH VIÊN ===
                           trailing: isLecturer
                               ? IconButton(
                                   icon: const Icon(
                                     Icons.delete_outline,
                                     color: Colors.red,
                                   ),
-                                  tooltip: 'Xóa sinh viên khỏi lớp',
                                   onPressed: () {
-                                    // TODO: Cần tạo hàm xóa enrollment trong ClassService
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Tính năng xóa đang phát triển',
-                                        ),
-                                      ),
-                                    );
+                                    /* TODO: Logic xóa */
                                   },
                                 )
-                              : null, // Sinh viên không thấy nút xóa
+                              : null,
                         );
                       },
                     ),
