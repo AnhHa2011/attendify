@@ -61,18 +61,86 @@ class ClassService {
     final classDoc = classQuery.docs.first;
     final classId = classDoc.id;
 
-    // 2. Tạo một bản ghi trong collection 'enrollments'
-    // Đường dẫn: enrollments/{enrollment_id}
-    // Dùng doc().set() để tự sinh ID cho bản ghi enrollment
+    final existingEnrollmentQuery = await _db
+        .collection('enrollments')
+        .where('classId', isEqualTo: classId)
+        .where('studentUid', isEqualTo: studentUid)
+        .limit(1)
+        .get();
+
+    // Nếu đã tìm thấy bản ghi enrollment, nghĩa là sinh viên đã ở trong lớp
+    if (existingEnrollmentQuery.docs.isNotEmpty) {
+      throw Exception('Bạn đã tham gia lớp học này rồi.');
+    }
+    // =================================================================
+
+    // 2. Nếu chưa tham gia, tạo một bản ghi mới trong collection 'enrollments'
     await _db.collection('enrollments').add({
       'classId': classId,
-      'className': classDoc
-          .data()['className'], // Lưu thêm thông tin lớp để dễ truy vấn
+      'className': classDoc.data()['className'],
       'studentUid': studentUid,
       'studentName': studentName,
       'studentEmail': studentEmail,
       'joinDate': FieldValue.serverTimestamp(),
     });
+  }
+  // // Lấy danh sách chi tiết các sinh viên đã tham gia lớp
+  // Future<List<Map<String, dynamic>>> getEnrolledStudents(String classId) async {
+  //   final enrollmentSnap = await _db
+  //       .collection('enrollments')
+  //       .where('classId', isEqualTo: classId)
+  //       .get();
+  //   if (enrollmentSnap.docs.isEmpty) return [];
+
+  //   final userFutures = enrollmentSnap.docs.map((doc) async {
+  //     final studentId = doc.data()['studentUid'];
+  //     final userDoc = await _db.collection('users').doc(studentId).get();
+  //     return userDoc.exists ? userDoc.data()! : null;
+  //   }).toList();
+
+  //   final users = await Future.wait(userFutures);
+  //   return users
+  //       .where((user) => user != null)
+  //       .cast<Map<String, dynamic>>()
+  //       .toList();
+  // }
+
+  /// Lấy danh sách sinh viên đã tham gia lớp, bao gồm cả ID của bản ghi enrollment
+  Future<List<Map<String, dynamic>>> getEnrolledStudents(String classId) async {
+    final List<Map<String, dynamic>> students = [];
+    try {
+      // 1. Lấy tất cả các bản ghi enrollment của lớp học
+      final enrollmentsQuery = await _db
+          .collection('enrollments')
+          .where('classId', isEqualTo: classId)
+          .get();
+
+      for (final doc in enrollmentsQuery.docs) {
+        final data = doc.data();
+        // 2. Thêm thông tin sinh viên VÀ ID của enrollment vào danh sách
+        students.add({
+          // QUAN TRỌNG: Thêm dòng này để lấy ID cho việc xoá
+          'enrollmentId': doc.id,
+          'displayName': data['studentName'],
+          'email': data['studentEmail'],
+          'uid': data['studentUid'], // Có thể cần dùng sau này
+        });
+      }
+    } catch (e) {
+      print('Error getting enrolled students: $e');
+      // Trả về danh sách rỗng nếu có lỗi
+    }
+    return students;
+  }
+
+  /// Xoá một sinh viên khỏi lớp học dựa trên ID của bản ghi enrollment
+  Future<void> removeStudentFromClass(String enrollmentId) async {
+    try {
+      await _db.collection('enrollments').doc(enrollmentId).delete();
+    } catch (e) {
+      // Ném ra lỗi để UI có thể bắt và hiển thị thông báo
+      throw Exception('Đã xảy ra lỗi khi xoá sinh viên: $e');
+    }
   }
 
   /// Lấy tổng số sinh viên đã tham gia một lớp học
@@ -164,27 +232,6 @@ class ClassService {
           }).toList();
           return await Future.wait(richClassFutures);
         });
-  }
-
-  // Lấy danh sách chi tiết các sinh viên đã tham gia lớp
-  Future<List<Map<String, dynamic>>> getEnrolledStudents(String classId) async {
-    final enrollmentSnap = await _db
-        .collection('enrollments')
-        .where('classId', isEqualTo: classId)
-        .get();
-    if (enrollmentSnap.docs.isEmpty) return [];
-
-    final userFutures = enrollmentSnap.docs.map((doc) async {
-      final studentId = doc.data()['studentUid'];
-      final userDoc = await _db.collection('users').doc(studentId).get();
-      return userDoc.exists ? userDoc.data()! : null;
-    }).toList();
-
-    final users = await Future.wait(userFutures);
-    return users
-        .where((user) => user != null)
-        .cast<Map<String, dynamic>>()
-        .toList();
   }
 
   /// Lấy danh sách các lớp học đã "làm giàu" mà MỘT sinh viên đã tham gia

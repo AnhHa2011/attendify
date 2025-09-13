@@ -265,18 +265,112 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                       separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (context, i) {
                         final m = members[i];
+                        // Lấy ra các thông tin cần thiết từ map
+                        final studentName = m['displayName'] ?? 'N/A';
+                        final studentEmail = m['email'] ?? 'N/A';
+                        final enrollmentId =
+                            m['enrollmentId']; // ID để thực hiện việc xoá
+
                         return ListTile(
                           leading: const Icon(Icons.person_outline),
-                          title: Text(m['displayName'] ?? 'N/A'),
-                          subtitle: Text(m['email'] ?? 'N/A'),
+                          title: Text(studentName),
+                          subtitle: Text(studentEmail),
                           trailing: isLecturer
                               ? IconButton(
                                   icon: const Icon(
                                     Icons.delete_outline,
                                     color: Colors.red,
                                   ),
-                                  onPressed: () {
-                                    /* TODO: Logic xóa */
+                                  onPressed: () async {
+                                    // --- BẮT ĐẦU LOGIC XOÁ MỚI ---
+
+                                    // B1: Kiểm tra xem enrollmentId có tồn tại không
+                                    if (enrollmentId == null) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Không tìm thấy thông tin để xoá.',
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    // B2: Hiển thị hộp thoại xác nhận
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return AlertDialog(
+                                          title: const Text('Xác nhận xoá'),
+                                          content: Text(
+                                            'Bạn có chắc chắn muốn xoá sinh viên "$studentName" khỏi lớp học không?',
+                                          ),
+                                          actions: <Widget>[
+                                            TextButton(
+                                              onPressed: () => Navigator.of(
+                                                context,
+                                              ).pop(false),
+                                              child: const Text('HUỶ'),
+                                            ),
+                                            TextButton(
+                                              onPressed: () => Navigator.of(
+                                                context,
+                                              ).pop(true),
+                                              child: const Text(
+                                                'XOÁ',
+                                                style: TextStyle(
+                                                  color: Colors.red,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+
+                                    // B3: Nếu người dùng xác nhận, tiến hành xoá
+                                    if (confirm == true) {
+                                      try {
+                                        // Gọi hàm từ service
+                                        await context
+                                            .read<ClassService>()
+                                            .removeStudentFromClass(
+                                              enrollmentId,
+                                            );
+
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Đã xoá sinh viên "$studentName".',
+                                            ),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                        // Cập nhật lại UI để danh sách làm mới
+                                        setState(() {});
+                                      } catch (e) {
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              e.toString().replaceFirst(
+                                                "Exception: ",
+                                                "",
+                                              ),
+                                            ),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                    // --- KẾT THÚC LOGIC XOÁ MỚI ---
                                   },
                                 )
                               : null,
