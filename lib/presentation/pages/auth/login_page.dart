@@ -91,6 +91,7 @@ class _LoginPageState extends State<LoginPage> {
                         AutofillHints.email,
                       ],
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
                         labelText: 'Email',
                         prefixIcon: Icon(Icons.email_outlined),
@@ -111,6 +112,12 @@ class _LoginPageState extends State<LoginPage> {
                       controller: _passCtrl,
                       autofillHints: const [AutofillHints.password],
                       obscureText: _obscure,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) {
+                        if (!isBusy) {
+                          _signInEmail();
+                        }
+                      },
                       decoration: InputDecoration(
                         labelText: 'Mật khẩu',
                         prefixIcon: const Icon(Icons.lock_outline),
