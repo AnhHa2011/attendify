@@ -1,6 +1,10 @@
+// lib/presentation/pages/admin/admin_class_list_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../app/providers/admin_class_provider.dart';
+
+// THÊM CÁC IMPORT MỚI CẦN THIẾT
+import '../../../services/firebase/class_service.dart';
 import '../../../data/models/class_model.dart';
 import '../classes/class_detail_page.dart';
 
@@ -16,22 +20,28 @@ class _AdminClassListPageState extends State<AdminClassListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final prov = context.watch<AdminClassProvider>();
+    // === THAY ĐỔI 1: SỬ DỤNG SERVICE TRỰC TIẾP ===
+    // Không dùng AdminClassProvider nữa
+    final classService = context.read<ClassService>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Tất cả lớp học')),
+      appBar: AppBar(title: const Text('Quản lý Lớp học')),
       body: Column(
         children: [
           // Filter theo giảng viên
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(16.0),
             child: StreamBuilder<List<Map<String, String>>>(
-              stream: prov.lecturers(),
+              // Gọi hàm từ service
+              stream: classService.lecturersStream(),
               builder: (context, snap) {
                 final list = snap.data ?? [];
                 return DropdownButtonFormField<String>(
                   value: _selectedLecturerUid,
                   hint: const Text('Lọc theo giảng viên'),
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                  ),
                   items: [
                     const DropdownMenuItem<String>(
                       value: null,
@@ -51,32 +61,56 @@ class _AdminClassListPageState extends State<AdminClassListPage> {
           ),
           Expanded(
             child: StreamBuilder<List<ClassModel>>(
+              // === THAY ĐỔI 2: GỌI CÁC HÀM STREAM "LÀM GIÀU" DỮ LIỆU ===
               stream: _selectedLecturerUid == null
-                  ? prov.allClasses()
-                  : prov.classesOfLecturer(_selectedLecturerUid!),
+                  ? classService.getRichClassesStream()
+                  : classService.getRichClassesStreamForLecturer(
+                      _selectedLecturerUid!,
+                    ),
               builder: (context, snap) {
                 if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
+                if (snap.hasError) {
+                  return Center(child: Text('Đã xảy ra lỗi: ${snap.error}'));
+                }
                 final items = snap.data ?? [];
-                if (items.isEmpty)
-                  return const Center(child: Text('Không có lớp nào'));
-                return ListView.separated(
+                if (items.isEmpty) {
+                  return const Center(child: Text('Không có lớp học nào.'));
+                }
+
+                return ListView.builder(
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, i) {
                     final c = items[i];
-                    return ListTile(
-                      title: Text('${c.classCode} • ${c.className}'),
-                      subtitle: Text(
-                        'GV: ${c.lecturerName} — Mã: ${c.joinCode}',
+
+                    // === THAY ĐỔI 3: HIỂN THỊ CÁC TRƯỜNG DỮ LIỆU MỚI ===
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
                       ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ClassDetailPage(classId: c.id),
+                      child: ListTile(
+                        title: Text(
+                          '${c.courseCode ?? "N/A"} • ${c.courseName ?? "..."}',
                         ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('GV: ${c.lecturerName ?? "..."}'),
+                            Text('Học kỳ: ${c.semester}'),
+                          ],
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          // Điều hướng không thay đổi
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ClassDetailPage(classId: c.id),
+                            ),
+                          );
+                        },
                       ),
                     );
                   },

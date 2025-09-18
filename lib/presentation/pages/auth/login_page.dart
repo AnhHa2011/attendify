@@ -147,31 +147,31 @@ class _LoginPageState extends State<LoginPage> {
                         child: const Text('Quên mật khẩu?'),
                       ),
                     ),
-                    const Divider(height: 32),
-                    OutlinedButton.icon(
-                      onPressed: isBusy ? null : _signInGoogle,
-                      icon: Image.asset(
-                        'assets/icons/google_logo.png',
-                        width: 24,
-                        height: 24,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.g_mobiledata),
-                      ),
-                      label: const Text('Đăng nhập/đăng ký với Google'),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('Chưa có tài khoản?'),
-                        TextButton(
-                          onPressed: isBusy
-                              ? null
-                              : () => context.go('/register'),
-                          child: const Text('Đăng ký'),
-                        ),
-                      ],
-                    ),
+                    // const Divider(height: 32),
+                    // OutlinedButton.icon(
+                    //   onPressed: isBusy ? null : _signInGoogle,
+                    //   icon: Image.asset(
+                    //     'assets/icons/google_logo.png',
+                    //     width: 24,
+                    //     height: 24,
+                    //     errorBuilder: (_, __, ___) =>
+                    //         const Icon(Icons.g_mobiledata),
+                    //   ),
+                    //   label: const Text('Đăng nhập/đăng ký với Google'),
+                    // ),
+                    // const SizedBox(height: 12),
+                    // Row(
+                    //   mainAxisAlignment: MainAxisAlignment.center,
+                    //   children: [
+                    //     const Text('Chưa có tài khoản?'),
+                    //     TextButton(
+                    //       onPressed: isBusy
+                    //           ? null
+                    //           : () => context.go('/register'),
+                    //       child: const Text('Đăng ký'),
+                    //     ),
+                    //   ],
+                    // ),
                   ],
                 ),
               ),

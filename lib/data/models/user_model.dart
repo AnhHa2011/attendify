@@ -1,22 +1,15 @@
 // lib/data/models/user_model.dart
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 /// Các role trong hệ thống
 enum UserRole { admin, lecture, student, unknown }
 
+// === KHÔI PHỤC LẠI EXTENSION ĐỂ TƯƠNG THÍCH VỚI CODE CŨ ===
 extension UserRoleX on UserRole {
   /// Key chuẩn để lưu Firestore
   String toKey() {
-    switch (this) {
-      case UserRole.admin:
-        return 'admin';
-      case UserRole.lecture:
-        return 'lecture';
-      case UserRole.student:
-        return 'student';
-      case UserRole.unknown:
-      default:
-        return 'unknown';
-    }
+    return name; // Dùng .name cho ngắn gọn và an toàn
   }
 
   /// Parse từ string Firestore → enum
@@ -35,34 +28,39 @@ extension UserRoleX on UserRole {
 }
 
 /// Model đại diện cho User trong app
-class AppUser {
+class UserModel {
   final String uid;
   final String email;
   final String displayName;
   final UserRole role;
 
-  AppUser({
+  UserModel({
     required this.uid,
     required this.email,
     required this.displayName,
     required this.role,
   });
 
-  Map<String, dynamic> toMap() {
-    return {
-      'uid': uid,
-      'email': email,
-      'displayName': displayName,
-      'role': role.toKey(),
-    };
+  /// Hàm factory để tạo UserModel từ DocumentSnapshot của Firestore
+  factory UserModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+
+    return UserModel(
+      uid: doc.id,
+      email: (data['email'] ?? '') as String,
+      displayName: (data['displayName'] ?? '') as String,
+      // Vẫn sử dụng hàm fromKey để parse role
+      role: UserRoleX.fromKey(data['role'] as String?),
+    );
   }
 
-  factory AppUser.fromMap(Map<String, dynamic> map) {
-    return AppUser(
-      uid: (map['uid'] ?? '') as String,
-      email: (map['email'] ?? '') as String,
-      displayName: (map['displayName'] ?? '') as String,
-      role: UserRoleX.fromKey(map['role'] as String?),
-    );
+  /// Hàm để chuyển đổi UserModel thành Map để ghi vào Firestore
+  Map<String, dynamic> toMap() {
+    return {
+      'email': email,
+      'displayName': displayName,
+      // Vẫn sử dụng hàm toKey để lưu role
+      'role': role.toKey(),
+    };
   }
 }

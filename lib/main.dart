@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 
 import 'app.dart';
 import 'app/providers/admin_class_provider.dart';
-import 'app/providers/class_provider.dart';
 import 'app/providers/lecturer_class_provider.dart';
 import 'app/providers/student_class_provider.dart';
 import 'app/providers/navigation_provider.dart'; // Thêm navigation provider
@@ -14,16 +13,22 @@ import 'app/providers/auth_provider.dart';
 import 'firebase_options.dart';
 import 'services/firebase/class_service.dart';
 import 'services/firebase/firebase_auth_service.dart';
+import 'package:attendify/services/firebase/session_service.dart';
+import 'package:attendify/services/firebase/admin_service.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Khởi tạo dữ liệu định dạng ngày tháng cho ngôn ngữ Tiếng Việt
+  await initializeDateFormatting('vi_VN', null);
 
   runApp(
     MultiProvider(
       providers: [
         // Service thuần (không notify)
         Provider<FirebaseAuthService>(create: (_) => FirebaseAuthService()),
+        Provider<SessionService>(create: (_) => SessionService()),
 
         // Navigation Provider (thêm mới)
         ChangeNotifierProvider<NavigationProvider>(
@@ -38,6 +43,7 @@ Future<void> main() async {
 
         // services
         Provider<ClassService>(create: (_) => ClassService()),
+        Provider<AdminService>(create: (_) => AdminService()),
 
         // providers theo role
         ChangeNotifierProvider(

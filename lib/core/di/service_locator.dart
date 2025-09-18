@@ -6,7 +6,6 @@ import '../../app/providers/navigation_provider.dart';
 import '../../app/providers/admin_class_provider.dart';
 import '../../app/providers/lecturer_class_provider.dart';
 import '../../app/providers/student_class_provider.dart';
-import '../../app/providers/class_provider.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -18,7 +17,6 @@ Future<void> setupServiceLocator() async {
   // Providers - Factory (để có thể dispose)
   sl.registerFactory<NavigationProvider>(() => NavigationProvider());
   sl.registerFactory<AuthProvider>(() => AuthProvider(sl()));
-  sl.registerFactory<ClassProvider>(() => ClassProvider(sl()));
   sl.registerFactory<AdminClassProvider>(() => AdminClassProvider(sl()));
   sl.registerFactory<LecturerClassProvider>(() => LecturerClassProvider(sl()));
   sl.registerFactory<StudentClassProvider>(() => StudentClassProvider(sl()));
