@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart';
 import 'package:provider/provider.dart';
-import '../../../services/firebase/admin_service.dart';
-import '../../../services/firebase/auth_rest_service.dart';
+import '../../../services/firebase/admin/admin_service.dart';
+import '../../../services/firebase/auth/auth_rest_service.dart';
 
 const _expectedHeaders = ['email', 'displayName', 'role', 'password'];
 

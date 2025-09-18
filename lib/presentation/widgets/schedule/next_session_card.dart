@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../data/models/session_model.dart';
-import '../../../services/firebase/session_service.dart';
+import '../../../services/firebase/sessions/session_service.dart';
 import 'weekly_schedule_widget.dart';
 
 class NextSessionCard extends StatelessWidget {

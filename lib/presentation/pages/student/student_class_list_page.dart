@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 // THÊM CÁC IMPORT MỚI CẦN THIẾT
 import '../../../app/providers/auth_provider.dart';
-import '../../../services/firebase/class_service.dart';
+import '../../../services/firebase/classes/class_service.dart';
 
 import '../../../data/models/class_model.dart';
 import '../classes/class_detail_page.dart';

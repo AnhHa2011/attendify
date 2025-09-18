@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../data/models/session_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../../app/providers/auth_provider.dart';
-import '../../../services/firebase/session_service.dart';
+import '../../../services/firebase/sessions/session_service.dart';
 
 class SessionDetailBottomSheet extends StatefulWidget {
   final SessionModel session;

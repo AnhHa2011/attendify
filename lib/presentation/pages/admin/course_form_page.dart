@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../data/models/course_model.dart';
-import '../../../services/firebase/admin_service.dart';
+import '../../../services/firebase/admin/admin_service.dart';
 
 class CourseFormPage extends StatefulWidget {
   final CourseModel? course;

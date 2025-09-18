@@ -1,8 +1,8 @@
 // lib/services/firebase/admin_service.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../data/models/course_model.dart';
-import '../../data/models/user_model.dart';
+import '../../../data/models/course_model.dart';
+import '../../../data/models/user_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AdminService {

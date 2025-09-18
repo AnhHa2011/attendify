@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/models/user_model.dart';
-import '../../services/firebase/firebase_auth_service.dart';
+import '../../services/firebase/auth/firebase_auth_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuthService _auth;

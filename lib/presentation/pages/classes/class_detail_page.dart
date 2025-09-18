@@ -8,8 +8,8 @@ import 'package:intl/intl.dart';
 import '../../../data/models/class_model.dart';
 import '../../../data/models/session_model.dart';
 import '../../../data/models/user_model.dart';
-import '../../../services/firebase/class_service.dart';
-import '../../../services/firebase/session_service.dart';
+import '../../../services/firebase/classes/class_service.dart';
+import '../../../services/firebase/sessions/session_service.dart';
 import '../../../app/providers/auth_provider.dart';
 import '../sessions/session_detail_page.dart';
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../data/models/session_model.dart';
-import '../../../services/firebase/session_service.dart';
+import '../../../services/firebase/sessions/session_service.dart';
 
 class WeeklyScheduleWidget extends StatelessWidget {
   final String userId;

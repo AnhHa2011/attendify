@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../../services/firebase/account_service.dart';
+import '../../../services/firebase/auth/account_service.dart';
 
 class MyAccountPage extends StatefulWidget {
   const MyAccountPage({super.key});

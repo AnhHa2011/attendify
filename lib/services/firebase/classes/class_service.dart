@@ -1,8 +1,8 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../data/models/class_model.dart';
-import '../../data/models/course_model.dart';
-import '../../data/models/user_model.dart';
+import '../../../data/models/class_model.dart';
+import '../../../data/models/course_model.dart';
+import '../../../data/models/user_model.dart';
 
 class ClassService {
   final _db = FirebaseFirestore.instance;

@@ -7,8 +7,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../data/models/class_model.dart';
 import '../../../data/models/session_model.dart';
-import '../../../services/firebase/class_service.dart';
-import '../../../services/firebase/session_service.dart';
+import '../../../services/firebase/classes/class_service.dart';
+import '../../../services/firebase/sessions/session_service.dart';
 
 class SessionDetailPage extends StatefulWidget {
   final SessionModel session;

@@ -4,13 +4,13 @@ import '../../app/providers/navigation_provider.dart';
 import '../../app/providers/auth_provider.dart';
 import '../../data/models/class_model.dart';
 import '../../data/models/user_model.dart';
-import '../../services/firebase/class_service.dart';
+import '../../services/firebase/classes/class_service.dart';
 import '../pages/classes/create_class_page.dart';
 
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/session_model.dart';
-import '../../services/firebase/session_service.dart';
+import '../../services/firebase/sessions/session_service.dart';
 import '../pages/common/edit_account_page.dart';
 import '../pages/sessions/session_detail_page.dart';
 import '../pages/admin/course_management_page.dart';

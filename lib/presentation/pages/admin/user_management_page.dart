@@ -1,5 +1,7 @@
+import 'package:attendify/presentation/pages/auth/reset_password_page.dart';
+import 'package:attendify/presentation/pages/common/edit_account_page.dart';
 import 'package:flutter/material.dart';
-import '../../../services/firebase/admin_service.dart';
+import '../../../services/firebase/admin/admin_service.dart';
 import '../../../data/models/user_model.dart';
 import 'user_bulk_import_page.dart';
 import 'user_form_page.dart';
@@ -118,22 +120,26 @@ class _UserManagementPageState extends State<UserManagementPage>
               subtitle: Text('${user.email} • ${user.role.name}'),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
+                spacing: 4,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: () {
-                      Navigator.of(
-                        context,
-                      ).pushNamed('/edit-user', arguments: user);
-                    },
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: 'Sửa',
+                    onPressed: () => _editUser(context, user),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.vpn_key),
-                    onPressed: () {
-                      Navigator.of(
-                        context,
-                      ).pushNamed('/reset-password', arguments: user);
-                    },
+                    icon: const Icon(Icons.vpn_key_outlined),
+                    tooltip: 'Gửi email đặt lại mật khẩu (Admin)',
+                    onPressed: () => _resetPasswordAsAdmin(
+                      context,
+                      adminService,
+                      user.email ?? '',
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    tooltip: 'Xoá',
+                    onPressed: () => _deleteUser(context, adminService, user),
                   ),
                 ],
               ),
@@ -142,5 +148,94 @@ class _UserManagementPageState extends State<UserManagementPage>
         );
       },
     );
+  }
+
+  void _editUser(BuildContext context, UserModel user) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => UserFormPage(user: user)));
+  }
+
+  Future<void> _deleteUser(
+    BuildContext context,
+    AdminService adminService,
+    UserModel user,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Xoá người dùng'),
+        content: Text('Bạn có chắc muốn xoá tài khoản "${user.email}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Huỷ'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Xoá'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final uid = user.uid ?? '';
+      if (uid.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không xác định được UID người dùng')),
+        );
+        return;
+      }
+      await adminService.deleteUser(uid);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Đã xoá tài khoản')));
+    }
+  }
+
+  Future<void> _resetPasswordAsAdmin(
+    BuildContext context,
+    AdminService adminService,
+    String email,
+  ) async {
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tài khoản này chưa có email hợp lệ')),
+      );
+      return;
+    }
+
+    // xác nhận trước khi gửi
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Gửi email đặt lại mật khẩu'),
+        content: Text('Bạn muốn gửi email đặt lại mật khẩu tới: $email ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Huỷ'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Gửi'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await adminService.sendPasswordResetForUserAsAdmin(email);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Đã gửi email đặt lại mật khẩu tới $email')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 }

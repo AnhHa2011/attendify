@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../../services/firebase/firebase_auth_service.dart';
+import '../../../services/firebase/auth/firebase_auth_service.dart';
 import '../../utils/auth_error.dart';
 
 class ResetPasswordPage extends StatefulWidget {

@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../../../services/firebase/account_service.dart';
+import '../../../services/firebase/auth/account_service.dart';
 
 class EditAccountPage extends StatefulWidget {
   final String currentName;

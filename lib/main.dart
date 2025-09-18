@@ -11,10 +11,10 @@ import 'app/providers/navigation_provider.dart'; // Thêm navigation provider
 import 'core/config/firebase_config.dart';
 import 'app/providers/auth_provider.dart';
 import 'firebase_options.dart';
-import 'services/firebase/class_service.dart';
-import 'services/firebase/firebase_auth_service.dart';
-import 'package:attendify/services/firebase/session_service.dart';
-import 'package:attendify/services/firebase/admin_service.dart';
+import 'services/firebase/classes/class_service.dart';
+import 'services/firebase/auth/firebase_auth_service.dart';
+import 'package:attendify/services/firebase/sessions/session_service.dart';
+import 'package:attendify/services/firebase/admin/admin_service.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {

@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 // Import các file cần thiết
 import '../../../app/providers/auth_provider.dart';
-import '../../../services/firebase/class_service.dart';
+import '../../../services/firebase/classes/class_service.dart';
 import '../../widgets/role_drawer_scaffold.dart';
 import 'qr_scanner_page.dart';
 import 'join_class_scanner_page.dart';

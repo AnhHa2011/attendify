@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/models/class_model.dart';
-import '../../services/firebase/class_service.dart';
+import '../../services/firebase/classes/class_service.dart';
 
 class AdminClassProvider extends ChangeNotifier {
   final ClassService _svc;

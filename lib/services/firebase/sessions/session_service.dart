@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../data/models/session_model.dart';
+import '../../../data/models/session_model.dart';
 
 class SessionService {
   final _db = FirebaseFirestore.instance;

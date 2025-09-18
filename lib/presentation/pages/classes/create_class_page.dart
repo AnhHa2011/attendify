@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../data/models/class_model.dart';
 import '../../../data/models/course_model.dart'; // Import model mới
-import '../../../services/firebase/class_service.dart';
+import '../../../services/firebase/classes/class_service.dart';
 import 'class_detail_page.dart';
 
 class CreateClassPage extends StatefulWidget {
