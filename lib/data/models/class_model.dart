@@ -23,16 +23,16 @@ class ClassSchedule {
 class ClassModel {
   // === Dữ liệu gốc, lưu trên Firestore ===
   final String id;
-  final String courseId; // THAY ĐỔI: Tham chiếu tới collection 'courses'
-  final String lecturerId; // THAY ĐỔI: Tham chiếu tới collection 'users'
-  final String semester; // THÊM MỚI
-  final List<ClassSchedule> schedules;
-  final int maxAbsences;
+  final String courseId;
+  final String lecturerId;
+  final String semester;
+  final String?
+  className; // <-- THÊM MỚI (Rất hữu ích để phân biệt lớp, ví dụ L01, L02)
   final String joinCode;
   final DateTime createdAt;
+  final bool isArchived; // <-- THÊM MỚI ĐỂ LƯU TRỮ
 
-  // === Dữ liệu "làm giàu", không lưu trên Firestore, chỉ dùng ở UI ===
-  // Được gán sau khi truy vấn từ các collection khác
+  // === Dữ liệu "làm giàu" ===
   final String? courseName;
   final String? courseCode;
   final String? lecturerName;
@@ -42,17 +42,15 @@ class ClassModel {
     required this.courseId,
     required this.lecturerId,
     required this.semester,
-    required this.schedules,
-    required this.maxAbsences,
+    this.className, // <-- THÊM MỚI
     required this.joinCode,
     required this.createdAt,
-    // Các trường "làm giàu" là tùy chọn
+    required this.isArchived, // <-- THÊM MỚI
     this.courseName,
     this.courseCode,
     this.lecturerName,
   });
 
-  // Tạo một bản sao của đối tượng với các giá trị được cập nhật
   ClassModel copyWith({
     String? courseName,
     String? courseCode,
@@ -63,40 +61,27 @@ class ClassModel {
       courseId: courseId,
       lecturerId: lecturerId,
       semester: semester,
-      schedules: schedules,
-      maxAbsences: maxAbsences,
+      className: className,
       joinCode: joinCode,
       createdAt: createdAt,
+      isArchived: isArchived,
       courseName: courseName ?? this.courseName,
       courseCode: courseCode ?? this.courseCode,
       lecturerName: lecturerName ?? this.lecturerName,
     );
   }
 
-  // toMap chỉ chứa các trường dữ liệu gốc để ghi lên Firestore
-  Map<String, dynamic> toMap() => {
-    'courseId': courseId,
-    'lecturerId': lecturerId,
-    'semester': semester,
-    'schedules': schedules.map((e) => e.toMap()).toList(),
-    'maxAbsences': maxAbsences,
-    'joinCode': joinCode,
-    'createdAt': Timestamp.fromDate(createdAt),
-  };
-
-  factory ClassModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final d = doc.data()!;
+  factory ClassModel.fromDoc(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
     return ClassModel(
       id: doc.id,
-      courseId: (d['courseId'] ?? '') as String,
-      lecturerId: (d['lecturerId'] ?? '') as String,
-      semester: (d['semester'] ?? '') as String,
-      schedules: (d['schedules'] as List? ?? const [])
-          .map((e) => ClassSchedule.fromMap(Map<String, dynamic>.from(e)))
-          .toList(),
-      maxAbsences: (d['maxAbsences'] ?? 0) as int,
-      joinCode: (d['joinCode'] ?? '') as String,
+      courseId: d['courseId'] ?? '',
+      lecturerId: d['lecturerId'] ?? '',
+      semester: d['semester'] ?? '',
+      className: d['className'], // có thể null
+      joinCode: d['joinCode'] ?? '',
       createdAt: ((d['createdAt'] as Timestamp?) ?? Timestamp.now()).toDate(),
+      isArchived: d['isArchived'] ?? false, // Mặc định là false nếu không có
     );
   }
 }

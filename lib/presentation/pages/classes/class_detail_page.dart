@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
 
+// Thay thế bằng các đường dẫn đúng trong dự án của bạn
 import '../../../data/models/class_model.dart';
 import '../../../data/models/session_model.dart';
 import '../../../data/models/user_model.dart';
@@ -22,54 +23,91 @@ class ClassDetailPage extends StatefulWidget {
 }
 
 class _ClassDetailPageState extends State<ClassDetailPage> {
-  bool _isCreatingSession = false;
+  bool _isStartingSession = false;
 
-  // Hàm tạo buổi học & QR
-  Future<void> _startNewAttendanceSession() async {
-    setState(() => _isCreatingSession = true);
+  // Hàm logic để Giảng viên chọn và kích hoạt buổi học
+  Future<void> _showSessionSelectorAndStartAttendance() async {
+    setState(() => _isStartingSession = true);
+    final sessionService = context.read<SessionService>();
+
     try {
-      final sessionService = context.read<SessionService>();
-
-      final String sessionId = await sessionService.createSession(
-        classId: widget.classId, // Lấy trực tiếp từ widget
-        title:
-            'Buổi học ngày ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
-        startTime: DateTime.now(),
-        endTime: DateTime.now().add(const Duration(minutes: 90)),
-        location: 'Tại lớp',
-        type: SessionType.lecture,
-      );
-
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final qrData = '${widget.classId}|$sessionId||$timestamp';
-
+      final scheduledSessions = await sessionService
+          .getScheduledSessionsForClass(widget.classId)
+          .first;
       if (!mounted) return;
-      await sessionService.toggleAttendance(sessionId, true);
 
-      showDialog(
+      if (scheduledSessions.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Không có buổi học nào được lên lịch hoặc tất cả đã diễn ra.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final SessionModel? selectedSession = await showDialog<SessionModel>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Điểm danh bằng mã QR'),
+        builder: (ctx) => AlertDialog(
+          title: const Text('Chọn buổi học để điểm danh'),
           content: SizedBox(
-            width: 250,
-            height: 250,
-            child: QrImageView(data: qrData),
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: scheduledSessions.length,
+              itemBuilder: (context, index) {
+                final session = scheduledSessions[index];
+                return ListTile(
+                  title: Text(session.title),
+                  subtitle: Text(
+                    'Lịch học: ${DateFormat('dd/MM/yyyy HH:mm').format(session.startTime)}',
+                  ),
+                  onTap: () => Navigator.of(ctx).pop(session),
+                );
+              },
+            ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('ĐÓNG'),
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Huỷ'),
             ),
           ],
         ),
       );
+
+      if (selectedSession != null) {
+        await sessionService.startAttendanceForSession(selectedSession.id);
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final qrData = '${widget.classId}|${selectedSession.id}||$timestamp';
+
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Điểm danh cho: ${selectedSession.title}'),
+            content: SizedBox(
+              width: 250,
+              height: 250,
+              child: QrImageView(data: qrData),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('ĐÓNG'),
+              ),
+            ],
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
     } finally {
-      if (mounted) setState(() => _isCreatingSession = false);
+      if (mounted) setState(() => _isStartingSession = false);
     }
   }
 
@@ -96,7 +134,6 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
           );
         }
 
-        // Luôn có sẵn thông tin lớp đã được làm giàu
         final classInfo = classSnap.data!;
 
         return Scaffold(
@@ -107,11 +144,12 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
           ),
           floatingActionButton: isLecturer
               ? FloatingActionButton.extended(
-                  onPressed: _isCreatingSession
+                  heroTag: 'fab_lecturer_class_detail',
+                  onPressed: _isStartingSession
                       ? null
-                      : _startNewAttendanceSession,
-                  label: const Text('Tạo buổi học & QR'),
-                  icon: _isCreatingSession
+                      : _showSessionSelectorAndStartAttendance,
+                  label: const Text('Bắt đầu điểm danh'),
+                  icon: _isStartingSession
                       ? const SizedBox(
                           width: 20,
                           height: 20,
@@ -164,7 +202,7 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
               ),
               const SizedBox(height: 24),
 
-              // --- DANH SÁCH BUỔI HỌC ---
+              // === THÊM LẠI PHẦN HIỂN THỊ DANH SÁCH BUỔI HỌC ===
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8.0),
                 child: Text(
@@ -207,15 +245,13 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                           ),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () {
-                            // SỬA LỖI ĐIỀU HƯỚNG TẠI ĐÂY
+                            // Điều hướng đến trang chi tiết buổi học của Giảng viên
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => SessionDetailPage(
-                                  session:
-                                      session, // Truyền cả đối tượng session
-                                  classInfo:
-                                      classInfo, // Truyền đối tượng classInfo từ StreamBuilder cha
+                                  session: session,
+                                  classInfo: classInfo,
                                 ),
                               ),
                             );
@@ -227,6 +263,7 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                 },
               ),
 
+              // =======================================================
               const SizedBox(height: 24),
 
               // --- DANH SÁCH SINH VIÊN ---

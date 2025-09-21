@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// Thay thế bằng các đường dẫn đúng
 import '../../../data/models/class_model.dart';
 import '../../../data/models/session_model.dart';
 import '../../../services/firebase/classes/class_service.dart';
@@ -33,173 +34,156 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.session.title),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: Theme.of(context).textTheme.bodyLarge?.color,
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddStudentDialog,
-        label: const Text('Thêm thủ công'),
-        icon: const Icon(Icons.add),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-        children: [
-          // --- THẺ THÔNG TIN LỚP HỌC ---
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.class_, color: Colors.blueGrey),
-              title: Text(widget.classInfo.courseName ?? '...'),
-              subtitle: Text(
-                'Mã: ${widget.classInfo.courseCode ?? "..."} • GV: ${widget.classInfo.lecturerName ?? "..."}',
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // --- THẺ THÔNG TIN BUỔI HỌC ---
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.session.title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Divider(height: 20),
-                  _buildInfoRow(
-                    Icons.calendar_today_outlined,
-                    'Ngày:',
-                    DateFormat(
-                      'EEEE, dd/MM/yyyy',
-                      'vi_VN',
-                    ).format(widget.session.startTime),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildInfoRow(
-                    Icons.schedule_outlined,
-                    'Thời gian:',
-                    '${DateFormat.Hm().format(widget.session.startTime)} - ${DateFormat.Hm().format(widget.session.endTime)}',
-                  ),
-                  const SizedBox(height: 8),
-                  _buildInfoRow(
-                    Icons.location_on_outlined,
-                    'Địa điểm:',
-                    widget.session.location,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // --- THẺ THỐNG KÊ ĐIỂM DANH ---
-          FutureBuilder<int>(
-            future: classService.getEnrolledStudentCount(widget.classInfo.id),
-            builder: (context, totalStudentsSnap) {
-              return StreamBuilder<List<Map<String, dynamic>>>(
-                stream: sessionService.getRichAttendanceList(widget.session.id),
-                builder: (context, attendanceSnap) {
-                  final attendedCount = attendanceSnap.data?.length ?? 0;
-                  final totalCount = totalStudentsSnap.data ?? 0;
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildStatColumn(
-                            'Đã điểm danh',
-                            attendedCount.toString(),
-                            Colors.green,
-                          ),
-                          _buildStatColumn(
-                            'Tổng số',
-                            totalCount.toString(),
-                            Colors.blue,
-                          ),
-                          _buildStatColumn(
-                            'Vắng',
-                            (totalCount - attendedCount).toString(),
-                            Colors.red,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-
-          const SizedBox(height: 24),
-
-          // --- DANH SÁCH SINH VIÊN ĐÃ ĐIỂM DANH ---
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              'Danh sách điểm danh',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-          ),
-          const SizedBox(height: 8),
-          StreamBuilder<List<Map<String, dynamic>>>(
-            stream: sessionService.getRichAttendanceList(widget.session.id),
+        actions: [
+          StreamBuilder<SessionModel>(
+            stream: sessionService.getSessionStream(widget.session.id),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final attendanceList = snapshot.data ?? [];
-              if (attendanceList.isEmpty) {
-                return const Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(24.0),
-                    child: Center(
-                      child: Text('Chưa có sinh viên nào điểm danh.'),
-                    ),
+              if (!snapshot.hasData) return const SizedBox.shrink();
+              final isOpen = snapshot.data!.isAttendanceOpen;
+              return TextButton.icon(
+                onPressed: () =>
+                    sessionService.toggleAttendance(widget.session.id, !isOpen),
+                icon: Icon(
+                  isOpen ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+                  color: isOpen ? Colors.green : Colors.red,
+                ),
+                label: Text(
+                  isOpen ? 'Đóng Điểm danh' : 'Mở Điểm danh',
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
                   ),
-                );
-              }
-              return ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: attendanceList.length,
-                itemBuilder: (context, index) {
-                  final data = attendanceList[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    child: ListTile(/* ... Code ListTile ... */),
-                  );
-                },
+                ),
               );
             },
           ),
         ],
       ),
-    );
-  }
-
-  // --- CÁC HÀM HELPER ---
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 20,
-          color: Theme.of(context).textTheme.bodySmall?.color,
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_session_detail',
+        onPressed: () =>
+            _showManualAttendanceDialog(context, sessionService, classService),
+        label: const Text('Điểm danh bù'),
+        icon: const Icon(Icons.person_add_alt_1),
+      ),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        // === NÂNG CẤP: DÙNG STREAM MỚI ĐỂ LẤY CẢ DANH SÁCH LỚP ===
+        stream: sessionService.getFullStudentListWithStatus(
+          sessionId: widget.session.id,
+          classId: widget.classInfo.id,
         ),
-        const SizedBox(width: 12),
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        const Spacer(),
-        Text(value),
-      ],
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Lỗi tải danh sách: ${snapshot.error}'));
+          }
+
+          final fullStudentList = snapshot.data ?? [];
+          final attendedCount = fullStudentList
+              .where((s) => s['status'] != 'absent')
+              .length;
+          final totalCount = fullStudentList.length;
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+            children: [
+              // --- THẺ THỐNG KÊ ĐIỂM DANH ---
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatColumn(
+                        'Có mặt',
+                        attendedCount.toString(),
+                        Colors.green,
+                      ),
+                      _buildStatColumn(
+                        'Tổng số',
+                        totalCount.toString(),
+                        Colors.blue,
+                      ),
+                      _buildStatColumn(
+                        'Vắng mặt',
+                        (totalCount - attendedCount).toString(),
+                        Colors.red,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // --- DANH SÁCH TẤT CẢ SINH VIÊN ---
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(
+                  'Danh sách sinh viên',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (fullStudentList.isEmpty)
+                const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(24.0),
+                    child: Center(
+                      child: Text('Lớp học chưa có sinh viên nào.'),
+                    ),
+                  ),
+                ),
+
+              if (fullStudentList.isNotEmpty)
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: fullStudentList.length,
+                  itemBuilder: (context, index) {
+                    final student = fullStudentList[index];
+                    final timestamp = student['timestamp'] as Timestamp?;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          child: Text(student['displayName']?[0] ?? '?'),
+                        ),
+                        title: Text(student['displayName'] ?? 'N/A'),
+                        subtitle: Text(student['email'] ?? 'N/A'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (timestamp != null)
+                              Text(
+                                DateFormat('HH:mm').format(timestamp.toDate()),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            const SizedBox(width: 8),
+                            _buildStatusChip(
+                              student['status'],
+                              onTap: () {
+                                _showUpdateStatusDialog(
+                                  context,
+                                  sessionService,
+                                  student,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+            ],
+          );
+        },
+      ),
     );
   }
+
+  // --- CÁC HÀM HELPER VÀ DIALOG ---
 
   Widget _buildStatColumn(String title, String value, Color color) {
     return Column(
@@ -219,32 +203,27 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
     );
   }
 
-  // Hàm hiển thị Dialog để thêm điểm danh thủ công
-  Future<void> _showAddStudentDialog() async {
-    final classService = context.read<ClassService>();
-    final sessionService = context.read<SessionService>();
-
-    // 1. Lấy danh sách TẤT CẢ sinh viên trong lớp
-    final allStudents = await classService.getEnrolledStudents(
-      widget.classInfo.id,
-    );
-
-    // 2. Lấy danh sách sinh viên ĐÃ điểm danh
-    final attendedList = await sessionService
-        .getRichAttendanceList(widget.session.id)
-        .first; // .first để lấy giá trị hiện tại của Stream
-    final attendedStudentIds = attendedList.map((e) => e['studentId']).toSet();
-
-    // 3. Lọc ra những sinh viên CHƯA điểm danh
-    final absentStudents = allStudents
-        .where((student) => !attendedStudentIds.contains(student['uid']))
+  /// Hiển thị Dialog để điểm danh bù cho các sinh viên vắng mặt
+  Future<void> _showManualAttendanceDialog(
+    BuildContext context,
+    SessionService sessionService,
+    ClassService classService,
+  ) async {
+    // Lấy danh sách sinh viên vắng mặt
+    final fullList = await sessionService
+        .getFullStudentListWithStatus(
+          sessionId: widget.session.id,
+          classId: widget.classInfo.id,
+        )
+        .first;
+    final absentStudents = fullList
+        .where((s) => s['status'] == 'absent')
         .toList();
 
     if (!mounted) return;
-
     if (absentStudents.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tất cả sinh viên đã được điểm danh.')),
+        const SnackBar(content: Text('Tất cả sinh viên đã có mặt.')),
       );
       return;
     }
@@ -292,36 +271,85 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
     );
   }
 
-  // Widget helper để hiển thị chip trạng thái
-  Widget _buildStatusChip(String? status) {
-    status ??= 'present';
+  /// Hiển thị Dialog để cập nhật trạng thái (có mặt, đi muộn, vắng phép)
+  Future<void> _showUpdateStatusDialog(
+    BuildContext context,
+    SessionService sessionService,
+    Map<String, dynamic> student,
+  ) async {
+    final newStatus = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text('Cập nhật trạng thái cho ${student['displayName']}'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'present'),
+            child: const Text('Có mặt'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'late'),
+            child: const Text('Đi muộn'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'excused'),
+            child: const Text('Vắng có phép'),
+          ),
+        ],
+      ),
+    );
+
+    if (newStatus != null) {
+      await sessionService.updateAttendanceStatus(
+        sessionId: widget.session.id,
+        studentId: student['uid'],
+        newStatus: newStatus,
+      );
+    }
+  }
+
+  /// Widget helper để hiển thị chip trạng thái, có thể nhấn vào
+  Widget _buildStatusChip(String? status, {required VoidCallback onTap}) {
     Color color;
     String label;
+    IconData icon;
 
     switch (status) {
       case 'late':
         color = Colors.orange;
         label = 'Đi muộn';
+        icon = Icons.watch_later_outlined;
         break;
       case 'excused':
         color = Colors.blue;
         label = 'Vắng phép';
+        icon = Icons.note_alt_outlined;
+        break;
+      case 'absent':
+        color = Colors.red;
+        label = 'Vắng mặt';
+        icon = Icons.highlight_off_outlined;
         break;
       case 'present':
       default:
         color = Colors.green;
         label = 'Có mặt';
+        icon = Icons.check_circle_outline;
     }
-    return Chip(
-      label: Text(label),
-      backgroundColor: color.withValues(alpha: 0.2),
-      labelStyle: TextStyle(
-        color: color,
-        fontWeight: FontWeight.bold,
-        fontSize: 12,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Chip(
+        avatar: Icon(icon, color: color, size: 16),
+        label: Text(label),
+        backgroundColor: color.withOpacity(0.15),
+        labelStyle: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+        side: BorderSide.none,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
       ),
-      side: BorderSide.none,
-      padding: EdgeInsets.zero,
     );
   }
 }

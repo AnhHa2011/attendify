@@ -17,6 +17,7 @@ import '../pages/admin/course_management_page.dart';
 import '../pages/admin/user_management_page.dart';
 import '../pages/admin/user_bulk_import_page.dart';
 import '../pages/classes/class_detail_page.dart';
+import 'package:attendify/presentation/pages/admin/class_management_page.dart';
 
 class HierarchicalMenuScaffold extends StatelessWidget {
   const HierarchicalMenuScaffold({super.key});
@@ -478,41 +479,98 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// Class List Page using ClassService directly
+// Class List Page sử dụng logic phân vai trò
 class _ClassListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final isAdmin = auth.role?.toKey() == 'admin';
+    final isAdmin = auth.role == UserRole.admin;
+
+    // Admin sẽ được điều hướng đến trang quản lý đầy đủ chức năng
+    if (isAdmin) {
+      // Trả về trang ClassManagementPage mà chúng ta đã tạo
+      return const ClassManagementPage();
+    } else {
+      // Giảng viên và Sinh viên sẽ thấy danh sách lớp của họ
+      return _LecturerAndStudentClassList();
+    }
+  }
+}
+
+// Widget dành cho Giảng viên và Sinh viên (có thể tách ra nếu logic phức tạp hơn)
+class _LecturerAndStudentClassList extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final classService = context.read<ClassService>();
+
+    // Xác định xem nên lấy stream nào dựa trên vai trò
+    Stream<List<ClassModel>> getClassStream() {
+      if (auth.role == UserRole.lecture) {
+        return classService.getRichClassesStreamForLecturer(auth.user!.uid);
+      } else {
+        // Mặc định là sinh viên
+        return classService.getRichEnrolledClassesStream(auth.user!.uid);
+      }
+    }
 
     return Scaffold(
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Danh sách lớp học',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-          ),
-          Expanded(child: isAdmin ? _AdminClassList() : _LecturerClassList()),
-        ],
+      appBar: AppBar(
+        title: const Text('Danh sách lớp học của tôi'),
+        automaticallyImplyLeading: false, // Ẩn nút back nếu không cần
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateClassPage()),
+      body: StreamBuilder<List<ClassModel>>(
+        stream: getClassStream(),
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snap.hasError) {
+            return Center(child: Text('Lỗi: ${snap.error}'));
+          }
+          final classes = snap.data ?? [];
+          if (classes.isEmpty) {
+            return const Center(child: Text('Bạn chưa có lớp học nào.'));
+          }
+
+          return ListView.builder(
+            itemCount: classes.length,
+            itemBuilder: (context, index) {
+              final classItem = classes[index];
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    child: Text(
+                      classItem.courseCode?.isNotEmpty == true
+                          ? classItem.courseCode!.substring(0, 2).toUpperCase()
+                          : 'C',
+                    ),
+                  ),
+                  title: Text(
+                    '${classItem.courseCode ?? "N/A"} • ${classItem.courseName ?? "..."}',
+                  ),
+                  subtitle: Text('GV: ${classItem.lecturerName ?? "..."}'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ClassDetailPage(classId: classItem.id),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           );
         },
-        child: const Icon(Icons.add),
-        tooltip: 'Tạo lớp mới',
       ),
     );
   }
 }
 
-// Admin class list với filter - using ClassService directly
+// === ADMIN CLASS LIST - ĐÃ SỬA LỖI VÀ HOÀN THIỆN ===
 class _AdminClassList extends StatefulWidget {
   @override
   State<_AdminClassList> createState() => _AdminClassListState();
@@ -524,7 +582,6 @@ class _AdminClassListState extends State<_AdminClassList> {
   @override
   Widget build(BuildContext context) {
     final classService = context.read<ClassService>();
-    final navProvider = context.read<NavigationProvider>();
 
     return Column(
       children: [
@@ -567,7 +624,6 @@ class _AdminClassListState extends State<_AdminClassList> {
         // Danh sách lớp học
         Expanded(
           child: StreamBuilder<List<ClassModel>>(
-            // === THAY ĐỔI 1: GỌI HÀM STREAM PHÙ HỢP ===
             stream: _selectedLecturerUid == null
                 ? classService.getRichClassesStream()
                 : classService.getRichClassesStreamForLecturer(
@@ -586,26 +642,29 @@ class _AdminClassListState extends State<_AdminClassList> {
               }
 
               return ListView.builder(
+                padding: const EdgeInsets.only(bottom: 80),
                 itemCount: classes.length,
                 itemBuilder: (context, index) {
                   final classItem = classes[index];
 
-                  // === THAY ĐỔI 2: SỬ DỤNG DỮ LIỆU ĐÃ "LÀM GIÀU" ===
+                  // === LOGIC AN TOÀN CHO SUBSTRING ===
+                  String leadingText;
+                  final code = classItem.courseCode;
+                  if (code == null || code.isEmpty) {
+                    leadingText = 'C';
+                  } else if (code.length < 2) {
+                    leadingText = code.toUpperCase();
+                  } else {
+                    leadingText = code.substring(0, 2).toUpperCase();
+                  }
+
                   return Card(
                     margin: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 4,
                     ),
                     child: ListTile(
-                      leading: CircleAvatar(
-                        child: Text(
-                          classItem.courseCode?.isNotEmpty == true
-                              ? classItem.courseCode!
-                                    .substring(0, 2)
-                                    .toUpperCase()
-                              : 'C',
-                        ),
-                      ),
+                      leading: CircleAvatar(child: Text(leadingText)),
                       title: Text(
                         '${classItem.courseCode ?? "N/A"} • ${classItem.courseName ?? "..."}',
                       ),
@@ -619,11 +678,6 @@ class _AdminClassListState extends State<_AdminClassList> {
                       trailing: const Icon(Icons.chevron_right),
                       isThreeLine: true,
                       onTap: () {
-                        // navProvider.navigateToClassContext(
-                        //   classId: classItem.id,
-                        //   className:
-                        //       '${classItem.courseCode} - ${classItem.courseName}',
-                        // );
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -644,12 +698,11 @@ class _AdminClassListState extends State<_AdminClassList> {
   }
 }
 
-// Lecturer class list - using ClassService directly
+// === LECTURER CLASS LIST - ĐÃ SỬA LỖI VÀ HOÀN THIỆN ===
 class _LecturerClassList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final classService = context.read<ClassService>();
-    final navProvider = context.read<NavigationProvider>();
     final auth = context.read<AuthProvider>();
     final lecturerUid = auth.user?.uid;
 
@@ -660,7 +713,6 @@ class _LecturerClassList extends StatelessWidget {
     }
 
     return StreamBuilder<List<ClassModel>>(
-      // === THAY ĐỔI 1: GỌI HÀM STREAM DÀNH RIÊNG CHO GIẢNG VIÊN ===
       stream: classService.getRichClassesStreamForLecturer(lecturerUid),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
@@ -671,7 +723,9 @@ class _LecturerClassList extends StatelessWidget {
         }
         final classes = snap.data ?? [];
         if (classes.isEmpty) {
-          return const Center(child: Text('Chưa có lớp học nào'));
+          return const Center(
+            child: Text('Bạn chưa được phân công lớp học nào.'),
+          );
         }
 
         return ListView.builder(
@@ -679,28 +733,27 @@ class _LecturerClassList extends StatelessWidget {
           itemBuilder: (context, index) {
             final classItem = classes[index];
 
-            // === THAY ĐỔI 2: SỬ DỤNG DỮ LIỆU ĐÃ "LÀM GIÀU" ===
+            // === LOGIC AN TOÀN CHO SUBSTRING ===
+            String leadingText;
+            final code = classItem.courseCode;
+            if (code == null || code.isEmpty) {
+              leadingText = 'C';
+            } else if (code.length < 2) {
+              leadingText = code.toUpperCase();
+            } else {
+              leadingText = code.substring(0, 2).toUpperCase();
+            }
+
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: ListTile(
-                leading: CircleAvatar(
-                  child: Text(
-                    classItem.courseCode?.isNotEmpty == true
-                        ? classItem.courseCode!.substring(0, 2).toUpperCase()
-                        : 'C',
-                  ),
-                ),
+                leading: CircleAvatar(child: Text(leadingText)),
                 title: Text(
                   '${classItem.courseCode ?? "N/A"} • ${classItem.courseName ?? "..."}',
                 ),
                 subtitle: Text('Học kỳ: ${classItem.semester}'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
-                  // navProvider.navigateToClassContext(
-                  //   classId: classItem.id,
-                  //   className:
-                  //       '${classItem.courseCode} - ${classItem.courseName}',
-                  // );
                   Navigator.push(
                     context,
                     MaterialPageRoute(

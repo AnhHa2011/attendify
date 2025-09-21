@@ -15,39 +15,32 @@ class QrScannerPage extends StatefulWidget {
 
 class _QrScannerPageState extends State<QrScannerPage> {
   final MobileScannerController controller = MobileScannerController();
-  bool _isProcessing = false; // Cờ để tránh xử lý một mã QR nhiều lần
+  bool _isProcessing = false;
 
-  // Hàm xử lý chính khi quét được mã
   Future<void> _handleScannedData(String qrData) async {
-    // Nếu đang xử lý rồi thì bỏ qua
     if (_isProcessing) return;
-
     setState(() => _isProcessing = true);
-    controller.stop(); // Tạm dừng camera
+    controller.stop();
 
     try {
-      // 1. Parse nội dung QR
       final parts = qrData.split('|');
       if (parts.length != 4) {
         throw Exception("Mã QR không hợp lệ.");
       }
 
-      final classId = parts[0];
+      // === THAY ĐỔI: CHỈ CẦN LẤY sessionId ===
+      // final classId = parts[0]; // Không cần dùng nữa
       final sessionId = parts[1];
-      // final lecturerId = parts[2]; // Có thể dùng để kiểm tra thêm
-      // final timestamp = int.parse(parts[3]);
 
       final sessionService = context.read<SessionService>();
       final studentId = context.read<AuthProvider>().user!.uid;
 
-      // 2. Gửi dữ liệu lên Firestore để ghi nhận điểm danh
+      // === THAY ĐỔI: GỌI HÀM markAttendance VỚI ĐÚNG THAM SỐ ===
       await sessionService.markAttendance(
-        classId: classId,
         sessionId: sessionId,
         studentId: studentId,
       );
 
-      // 3. Thông báo thành công
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -55,19 +48,20 @@ class _QrScannerPageState extends State<QrScannerPage> {
           backgroundColor: Colors.green,
         ),
       );
-      // Có thể pop trang này đi nếu muốn
-      // Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
+      // Sửa lại cách hiển thị lỗi để thân thiện hơn
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Lỗi: ${e.toString().replaceFirst("Exception: ", "")}'),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
-      // Sau 3 giây, cho phép quét lại để tránh spam
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
           setState(() => _isProcessing = false);
-          controller.start(); // Khởi động lại camera
+          controller.start();
         }
       });
     }
@@ -81,6 +75,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Giao diện không cần thay đổi, giữ nguyên
     return Scaffold(
       body: Stack(
         children: [
@@ -93,7 +88,6 @@ class _QrScannerPageState extends State<QrScannerPage> {
               }
             },
           ),
-          // Lớp phủ giao diện
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -112,7 +106,6 @@ class _QrScannerPageState extends State<QrScannerPage> {
                   style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
                 const SizedBox(height: 40),
-                // Hiển thị vòng xoay loading khi đang xử lý
                 if (_isProcessing)
                   const CircularProgressIndicator(color: Colors.white),
               ],

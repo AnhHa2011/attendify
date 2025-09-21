@@ -1,10 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum SessionStatus {
-  upcoming, // Sắp diễn ra
-  ongoing, // Đang diễn ra
-  completed, // Đã kết thúc
-  cancelled, // Đã hủy
+  scheduled, // <-- ĐỔI TÊN: từ upcoming thành scheduled
+  inProgress, // <-- ĐỔI TÊN: từ ongoing thành inProgress
+  completed,
+  cancelled,
 }
 
 enum SessionType {
@@ -103,8 +103,19 @@ class SessionModel {
     };
   }
 
-  factory SessionModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory SessionModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = doc.data()!;
+
+    // Hàm helper để parse Timestamp một cách an toàn
+    DateTime _parseTimestamp(dynamic timestamp, {required DateTime fallback}) {
+      if (timestamp is Timestamp) {
+        return timestamp.toDate();
+      }
+      return fallback;
+    }
+
     return SessionModel(
       id: doc.id,
       classId: data['classId'] ?? '',
@@ -114,8 +125,9 @@ class SessionModel {
       lecturerName: data['lecturerName'] ?? '',
       title: data['title'] ?? '',
       description: data['description'],
-      startTime: (data['startTime'] as Timestamp).toDate(),
-      endTime: (data['endTime'] as Timestamp).toDate(),
+      // SỬA LỖI: Sử dụng hàm helper để tránh lỗi null
+      startTime: _parseTimestamp(data['startTime'], fallback: DateTime.now()),
+      endTime: _parseTimestamp(data['endTime'], fallback: DateTime.now()),
       location: data['location'] ?? '',
       type: SessionType.values.firstWhere(
         (e) => e.name == data['type'],
@@ -123,11 +135,12 @@ class SessionModel {
       ),
       status: SessionStatus.values.firstWhere(
         (e) => e.name == data['status'],
-        orElse: () => SessionStatus.upcoming,
+        orElse: () => SessionStatus.scheduled,
       ),
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      // SỬA LỖI: Sử dụng hàm helper cho createdAt
+      createdAt: _parseTimestamp(data['createdAt'], fallback: DateTime.now()),
       updatedAt: data['updatedAt'] != null
-          ? (data['updatedAt'] as Timestamp).toDate()
+          ? _parseTimestamp(data['updatedAt'], fallback: DateTime.now())
           : null,
       totalStudents: data['totalStudents'] ?? 0,
       attendedStudents: data['attendedStudents'] ?? 0,
@@ -195,9 +208,9 @@ extension SessionModelExtension on SessionModel {
 
   String get statusDisplayName {
     switch (status) {
-      case SessionStatus.upcoming:
-        return 'Sắp diễn ra';
-      case SessionStatus.ongoing:
+      case SessionStatus.scheduled: // <-- ĐỔI TÊN
+        return 'Đã lên lịch';
+      case SessionStatus.inProgress: // <-- ĐỔI TÊN
         return 'Đang diễn ra';
       case SessionStatus.completed:
         return 'Đã kết thúc';

@@ -61,6 +61,7 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
             MaterialPageRoute(builder: (context) => const CourseFormPage()),
           );
         },
+        heroTag: 'fab_course_management_page',
         tooltip: 'Thêm môn học',
         child: const Icon(Icons.add),
       ),

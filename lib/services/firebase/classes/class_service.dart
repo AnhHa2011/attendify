@@ -182,7 +182,7 @@ class ClassService {
   Stream<List<ClassModel>> getRichClassesStreamForLecturer(String lecturerId) {
     return _db
         .collection('classes')
-        .where('lecturerId', isEqualTo: lecturerId) // Lọc theo giảng viên
+        .where('isArchived', isEqualTo: false) // Lọc theo giảng viên
         .snapshots()
         .asyncMap((classSnapshot) async {
           // Đoạn code "làm giàu" dữ liệu giống hệt hàm getRichClassesStream()

@@ -1,46 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../data/models/session_model.dart';
+import '../../../data/models/user_model.dart';
 
 class SessionService {
   final _db = FirebaseFirestore.instance;
-
-  // // Tạo buổi học mới
-  // Future<String> createSession({
-  //   required String classId,
-  //   required String className,
-  //   required String classCode,
-  //   required String lecturerId,
-  //   required String lecturerName,
-  //   required String title,
-  //   String? description,
-  //   required DateTime startTime,
-  //   required DateTime endTime,
-  //   required String location,
-  //   required SessionType type,
-  // }) async {
-  //   final now = DateTime.now();
-
-  //   final ref = await _db.collection('sessions').add({
-  //     'classId': classId,
-  //     'className': className,
-  //     'classCode': classCode,
-  //     'lecturerId': lecturerId,
-  //     'lecturerName': lecturerName,
-  //     'title': title,
-  //     'description': description,
-  //     'startTime': Timestamp.fromDate(startTime),
-  //     'endTime': Timestamp.fromDate(endTime),
-  //     'location': location,
-  //     'type': type.name,
-  //     'status': SessionStatus.upcoming.name,
-  //     'createdAt': Timestamp.fromDate(now),
-  //     'totalStudents': 0,
-  //     'attendedStudents': 0,
-  //     'isAttendanceOpen': false,
-  //   });
-
-  //   return ref.id;
-  // }
 
   // Tạo buổi học mới
   Future<String> createSession({
@@ -63,12 +26,36 @@ class SessionService {
       'endTime': Timestamp.fromDate(endTime),
       'location': location,
       'type': type.name,
-      'status': SessionStatus.upcoming.name,
+      'status': SessionStatus.scheduled.name,
       'createdAt': Timestamp.fromDate(now),
       'isAttendanceOpen': false,
     });
 
     return ref.id;
+  }
+
+  /// Lấy danh sách các buổi học ĐÃ ĐƯỢC LÊN LỊCH (chưa bắt đầu) của một lớp
+  Stream<List<SessionModel>> getScheduledSessionsForClass(String classId) {
+    return _db
+        .collection('sessions')
+        .where('classId', isEqualTo: classId)
+        .where('status', isEqualTo: SessionStatus.scheduled.name)
+        .orderBy('startTime')
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => SessionModel.fromFirestore(doc))
+              .toList(),
+        );
+  }
+
+  /// Kích hoạt trạng thái điểm danh cho một buổi học cụ thể (Dành cho Giảng viên)
+  Future<void> startAttendanceForSession(String sessionId) async {
+    await _db.collection('sessions').doc(sessionId).update({
+      'status': SessionStatus.inProgress.name,
+      'actualStartTime': FieldValue.serverTimestamp(),
+      'attendanceOpen': true, // Mở điểm danh
+    });
   }
 
   // /// Lấy danh sách các buổi học ĐÃ ĐƯỢỢC LÊN LỊCH (chưa bắt đầu) của một lớp
@@ -101,65 +88,58 @@ class SessionService {
   //   }
   // }
 
-  /// Ghi nhận điểm danh cho sinh viên
-  Future<void> markAttendance({
-    required String
-    classId, // Vẫn cần classId để kiểm tra logic sau này nếu muốn
-    required String sessionId,
-    required String studentId,
-  }) async {
-    try {
-      // SỬA LỖI: Đường dẫn đúng là collection 'sessions' ở cấp cao nhất
-      final sessionRef = _db.collection('sessions').doc(sessionId);
-
-      final sessionSnap = await sessionRef.get();
-
-      if (!sessionSnap.exists) {
-        throw Exception("Buổi học không tồn tại!");
-      }
-
-      final data = sessionSnap.data() as Map<String, dynamic>;
-
-      // Kiểm tra xem điểm danh có đang mở không
-      if (data['isAttendanceOpen'] != true) {
-        throw Exception("Giảng viên chưa mở điểm danh cho buổi học này.");
-      }
-
-      // (Tùy chọn) Kiểm tra buổi học còn hiệu lực
-      if (data.containsKey('endTime')) {
-        final endTime = (data['endTime'] as Timestamp).toDate();
-        if (DateTime.now().isAfter(endTime)) {
-          throw Exception("Đã hết thời gian điểm danh!");
-        }
-      }
-
-      // Lưu điểm danh vào sub-collection 'attendances' của buổi học
-      await sessionRef.collection('attendances').doc(studentId).set({
-        'studentId': studentId,
-        'attendTime': FieldValue.serverTimestamp(),
-        'status': 'present',
-      });
-    } catch (e) {
-      // Ném lại lỗi để UI có thể bắt và hiển thị
-      rethrow;
-    }
-  }
-
-  /// Cập nhật trạng thái điểm danh của một sinh viên
-  Future<void> updateAttendanceStatus({
-    required String sessionId,
-    required String studentId,
-    required String newStatus,
-  }) {
+  /// Lắng nghe thay đổi của MỘT buổi học cụ thể
+  Stream<SessionModel> getSessionStream(String sessionId) {
     return _db
         .collection('sessions')
         .doc(sessionId)
-        .collection('attendances')
-        .doc(studentId)
-        .update({'status': newStatus});
+        .snapshots()
+        .map(
+          (doc) => SessionModel.fromFirestore(
+            doc as DocumentSnapshot<Map<String, dynamic>>,
+          ),
+        );
   }
 
-  // Thêm hàm điểm danh thủ công
+  /// Bật hoặc tắt điểm danh cho một buổi học (Dành cho Giảng viên)
+  Future<void> toggleAttendance(String sessionId, bool isOpen) {
+    return _db.collection('sessions').doc(sessionId).update({
+      'attendanceOpen': isOpen,
+    });
+  }
+
+  /// Ghi nhận điểm danh cho sinh viên (Khi SV quét mã QR)
+  Future<void> markAttendance({
+    required String sessionId,
+    required String studentId,
+  }) async {
+    final sessionRef = _db.collection('sessions').doc(sessionId);
+    final sessionDoc = await sessionRef.get();
+
+    if (!sessionDoc.exists) {
+      throw Exception('Buổi học không tồn tại.');
+    }
+
+    final isAttendanceOpen = sessionDoc.data()?['attendanceOpen'] ?? false;
+    if (!isAttendanceOpen) {
+      throw Exception('Giảng viên chưa mở điểm danh cho buổi học này.');
+    }
+
+    final attendeeRef = sessionRef.collection('attendees').doc(studentId);
+    final attendeeDoc = await attendeeRef.get();
+
+    if (attendeeDoc.exists) {
+      throw Exception('Bạn đã điểm danh cho buổi học này rồi.');
+    }
+
+    await attendeeRef.set({
+      'studentId': studentId,
+      'timestamp': FieldValue.serverTimestamp(),
+      'status': 'present',
+    });
+  }
+
+  /// Thêm điểm danh thủ công (Dành cho Giảng viên)
   Future<void> addManualAttendance({
     required String sessionId,
     required String studentId,
@@ -167,13 +147,121 @@ class SessionService {
     return _db
         .collection('sessions')
         .doc(sessionId)
-        .collection('attendances')
+        .collection('attendees')
         .doc(studentId)
         .set({
           'studentId': studentId,
-          'attendTime': FieldValue.serverTimestamp(),
-          'status': 'present', // Mặc định là có mặt
-        }, SetOptions(merge: true));
+          'timestamp': FieldValue.serverTimestamp(),
+          'status': 'present',
+        });
+  }
+
+  /// Lấy danh sách sinh viên đã điểm danh (đã "làm giàu")
+  Stream<List<Map<String, dynamic>>> getRichAttendanceList(String sessionId) {
+    return _db
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('attendees')
+        .snapshots()
+        .asyncMap((snapshot) async {
+          if (snapshot.docs.isEmpty) return [];
+
+          final studentIds = snapshot.docs.map((doc) => doc.id).toList();
+          final userDocs = await _db
+              .collection('users')
+              .where(FieldPath.documentId, whereIn: studentIds)
+              .get();
+          final userMap = {
+            for (var doc in userDocs.docs) doc.id: UserModel.fromFirestore(doc),
+          };
+
+          return snapshot.docs.map((doc) {
+            final student = userMap[doc.id];
+            return {
+              'studentId': doc.id,
+              'displayName': student?.displayName ?? 'N/A',
+              'email': student?.email ?? 'N/A',
+              'timestamp': doc.data()['timestamp'],
+              'status': doc.data()['status'],
+            };
+          }).toList();
+        });
+  }
+
+  /// Cập nhật trạng thái điểm danh của một sinh viên
+  Future<void> updateAttendanceStatus({
+    required String sessionId,
+    required String studentId,
+    required String newStatus, // Ví dụ: 'present', 'late', 'excused'
+  }) {
+    return _db
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('attendees')
+        .doc(studentId)
+        .update({'status': newStatus});
+  }
+
+  /// === NÂNG CẤP: Lấy danh sách TẤT CẢ sinh viên trong lớp (bao gồm cả trạng thái điểm danh) ===
+  Stream<List<Map<String, dynamic>>> getFullStudentListWithStatus({
+    required String sessionId,
+    required String classId,
+  }) {
+    // 1. Lắng nghe danh sách sinh viên ĐÃ điểm danh
+    final attendeesStream = _db
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('attendees')
+        .snapshots();
+
+    // 2. Lấy danh sách TẤT CẢ sinh viên trong lớp (chỉ 1 lần)
+    final allStudentsFuture = _db
+        .collection('enrollments')
+        .where('classId', isEqualTo: classId)
+        .get()
+        .then((snapshot) async {
+          if (snapshot.docs.isEmpty) return <UserModel>[];
+          final studentIds = snapshot.docs
+              .map((doc) => doc['studentUid'] as String)
+              .toList();
+          if (studentIds.isEmpty) return <UserModel>[]; // Thêm kiểm tra này
+          final studentsSnapshot = await _db
+              .collection('users')
+              .where(FieldPath.documentId, whereIn: studentIds)
+              .get();
+          return studentsSnapshot.docs
+              .map((doc) => UserModel.fromFirestore(doc))
+              .toList();
+        });
+
+    // 3. Kết hợp 2 nguồn dữ liệu
+    return attendeesStream.asyncMap((attendeesSnapshot) async {
+      final allStudents = await allStudentsFuture;
+      final attendedMap = {
+        for (var doc in attendeesSnapshot.docs) doc.id: doc.data(),
+      };
+
+      final fullList = allStudents.map((student) {
+        final attendanceData = attendedMap[student.uid];
+        return {
+          'uid': student.uid,
+          'displayName': student.displayName,
+          'email': student.email,
+          'status': attendanceData?['status'] ?? 'absent',
+          'timestamp': attendanceData?['timestamp'],
+        };
+      }).toList();
+
+      fullList.sort((a, b) {
+        if (a['status'] != 'absent' && b['status'] == 'absent') return -1;
+        if (a['status'] == 'absent' && b['status'] != 'absent') return 1;
+        return (a['displayName'] as String).compareTo(
+          b['displayName'] as String,
+        );
+      });
+
+      return fullList;
+    });
   }
 
   // Lấy tất cả buổi học
@@ -183,8 +271,9 @@ class SessionService {
         .orderBy('startTime', descending: false)
         .snapshots()
         .map(
-          (snapshot) =>
-              snapshot.docs.map((doc) => SessionModel.fromDoc(doc)).toList(),
+          (snapshot) => snapshot.docs
+              .map((doc) => SessionModel.fromFirestore(doc))
+              .toList(),
         );
   }
 
@@ -210,52 +299,6 @@ class SessionService {
         });
   }
 
-  /// Lấy danh sách sinh viên đã điểm danh (kèm thông tin chi tiết của sinh viên)
-  Stream<List<Map<String, dynamic>>> getRichAttendanceList(String sessionId) {
-    return _db
-        .collection('sessions')
-        .doc(sessionId)
-        .collection('attendances')
-        .orderBy('attendTime', descending: false)
-        .snapshots()
-        .asyncMap((snapshot) async {
-          if (snapshot.docs.isEmpty) {
-            return []; // Trả về danh sách rỗng nếu chưa có ai điểm danh
-          }
-
-          // Tạo một danh sách các "công việc" cần làm: lấy thông tin user cho mỗi studentId
-          final userFutures = snapshot.docs.map((doc) async {
-            final attendanceData = doc.data();
-            final studentId = attendanceData['studentId'];
-
-            try {
-              // Lấy thông tin từ collection 'users'
-              final userDoc = await _db
-                  .collection('users')
-                  .doc(studentId)
-                  .get();
-              if (userDoc.exists) {
-                final userData = userDoc.data()!;
-                // Gộp thông tin điểm danh và thông tin user lại với nhau
-                return {
-                  ...attendanceData,
-                  'studentName': userData['displayName'],
-                  'studentEmail': userData['email'],
-                };
-              }
-            } catch (e) {
-              // Bỏ qua nếu không tìm thấy user, tránh làm crash cả stream
-              print('Error fetching user $studentId: $e');
-            }
-            // Trả về dữ liệu gốc nếu không tìm thấy user
-            return attendanceData;
-          }).toList();
-
-          // Chạy tất cả các "công việc" song song và đợi kết quả
-          return await Future.wait(userFutures);
-        });
-  }
-
   // Lấy buổi học của giảng viên
   Stream<List<SessionModel>> sessionsOfLecturer(String lecturerId) {
     return _db
@@ -264,8 +307,9 @@ class SessionService {
         .orderBy('startTime', descending: false)
         .snapshots()
         .map(
-          (snapshot) =>
-              snapshot.docs.map((doc) => SessionModel.fromDoc(doc)).toList(),
+          (snapshot) => snapshot.docs
+              .map((doc) => SessionModel.fromFirestore(doc))
+              .toList(),
         );
   }
 
@@ -277,8 +321,9 @@ class SessionService {
         .orderBy('startTime', descending: false)
         .snapshots()
         .map(
-          (snapshot) =>
-              snapshot.docs.map((doc) => SessionModel.fromDoc(doc)).toList(),
+          (snapshot) => snapshot.docs
+              .map((doc) => SessionModel.fromFirestore(doc))
+              .toList(),
         );
   }
 
@@ -304,7 +349,7 @@ class SessionService {
               .get();
 
           return sessionSnapshot.docs
-              .map((doc) => SessionModel.fromDoc(doc))
+              .map((doc) => SessionModel.fromFirestore(doc))
               .toList();
         });
   }
@@ -350,7 +395,7 @@ class SessionService {
     final snapshot = await query.get();
     if (snapshot.docs.isEmpty) return null;
 
-    return SessionModel.fromDoc(
+    return SessionModel.fromFirestore(
       snapshot.docs.first as DocumentSnapshot<Map<String, dynamic>>,
     );
   }
@@ -376,8 +421,9 @@ class SessionService {
           .orderBy('startTime', descending: false)
           .snapshots()
           .map(
-            (snapshot) =>
-                snapshot.docs.map((doc) => SessionModel.fromDoc(doc)).toList(),
+            (snapshot) => snapshot.docs
+                .map((doc) => SessionModel.fromFirestore(doc))
+                .toList(),
           );
     } else {
       // Cho student
@@ -406,7 +452,7 @@ class SessionService {
                 .get();
 
             return sessionSnapshot.docs
-                .map((doc) => SessionModel.fromDoc(doc))
+                .map((doc) => SessionModel.fromFirestore(doc))
                 .toList();
           });
     }
@@ -432,8 +478,9 @@ class SessionService {
           .orderBy('startTime', descending: false)
           .snapshots()
           .map(
-            (snapshot) =>
-                snapshot.docs.map((doc) => SessionModel.fromDoc(doc)).toList(),
+            (snapshot) => snapshot.docs
+                .map((doc) => SessionModel.fromFirestore(doc))
+                .toList(),
           );
     } else {
       return _db
@@ -461,7 +508,7 @@ class SessionService {
                 .get();
 
             return sessionSnapshot.docs
-                .map((doc) => SessionModel.fromDoc(doc))
+                .map((doc) => SessionModel.fromFirestore(doc))
                 .toList();
           });
     }
@@ -474,14 +521,6 @@ class SessionService {
   ) async {
     await _db.collection('sessions').doc(sessionId).update({
       'status': status.name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  // Mở/đóng điểm danh
-  Future<void> toggleAttendance(String sessionId, bool isOpen) async {
-    await _db.collection('sessions').doc(sessionId).update({
-      'isAttendanceOpen': isOpen,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
@@ -516,7 +555,7 @@ class SessionService {
     final snapshot = await query.get();
     final sessions = snapshot.docs
         .map(
-          (doc) => SessionModel.fromDoc(
+          (doc) => SessionModel.fromFirestore(
             doc as DocumentSnapshot<Map<String, dynamic>>,
           ),
         )
@@ -528,7 +567,7 @@ class SessionService {
           .where((s) => s.status == SessionStatus.completed)
           .length,
       'upcoming': sessions
-          .where((s) => s.status == SessionStatus.upcoming)
+          .where((s) => s.status == SessionStatus.scheduled)
           .length,
       'cancelled': sessions
           .where((s) => s.status == SessionStatus.cancelled)

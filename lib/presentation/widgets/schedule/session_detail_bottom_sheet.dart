@@ -199,7 +199,7 @@ class _SessionDetailBottomSheetState extends State<SessionDetailBottomSheet> {
 
                     // Attendance Info (if completed or ongoing)
                     if (widget.session.status == SessionStatus.completed ||
-                        widget.session.status == SessionStatus.ongoing) ...[
+                        widget.session.status == SessionStatus.inProgress) ...[
                       const SizedBox(height: 20),
                       _AttendanceSection(session: widget.session),
                     ],
@@ -225,8 +225,8 @@ class _SessionDetailBottomSheetState extends State<SessionDetailBottomSheet> {
   }
 
   bool _shouldShowQuickActions() {
-    return widget.session.status == SessionStatus.upcoming ||
-        widget.session.status == SessionStatus.ongoing;
+    return widget.session.status == SessionStatus.scheduled ||
+        widget.session.status == SessionStatus.inProgress;
   }
 
   void _onStatusChanged(SessionStatus newStatus) {
@@ -380,9 +380,9 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     Color getStatusColor() {
       switch (session.status) {
-        case SessionStatus.upcoming:
+        case SessionStatus.scheduled:
           return Colors.blue;
-        case SessionStatus.ongoing:
+        case SessionStatus.inProgress:
           return Colors.green;
         case SessionStatus.completed:
           return Colors.grey;
@@ -393,9 +393,9 @@ class _StatusChip extends StatelessWidget {
 
     IconData getStatusIcon() {
       switch (session.status) {
-        case SessionStatus.upcoming:
+        case SessionStatus.scheduled:
           return Icons.schedule;
-        case SessionStatus.ongoing:
+        case SessionStatus.inProgress:
           return Icons.play_circle_filled;
         case SessionStatus.completed:
           return Icons.check_circle;
@@ -451,7 +451,7 @@ class _QuickActionsSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            if (session.status == SessionStatus.upcoming) ...[
+            if (session.status == SessionStatus.scheduled) ...[
               Expanded(
                 child: FilledButton.icon(
                   onPressed: isUpdating ? null : () => _startSession(context),
@@ -471,7 +471,7 @@ class _QuickActionsSection extends StatelessWidget {
                   ),
                 ),
               ),
-            ] else if (session.status == SessionStatus.ongoing) ...[
+            ] else if (session.status == SessionStatus.inProgress) ...[
               Expanded(
                 child: FilledButton.icon(
                   onPressed: isUpdating
@@ -515,9 +515,9 @@ class _QuickActionsSection extends StatelessWidget {
       final sessionService = context.read<SessionService>();
       await sessionService.updateSessionStatus(
         session.id,
-        SessionStatus.ongoing,
+        SessionStatus.inProgress,
       );
-      onStatusChanged(SessionStatus.ongoing);
+      onStatusChanged(SessionStatus.inProgress);
 
       if (context.mounted) {
         ScaffoldMessenger.of(

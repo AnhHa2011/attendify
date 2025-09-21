@@ -82,6 +82,7 @@ class _UserManagementPageState extends State<UserManagementPage>
         ],
         // hiển thị như FAB
         child: FloatingActionButton(
+          heroTag: 'fab_user_management_page',
           backgroundColor: Theme.of(context).primaryColor,
           child: const Icon(Icons.group_add), // icon hợp lý hơn dấu +
           onPressed: null, // PopupMenuButton xử lý việc mở menu
