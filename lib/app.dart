@@ -1,19 +1,18 @@
 // lib/app.dart
+import 'package:attendify/features/common/data/models/user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'app/providers/auth_provider.dart';
-
-// Menu UI (chỉ giao diện)
-import 'presentation/pages/admin/admin_menu.dart';
-import 'presentation/pages/lecture/lecture_menu.dart';
-import 'presentation/pages/student/student_menu.dart';
-
-// Trang auth của bạn
-import 'presentation/pages/auth/login_page.dart';
-import 'presentation/pages/auth/register_page.dart';
-import 'presentation/pages/auth/reset_password_page.dart';
+import 'features/admin/presentation/pages/admin_menu.dart';
+import 'features/auth/presentation/pages/login_page.dart';
+import 'features/auth/presentation/pages/register_page.dart';
+import 'features/auth/presentation/pages/reset_password_page.dart';
+import 'features/lecture/presentation/pages/lecture_menu.dart';
+import 'features/schedule/data/services/schedule_service.dart';
+import 'features/student/presentation/pages/student_menu.dart';
+import 'features/schedule/presentation/pages/schedule_page.dart';
 
 class AttendifyApp extends StatelessWidget {
   const AttendifyApp({super.key});
@@ -74,6 +73,20 @@ class AttendifyApp extends StatelessWidget {
         GoRoute(path: '/lecture', builder: (c, s) => const LectureMenuPage()),
         GoRoute(path: '/student', builder: (c, s) => const StudentMenuPage()),
 
+        GoRoute(
+          path: '/schedule',
+          builder: (ctx, state) {
+            final auth = ctx.read<AuthProvider>();
+            final uid = auth.user?.uid ?? '';
+            final isLecturer = auth.role == UserRole.lecture;
+
+            // Bọc provider cục bộ cho trang
+            return Provider<ScheduleService>(
+              create: (_) => ScheduleService(),
+              child: SchedulePage(currentUid: uid, isLecturer: isLecturer),
+            );
+          },
+        ),
         // Mặc định
         GoRoute(path: '/', builder: (c, s) => const SizedBox.shrink()),
       ],

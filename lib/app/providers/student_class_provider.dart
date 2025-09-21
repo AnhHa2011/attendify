@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../data/models/class_model.dart';
-import '../../services/firebase/classes/class_service.dart';
+import '../../features/common/data/models/class_model.dart';
+import '../../features/classes/data/services/class_service.dart';
 
 class StudentClassProvider extends ChangeNotifier {
   final ClassService _svc;
