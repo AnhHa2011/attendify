@@ -18,15 +18,14 @@ class CreateClassPage extends StatefulWidget {
 class _CreateClassPageState extends State<CreateClassPage> {
   final _formKey = GlobalKey<FormState>();
 
-  // === THAY ĐỔI STATE: LƯU ID THAY VÌ TEXTCONTROLLER ===
   String? _selectedCourseId;
   String? _selectedLecturerId;
   final _semesterCtrl = TextEditingController(text: 'HK1 2025-2026');
   final _maxAbsCtrl = TextEditingController(text: '3');
-  // Lịch học vẫn giữ nguyên
-  final int _day = 1;
-  final _startCtrl = TextEditingController(text: '07:30');
-  final _endCtrl = TextEditingController(text: '09:30');
+
+  // Sửa lại state cho lịch học để dễ quản lý
+  int _dayOfWeek = 1; // Thứ 2
+  TimeOfDay _startTime = const TimeOfDay(hour: 7, minute: 30);
 
   bool _submitting = false;
 
@@ -34,25 +33,39 @@ class _CreateClassPageState extends State<CreateClassPage> {
   void dispose() {
     _semesterCtrl.dispose();
     _maxAbsCtrl.dispose();
-    _startCtrl.dispose();
-    _endCtrl.dispose();
     super.dispose();
   }
 
+  // === HÀM HELPER ĐỂ CHUYỂN ĐỔI STRING SANG TIMEOFDAY ===
+  // (Bạn có thể bỏ qua hàm này nếu bạn dùng TimePicker để chọn giờ)
+  TimeOfDay _parseTime(String time) {
+    final parts = time.split(':');
+    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+  }
+
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() ||
+        _selectedCourseId == null ||
+        _selectedLecturerId == null) {
+      // Thêm kiểm tra null cho Dropdown
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng điền đầy đủ thông tin')),
+      );
+      return;
+    }
     setState(() => _submitting = true);
 
     try {
       final svc = context.read<ClassService>();
 
-      // === THAY ĐỔI LOGIC SUBMIT: DÙNG ID ĐÃ CHỌN ===
+      // === PHẦN SỬA LỖI QUAN TRỌNG NHẤT ===
+      // Sử dụng đúng tên tham số (dayOfWeek, startTime) và đúng kiểu dữ liệu.
       final classId = await svc.createClass(
         courseId: _selectedCourseId!,
         lecturerId: _selectedLecturerId!,
         semester: _semesterCtrl.text.trim(),
         schedules: [
-          ClassSchedule(day: _day, start: _startCtrl.text, end: _endCtrl.text),
+          ClassSchedule(dayOfWeek: _dayOfWeek, startTime: _startTime),
         ],
         maxAbsences: int.parse(_maxAbsCtrl.text),
       );
@@ -79,6 +92,7 @@ class _CreateClassPageState extends State<CreateClassPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Để code gọn hơn, có thể khai báo service ở đây
     final classService = context.read<ClassService>();
 
     return Scaffold(
@@ -92,16 +106,19 @@ class _CreateClassPageState extends State<CreateClassPage> {
               key: _formKey,
               child: ListView(
                 children: [
-                  // === THAY ĐỔI: DROPDOWN CHỌN MÔN HỌC ===
+                  // Dropdown chọn môn học (Code của bạn đã đúng)
                   StreamBuilder<List<CourseModel>>(
                     stream: classService.getAllCoursesStream(),
                     builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return const CircularProgressIndicator();
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return const Text('Không có môn học nào.');
                       }
                       final courses = snapshot.data!;
                       return DropdownButtonFormField<String>(
-                        initialValue: _selectedCourseId,
+                        value: _selectedCourseId,
                         hint: const Text('Chọn môn học'),
                         items: courses.map((course) {
                           return DropdownMenuItem(
@@ -117,23 +134,26 @@ class _CreateClassPageState extends State<CreateClassPage> {
                             v == null ? 'Vui lòng chọn môn học' : null,
                         decoration: const InputDecoration(
                           border: OutlineInputBorder(),
+                          labelText: 'Môn học',
                         ),
                       );
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
 
-                  // === THAY ĐỔI: DROPDOWN CHỌN GIẢNG VIÊN ===
+                  // Dropdown chọn giảng viên (Code của bạn đã đúng)
                   StreamBuilder<List<Map<String, String>>>(
-                    stream: classService
-                        .lecturersStream(), // Giả sử hàm này vẫn tồn tại
+                    stream: classService.lecturersStream(),
                     builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return const CircularProgressIndicator();
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return const Text('Không có giảng viên nào.');
                       }
                       final lecturers = snapshot.data!;
                       return DropdownButtonFormField<String>(
-                        initialValue: _selectedLecturerId,
+                        value: _selectedLecturerId,
                         hint: const Text('Chọn giảng viên phụ trách'),
                         items: lecturers.map((lecturer) {
                           return DropdownMenuItem(
@@ -149,27 +169,46 @@ class _CreateClassPageState extends State<CreateClassPage> {
                             v == null ? 'Vui lòng chọn giảng viên' : null,
                         decoration: const InputDecoration(
                           border: OutlineInputBorder(),
+                          labelText: 'Giảng viên',
                         ),
                       );
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
 
-                  // === THAY ĐỔI: NHẬP HỌC KỲ ===
+                  // Nhập học kỳ
                   TextFormField(
                     controller: _semesterCtrl,
-                    decoration: const InputDecoration(labelText: 'Học kỳ'),
+                    decoration: const InputDecoration(
+                      labelText: 'Học kỳ',
+                      border: OutlineInputBorder(),
+                    ),
                     validator: (v) =>
                         v == null || v.trim().isEmpty ? 'Nhập học kỳ' : null,
                   ),
-
-                  // Các trường còn lại (lịch học, số buổi vắng) có thể giữ nguyên
-                  // ...
                   const SizedBox(height: 16),
+
+                  // TODO: Thêm UI để người dùng có thể chọn ngày và giờ ở đây
+                  // Ví dụ đơn giản:
+                  Text(
+                    'Lịch học hiện tại: Thứ ${_dayOfWeek + 1}, lúc ${_startTime.format(context)}',
+                  ),
+
+                  const SizedBox(height: 24),
                   FilledButton(
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
                     onPressed: _submitting ? null : _submit,
                     child: _submitting
-                        ? const CircularProgressIndicator()
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: Colors.white,
+                            ),
+                          )
                         : const Text('Tạo lớp'),
                   ),
                 ],
