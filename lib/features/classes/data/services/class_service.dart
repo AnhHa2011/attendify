@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../common/data/models/class_model.dart';
 import '../../../common/data/models/course_model.dart';
+import '../../../common/data/models/class_schedule_model.dart';
 
 class ClassService {
   final _db = FirebaseFirestore.instance;
@@ -12,33 +13,57 @@ class ClassService {
     return List.generate(len, (_) => chars[rnd.nextInt(chars.length)]).join();
   }
 
-  // // Tạo lớp (admin chọn GV hoặc GV tự tạo cho mình)
-  // Future<String> createClass({
-  //   required String lecturerId,
-  //   required String lecturerName,
-  //   required String lecturerEmail,
-  //   required String className,
-  //   required String classCode,
-  //   required List<ClassSchedule> schedules,
-  //   required int maxAbsences,
-  // }) async {
-  //   final joinCode = _randomCode();
-  //   final now = DateTime.now();
+  /// === NÂNG CẤP: TẠO LỊCH HỌC HÀNG LOẠT DỰA TRÊN THỜI KHÓA BIỂU HÀNG TUẦN ===
+  Future<void> createRecurringSessions({
+    required String classId,
+    required String baseTitle,
+    required String location,
+    required int durationInMinutes,
+    required int numberOfWeeks,
+    required List<ClassSchedule> weeklySchedules, // <<<--- Dùng model mới
+    required DateTime semesterStartDate, // Ngày bắt đầu của học kỳ
+  }) async {
+    final batch = _db.batch();
 
-  //   final ref = await _db.collection('classes').add({
-  //     'className': className,
-  //     'classCode': classCode,
-  //     'lecturerId': lecturerId,
-  //     'lecturerName': lecturerName,
-  //     'lecturerEmail': lecturerEmail,
-  //     'schedules': schedules.map((e) => e.toMap()).toList(),
-  //     'maxAbsences': maxAbsences,
-  //     'joinCode': joinCode,
-  //     'createdAt': now, // hiển thị tức thì
-  //     'createdAtServer': FieldValue.serverTimestamp(),
-  //   });
-  //   return ref.id;
-  // }
+    // Lặp qua từng tuần trong tổng số tuần
+    for (int week = 0; week < numberOfWeeks; week++) {
+      // Lặp qua từng lịch học trong tuần (ví dụ: Thứ 2 và Thứ 4)
+      for (final schedule in weeklySchedules) {
+        // Tính toán ngày chính xác của buổi học trong tuần hiện tại
+        DateTime sessionDate = semesterStartDate.add(Duration(days: week * 7));
+        // Tìm đến đúng ngày trong tuần (ví dụ: Thứ 2)
+        sessionDate = sessionDate.add(
+          Duration(days: schedule.dayOfWeek - sessionDate.weekday),
+        );
+
+        // Ghép ngày và giờ
+        final startTime = DateTime(
+          sessionDate.year,
+          sessionDate.month,
+          sessionDate.day,
+          schedule.startTime.hour,
+          schedule.startTime.minute,
+        );
+
+        final docRef = _db.collection('sessions').doc();
+        batch.set(docRef, {
+          'classId': classId,
+          'title':
+              '$baseTitle - Buổi ${(week * weeklySchedules.length) + weeklySchedules.indexOf(schedule) + 1}',
+          'startTime': Timestamp.fromDate(startTime),
+          'endTime': Timestamp.fromDate(
+            startTime.add(Duration(minutes: durationInMinutes)),
+          ),
+          'location': location,
+          'status': 'scheduled',
+          'type': 'lecture',
+          'attendanceOpen': false,
+        });
+      }
+    }
+
+    await batch.commit();
+  }
 
   Future<void> enrollStudent({
     required String joinCode,
@@ -84,32 +109,50 @@ class ClassService {
     });
   }
 
-  /// Lấy danh sách sinh viên đã tham gia lớp, bao gồm cả ID của bản ghi enrollment
+  /// Lấy danh sách sinh viên đã ghi danh vào lớp, bao gồm cả thông tin chi tiết.
   Future<List<Map<String, dynamic>>> getEnrolledStudents(String classId) async {
-    final List<Map<String, dynamic>> students = [];
-    try {
-      // 1. Lấy tất cả các bản ghi enrollment của lớp học
-      final enrollmentsQuery = await _db
-          .collection('enrollments')
-          .where('classId', isEqualTo: classId)
-          .get();
+    // 1. Lấy tất cả các bản ghi enrollment của lớp học
+    final enrollmentsQuery = await _db
+        .collection('enrollments')
+        .where('classId', isEqualTo: classId)
+        .get();
 
-      for (final doc in enrollmentsQuery.docs) {
-        final data = doc.data();
-        // 2. Thêm thông tin sinh viên VÀ ID của enrollment vào danh sách
-        students.add({
-          // QUAN TRỌNG: Thêm dòng này để lấy ID cho việc xoá
-          'enrollmentId': doc.id,
-          'displayName': data['studentName'],
-          'email': data['studentEmail'],
-          'uid': data['studentUid'], // Có thể cần dùng sau này
-        });
-      }
-    } catch (e) {
-      print('Error getting enrolled students: $e');
-      // Trả về danh sách rỗng nếu có lỗi
+    if (enrollmentsQuery.docs.isEmpty) {
+      return []; // Trả về danh sách rỗng nếu không có sinh viên nào
     }
-    return students;
+
+    // 2. Lấy ra danh sách các studentUid
+    final studentUids = enrollmentsQuery.docs
+        .map((doc) => doc.data()['studentUid'] as String)
+        .toList();
+
+    // Lấy ID của bản ghi enrollment để dùng cho việc xoá
+    final enrollmentIds = {
+      for (var doc in enrollmentsQuery.docs) doc.data()['studentUid']: doc.id,
+    };
+
+    if (studentUids.isEmpty) {
+      return [];
+    }
+
+    // 3. Dùng danh sách studentUids để lấy thông tin chi tiết từ collection 'users'
+    // Firestore cho phép query tối đa 30 item trong một lệnh 'whereIn'
+    final usersSnapshot = await _db
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: studentUids)
+        .get();
+
+    // 4. Chuyển đổi kết quả thành danh sách Map mong muốn
+    return usersSnapshot.docs.map((userDoc) {
+      final userData = userDoc.data();
+      return {
+        'uid': userDoc.id,
+        'displayName': userData['displayName'] ?? 'N/A',
+        'email': userData['email'] ?? 'N/A',
+        // Thêm enrollmentId vào map để logic Xoá có thể hoạt động
+        'enrollmentId': enrollmentIds[userDoc.id],
+      };
+    }).toList();
   }
 
   /// Xoá một sinh viên khỏi lớp học dựa trên ID của bản ghi enrollment

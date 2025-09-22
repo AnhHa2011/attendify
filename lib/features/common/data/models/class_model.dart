@@ -2,24 +2,6 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ClassSchedule không cần thay đổi, có thể giữ nguyên ở đây hoặc tách file riêng.
-class ClassSchedule {
-  final int day;
-  final String start;
-  final String end;
-  const ClassSchedule({
-    required this.day,
-    required this.start,
-    required this.end,
-  });
-  Map<String, dynamic> toMap() => {'day': day, 'start': start, 'end': end};
-  factory ClassSchedule.fromMap(Map<String, dynamic> m) => ClassSchedule(
-    day: m['day'] as int,
-    start: m['start'] as String,
-    end: m['end'] as String,
-  );
-}
-
 class ClassModel {
   // === Dữ liệu gốc, lưu trên Firestore ===
   final String id;

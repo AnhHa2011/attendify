@@ -9,6 +9,7 @@ import '../../../common/data/models/class_model.dart';
 import '../../../common/data/models/session_model.dart';
 import '../../../common/data/models/user_model.dart';
 import '../../data/services/admin_service.dart';
+import '../../../common/data/models/class_schedule_model.dart';
 
 class AdminClassDetailPage extends StatelessWidget {
   final ClassModel classInfo;
@@ -399,7 +400,7 @@ class AdminClassDetailPage extends StatelessWidget {
     );
   }
 
-  // Hàm hiển thị form tạo lịch hàng loạt
+  // Hàm hiển thị form tạo lịch hàng loạt linh hoạt
   void _showRecurringSessionForm(
     BuildContext context,
     AdminService adminSvc,
@@ -410,8 +411,25 @@ class AdminClassDetailPage extends StatelessWidget {
     final locationCtrl = TextEditingController(text: 'Tại lớp');
     final durationCtrl = TextEditingController(text: '90');
     final weeksCtrl = TextEditingController(text: '15');
-    DateTime? selectedDate = DateTime.now();
-    TimeOfDay? selectedTime = TimeOfDay.now();
+    DateTime semesterStartDate = DateTime.now();
+
+    // State để quản lý danh sách lịch học hàng tuần
+    List<ClassSchedule> weeklySchedules = [
+      const ClassSchedule(
+        dayOfWeek: 1,
+        startTime: TimeOfDay(hour: 7, minute: 30),
+      ),
+    ];
+
+    final weekdays = [
+      'Thứ 2',
+      'Thứ 3',
+      'Thứ 4',
+      'Thứ 5',
+      'Thứ 6',
+      'Thứ 7',
+      'Chủ nhật',
+    ];
 
     showDialog(
       context: context,
@@ -425,6 +443,7 @@ class AdminClassDetailPage extends StatelessWidget {
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       TextFormField(
                         controller: titleCtrl,
@@ -464,56 +483,129 @@ class AdminClassDetailPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Chọn ngày giờ cho buổi ĐẦU TIÊN:',
+                        'Ngày bắt đầu học kỳ:',
                         style: Theme.of(context).textTheme.labelSmall,
                       ),
-                      const SizedBox(height: 8),
-                      Row(
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.calendar_today),
+                        label: Text(
+                          DateFormat('dd/MM/yyyy').format(semesterStartDate),
+                        ),
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context, // Sửa lỗi: Thêm context
+                            initialDate: semesterStartDate,
+                            firstDate: DateTime(
+                              2020,
+                            ), // Sửa lỗi: Thêm firstDate
+                            lastDate: DateTime(2030), // Sửa lỗi: Thêm lastDate
+                          );
+                          if (date != null) {
+                            setDialogState(() => semesterStartDate = date);
+                          }
+                        },
+                      ),
+                      const Divider(height: 24),
+                      Text(
+                        'Lịch học trong tuần:',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      Column(
+                        mainAxisSize: MainAxisSize
+                            .min, // Quan trọng: để Column chỉ chiếm đúng không gian cần thiết
                         children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.calendar_today),
-                              label: Text(
-                                selectedDate == null
-                                    ? 'Chọn ngày'
-                                    : DateFormat(
-                                        'dd/MM/yyyy',
-                                      ).format(selectedDate!),
-                              ),
-                              onPressed: () async {
-                                final date = await showDatePicker(
-                                  context: context,
-                                  initialDate: DateTime.now(),
-                                  firstDate: DateTime(2020),
-                                  lastDate: DateTime(2030),
+                          for (
+                            int index = 0;
+                            index < weeklySchedules.length;
+                            index++
+                          )
+                            Builder(
+                              builder: (context) {
+                                // Dùng Builder để lấy context mới nếu cần
+                                final schedule = weeklySchedules[index];
+                                return Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 2,
+                                      child: DropdownButton<int>(
+                                        value: schedule.dayOfWeek,
+                                        items: List.generate(
+                                          7,
+                                          (i) => DropdownMenuItem(
+                                            value: i + 1,
+                                            child: Text(weekdays[i]),
+                                          ),
+                                        ),
+                                        onChanged: (value) {
+                                          if (value != null) {
+                                            setDialogState(
+                                              () => weeklySchedules[index] =
+                                                  ClassSchedule(
+                                                    dayOfWeek: value,
+                                                    startTime:
+                                                        schedule.startTime,
+                                                  ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      flex: 2,
+                                      child: OutlinedButton(
+                                        child: Text(
+                                          schedule.startTime.format(context),
+                                        ),
+                                        onPressed: () async {
+                                          final time = await showTimePicker(
+                                            context: context,
+                                            initialTime: schedule.startTime,
+                                          );
+                                          if (time != null) {
+                                            setDialogState(
+                                              () => weeklySchedules[index] =
+                                                  ClassSchedule(
+                                                    dayOfWeek:
+                                                        schedule.dayOfWeek,
+                                                    startTime: time,
+                                                  ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.remove_circle_outline,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () => setDialogState(
+                                        () => weeklySchedules.removeAt(index),
+                                      ),
+                                    ),
+                                  ],
                                 );
-                                if (date != null) {
-                                  setDialogState(() => selectedDate = date);
-                                }
                               },
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.access_time),
-                              label: Text(
-                                selectedTime == null
-                                    ? 'Chọn giờ'
-                                    : selectedTime!.format(context),
-                              ),
-                              onPressed: () async {
-                                final time = await showTimePicker(
-                                  context: context,
-                                  initialTime: TimeOfDay.now(),
-                                );
-                                if (time != null) {
-                                  setDialogState(() => selectedTime = time);
-                                }
-                              },
-                            ),
-                          ),
                         ],
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.add),
+                          label: const Text('Thêm lịch'),
+                          onPressed: () {
+                            setDialogState(
+                              () => weeklySchedules.add(
+                                const ClassSchedule(
+                                  dayOfWeek: 1,
+                                  startTime: TimeOfDay(hour: 7, minute: 30),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -527,25 +619,21 @@ class AdminClassDetailPage extends StatelessWidget {
                 FilledButton(
                   onPressed: () async {
                     if (formKey.currentState!.validate() &&
-                        selectedDate != null &&
-                        selectedTime != null) {
-                      final startTime = DateTime(
-                        selectedDate!.year,
-                        selectedDate!.month,
-                        selectedDate!.day,
-                        selectedTime!.hour,
-                        selectedTime!.minute,
-                      );
+                        weeklySchedules.isNotEmpty) {
+                      // Sửa lỗi: Đảm bảo không dùng BuildContext trong async gap
+                      final navigator = Navigator.of(ctx);
+
                       await adminSvc.createRecurringSessions(
                         classId: classId,
                         baseTitle: titleCtrl.text.trim(),
                         location: locationCtrl.text.trim(),
-                        firstSessionStartTime: startTime,
                         durationInMinutes:
                             int.tryParse(durationCtrl.text) ?? 90,
                         numberOfWeeks: int.tryParse(weeksCtrl.text) ?? 1,
+                        semesterStartDate: semesterStartDate,
+                        weeklySchedules: weeklySchedules,
                       );
-                      if (ctx.mounted) Navigator.of(ctx).pop();
+                      navigator.pop();
                     }
                   },
                   child: const Text('Tạo lịch'),

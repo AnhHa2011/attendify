@@ -1,4 +1,4 @@
-// lib/services/firebase/admin/admin_service.dart
+// lib/features/admin/data/services/admin_service.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,6 +7,7 @@ import '../../../common/data/models/class_model.dart';
 import '../../../common/data/models/course_model.dart';
 import '../../../common/data/models/session_model.dart';
 import '../../../common/data/models/user_model.dart';
+import '../../../common/data/models/class_schedule_model.dart';
 
 class AdminService {
   final _db = FirebaseFirestore.instance;
@@ -44,42 +45,10 @@ class AdminService {
     }
   }
 
-  // /// Chỉ Admin mới được phép gửi email đặt lại mật khẩu cho user khác.
-  // Future<void> sendPasswordResetForUserAsAdmin(String targetEmail) async {
-  //   final current = _auth.currentUser;
-  //   if (current == null) {
-  //     throw Exception('Bạn chưa đăng nhập.');
-  //   }
-  //   final meDoc = await _db.collection('users').doc(current.uid).get();
-  //   final role = (meDoc.data()?['role'] ?? '').toString().toLowerCase();
-  //   if (role != 'admin' && role != 'it') {
-  //     throw Exception('Chỉ Admin mới có quyền gửi email đặt lại mật khẩu.');
-  //   }
-  //   await _auth.sendPasswordResetEmail(email: targetEmail.trim());
-  // }
   /// Send reset password email to a user
   Future<void> sendPasswordResetForUser(String email) async {
     await _auth.sendPasswordResetEmail(email: email);
   }
-  // === QUẢN LÝ NGƯỜI DÙNG (USERS) ===
-
-  /// Lấy danh sách tất cả giảng viên
-  // Stream<List<Map<String, String>>> getAllLecturersStream() {
-  //   return _db
-  //       .collection('users')
-  //       .where('role', isEqualTo: 'lecturer')
-  //       .snapshots()
-  //       .map(
-  //         (snapshot) => snapshot.docs.map((doc) {
-  //           final d = doc.data();
-  //           return {
-  //             'uid': doc.id,
-  //             'name': (d['displayName'] ?? '') as String,
-  //             'email': (d['email'] ?? '') as String,
-  //           };
-  //         }).toList(),
-  //       );
-  // }
 
   /// Hàm này trả về đúng kiểu List<UserModel>.
   Stream<List<UserModel>> getUsersStreamByRole(UserRole role) {
@@ -211,6 +180,53 @@ class AdminService {
   //     'joinCode': null,
   //   });
   // }
+
+  /// Tạo lịch học hàng loạt cho nhiều tuần liên tiếp
+  Future<void> createRecurringSessions({
+    required String classId,
+    required String baseTitle,
+    required String location,
+    required int durationInMinutes,
+    required int numberOfWeeks,
+    required List<ClassSchedule> weeklySchedules,
+    required DateTime semesterStartDate,
+  }) async {
+    final batch = _db.batch();
+
+    for (int week = 0; week < numberOfWeeks; week++) {
+      for (final schedule in weeklySchedules) {
+        DateTime sessionDate = semesterStartDate.add(Duration(days: week * 7));
+        sessionDate = sessionDate.add(
+          Duration(days: schedule.dayOfWeek - sessionDate.weekday),
+        );
+
+        final startTime = DateTime(
+          sessionDate.year,
+          sessionDate.month,
+          sessionDate.day,
+          schedule.startTime.hour,
+          schedule.startTime.minute,
+        );
+
+        final docRef = _db.collection('sessions').doc();
+        batch.set(docRef, {
+          'classId': classId,
+          'title':
+              '$baseTitle - Buổi ${(week * weeklySchedules.length) + weeklySchedules.indexOf(schedule) + 1}',
+          'startTime': Timestamp.fromDate(startTime),
+          'endTime': Timestamp.fromDate(
+            startTime.add(Duration(minutes: durationInMinutes)),
+          ),
+          'location': location,
+          'status': 'scheduled', // Giả sử model của bạn chấp nhận chuỗi
+          'type': 'lecture', // Giả sử model của bạn chấp nhận chuỗi
+          'attendanceOpen': false,
+        });
+      }
+    }
+
+    await batch.commit();
+  }
   // === QUẢN LÝ MÔN HỌC (COURSES) ===
 
   /// Tạo một môn học mới
@@ -474,36 +490,6 @@ class AdminService {
               .map((doc) => SessionModel.fromFirestore(doc))
               .toList(),
         );
-  }
-
-  /// Tạo lịch học hàng loạt cho nhiều tuần liên tiếp
-  Future<void> createRecurringSessions({
-    required String classId,
-    required String baseTitle,
-    required DateTime firstSessionStartTime,
-    required int durationInMinutes,
-    required String location,
-    required int numberOfWeeks,
-  }) async {
-    final batch = _db.batch();
-    for (int i = 0; i < numberOfWeeks; i++) {
-      final sessionStartTime = firstSessionStartTime.add(Duration(days: 7 * i));
-      final sessionEndTime = sessionStartTime.add(
-        Duration(minutes: durationInMinutes),
-      );
-      final docRef = _db.collection('sessions').doc();
-      batch.set(docRef, {
-        'classId': classId,
-        'title': '$baseTitle - Buổi ${i + 1}',
-        'startTime': Timestamp.fromDate(sessionStartTime),
-        'endTime': Timestamp.fromDate(sessionEndTime),
-        'location': location,
-        'status': SessionStatus.scheduled.name,
-        'type': SessionType.lecture.name,
-        'attendanceOpen': false,
-      });
-    }
-    await batch.commit();
   }
 
   // === THÊM MỚI: CÁC HÀM QUẢN LÝ VIỆC GHI DANH (ENROLLMENT) ===

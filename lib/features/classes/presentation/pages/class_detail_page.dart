@@ -13,6 +13,7 @@ import '../../../../../app/providers/auth_provider.dart';
 import '../../../sessions/presentation/pages/data/services/session_service.dart';
 import '../../../sessions/presentation/pages/session_detail_page.dart';
 import '../../data/services/class_service.dart';
+import '../../widgets/dynamic_qr_code_dialog.dart';
 
 class ClassDetailPage extends StatefulWidget {
   final String classId;
@@ -25,22 +26,22 @@ class ClassDetailPage extends StatefulWidget {
 class _ClassDetailPageState extends State<ClassDetailPage> {
   bool _isStartingSession = false;
 
-  // Hàm logic để Giảng viên chọn và kích hoạt buổi học
-  Future<void> _showSessionSelectorAndstartTimetendance() async {
+  Future<void> _showSessionSelectorAndStartAttendance() async {
     setState(() => _isStartingSession = true);
     final sessionService = context.read<SessionService>();
 
     try {
-      final scheduledSessions = await sessionService
-          .getScheduledSessionsForClass(widget.classId)
+      // === THAY ĐỔI: GỌI HÀM MỚI ĐỂ LẤY DANH SÁCH BUỔI HỌC PHÙ HỢP ===
+      final attendableSessions = await sessionService
+          .getAttendableSessionsForClass(widget.classId)
           .first;
       if (!mounted) return;
 
-      if (scheduledSessions.isEmpty) {
+      if (attendableSessions.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Không có buổi học nào được lên lịch hoặc tất cả đã diễn ra.',
+              'Không có buổi học nào có thể điểm danh vào lúc này.',
             ),
           ),
         );
@@ -55,14 +56,22 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
             width: double.maxFinite,
             child: ListView.builder(
               shrinkWrap: true,
-              itemCount: scheduledSessions.length,
+              itemCount: attendableSessions.length, // Dùng danh sách mới
               itemBuilder: (context, index) {
-                final session = scheduledSessions[index];
+                final session = attendableSessions[index];
+                // Thêm hiển thị trạng thái để Giảng viên biết
+                final isOngoing = session.status == SessionStatus.inProgress;
                 return ListTile(
                   title: Text(session.title),
                   subtitle: Text(
                     'Lịch học: ${DateFormat('dd/MM/yyyy HH:mm').format(session.startTime)}',
                   ),
+                  trailing: isOngoing
+                      ? const Chip(
+                          label: Text('Đang diễn ra'),
+                          backgroundColor: Colors.greenAccent,
+                        )
+                      : null,
                   onTap: () => Navigator.of(ctx).pop(session),
                 );
               },
@@ -78,28 +87,25 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
       );
 
       if (selectedSession != null) {
-        await sessionService.startTimetendanceForSession(selectedSession.id);
-        final timestamp = DateTime.now().millisecondsSinceEpoch;
-        final qrData = '${widget.classId}|${selectedSession.id}||$timestamp';
+        // Nếu buổi học chưa được mở, thì mở nó ra
+        if (selectedSession.status != SessionStatus.inProgress) {
+          await sessionService.startAttendanceForSession(selectedSession.id);
+        }
 
         if (!mounted) return;
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Điểm danh cho: ${selectedSession.title}'),
-            content: SizedBox(
-              width: 250,
-              height: 250,
-              child: QrImageView(data: qrData),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('ĐÓNG'),
-              ),
-            ],
+          barrierDismissible: false,
+          builder: (context) => DynamicQrCodeDialog(
+            classId: widget.classId,
+            sessionId: selectedSession.id,
+            sessionTitle: selectedSession.title,
+            refreshInterval: 60,
           ),
-        );
+        ).then((_) {
+          // Sau khi đóng dialog, tự động đóng điểm danh để bảo mật
+          sessionService.toggleAttendance(selectedSession.id, false);
+        });
       }
     } catch (e) {
       if (!mounted) return;
@@ -147,7 +153,7 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                   heroTag: 'fab_lecturer_class_detail',
                   onPressed: _isStartingSession
                       ? null
-                      : _showSessionSelectorAndstartTimetendance,
+                      : _showSessionSelectorAndStartAttendance,
                   label: const Text('Bắt đầu điểm danh'),
                   icon: _isStartingSession
                       ? const SizedBox(

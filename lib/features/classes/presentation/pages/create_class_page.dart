@@ -3,9 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../common/data/models/class_model.dart';
 import '../../../common/data/models/course_model.dart'; // Import model mới
 import '../../data/services/class_service.dart';
+import '../../../common/data/models/class_schedule_model.dart';
 import 'class_detail_page.dart';
 
 class CreateClassPage extends StatefulWidget {

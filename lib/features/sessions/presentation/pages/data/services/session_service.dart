@@ -50,44 +50,49 @@ class SessionService {
         );
   }
 
-  /// Kích hoạt trạng thái điểm danh cho một buổi học cụ thể (Dành cho Giảng viên)
-  Future<void> startTimetendanceForSession(String sessionId) async {
+  /// Kích hoạt điểm danh VÀ đặt thời gian tự động đóng sau 2 giờ
+  Future<void> startAttendanceForSession(String sessionId) async {
+    final autoCloseTime = DateTime.now().add(const Duration(hours: 2));
+
     await _db.collection('sessions').doc(sessionId).update({
       'status': SessionStatus.inProgress.name,
       'actualStartTime': FieldValue.serverTimestamp(),
-      'attendanceOpen': true, // Mở điểm danh
+      'attendanceOpen': true,
+      // THÊM MỚI: Ghi lại thời gian hết hạn
+      'attendanceAutoCloseTime': Timestamp.fromDate(autoCloseTime),
     });
   }
 
-  // /// Lấy danh sách các buổi học ĐÃ ĐƯỢỢC LÊN LỊCH (chưa bắt đầu) của một lớp
-  // Stream<List<SessionModel>> getScheduledSessionsForClass(String classId) {
-  //   return _db
-  //       .collection('sessions')
-  //       .where('classId', isEqualTo: classId)
-  //       // Chỉ lấy những buổi có trạng thái là 'scheduled'
-  //       .where('status', isEqualTo: SessionStatus.scheduled.name)
-  //       .orderBy('startTime') // Sắp xếp theo thời gian bắt đầu
-  //       .snapshots()
-  //       .map(
-  //         (snapshot) => snapshot.docs
-  //             .map((doc) => SessionModel.fromFirestore(doc))
-  //             .toList(),
-  //       );
-  // }
+  /// Bao gồm các buổi 'scheduled' và 'inProgress' tính đến cuối ngày hôm nay.
+  Stream<List<SessionModel>> getAttendableSessionsForClass(String classId) {
+    final now = DateTime.now();
+    // Tạo mốc thời gian là cuối ngày hôm nay (23:59:59)
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
-  // /// Kích hoạt trạng thái điểm danh cho một buổi học cụ thể
-  // Future<void> startTimetendanceForSession(String sessionId) async {
-  //   try {
-  //     await _db.collection('sessions').doc(sessionId).update({
-  //       // Chuyển trạng thái sang 'đang diễn ra'
-  //       'status': SessionStatus.inProgress.name,
-  //       // Có thể lưu lại thời gian bắt đầu thực tế nếu cần
-  //       'actualStartTime': FieldValue.serverTimestamp(),
-  //     });
-  //   } catch (e) {
-  //     throw Exception('Không thể bắt đầu buổi học: $e');
-  //   }
-  // }
+    return _db
+        .collection('sessions')
+        .where('classId', isEqualTo: classId)
+        // Chỉ lấy các buổi có trạng thái 'scheduled' hoặc 'inProgress'
+        .where(
+          'status',
+          whereIn: [
+            SessionStatus.scheduled.name,
+            SessionStatus.inProgress.name,
+          ],
+        )
+        // Chỉ lấy các buổi có thời gian bắt đầu từ quá khứ cho đến hết ngày hôm nay
+        .where('startTime', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
+        .orderBy(
+          'startTime',
+          descending: true,
+        ) // Hiển thị buổi gần nhất lên đầu
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => SessionModel.fromFirestore(doc))
+              .toList(),
+        );
+  }
 
   /// Lắng nghe thay đổi của MỘT buổi học cụ thể
   Stream<SessionModel> getSessionStream(String sessionId) {
@@ -106,6 +111,7 @@ class SessionService {
   }
 
   /// Ghi nhận điểm danh cho sinh viên (Khi SV quét mã QR)
+  /// Ghi nhận điểm danh cho sinh viên (Khi SV quét mã QR)
   Future<void> markAttendance({
     required String sessionId,
     required String studentId,
@@ -117,9 +123,24 @@ class SessionService {
       throw Exception('Buổi học không tồn tại.');
     }
 
-    final isAttendanceOpen = sessionDoc.data()?['attendanceOpen'] ?? false;
+    final sessionData = sessionDoc.data()!;
+    final isAttendanceOpen = sessionData['attendanceOpen'] ?? false;
     if (!isAttendanceOpen) {
-      throw Exception('Giảng viên chưa mở điểm danh cho buổi học này.');
+      throw Exception('Giảng viên chưa mở hoặc đã đóng điểm danh.');
+    }
+
+    // THÊM MỚI: KIỂM TRA THỜI GIAN HẾT HẠN
+    final autoCloseTimestamp =
+        sessionData['attendanceAutoCloseTime'] as Timestamp?;
+    if (autoCloseTimestamp != null &&
+        DateTime.now().isAfter(autoCloseTimestamp.toDate())) {
+      // Nếu đã quá giờ, tự động đóng điểm danh trên server và báo lỗi
+      await sessionRef.update({'attendanceOpen': false});
+      throw Exception('Đã hết thời gian điểm danh cho buổi học này.');
+    }
+
+    if (!sessionDoc.exists) {
+      throw Exception('Buổi học không tồn tại.');
     }
 
     final attendeeRef = sessionRef.collection('attendees').doc(studentId);
@@ -191,12 +212,21 @@ class SessionService {
     required String studentId,
     required String newStatus, // Ví dụ: 'present', 'late', 'excused'
   }) {
-    return _db
+    final attendeeRef = _db
         .collection('sessions')
         .doc(sessionId)
         .collection('attendees')
-        .doc(studentId)
-        .update({'status': newStatus});
+        .doc(studentId);
+
+    // Dùng .set() với merge: true
+    // - Nếu sinh viên chưa điểm danh (document chưa tồn tại), nó sẽ TẠO MỚI.
+    // - Nếu sinh viên đã điểm danh (document đã tồn tại), nó sẽ CẬP NHẬT.
+    return attendeeRef.set({
+      'status': newStatus,
+      // Thêm các trường này để đảm bảo dữ liệu nhất quán khi tạo mới
+      'studentId': studentId,
+      'timestamp': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true)); // SetOptions(merge: true) rất quan trọng!
   }
 
   /// === NÂNG CẤP: Lấy danh sách TẤT CẢ sinh viên trong lớp (bao gồm cả trạng thái điểm danh) ===
