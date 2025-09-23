@@ -445,12 +445,6 @@ class _ClassBulkImportPageState extends State<ClassBulkImportPage> {
                           label: const Text('Tải template lớp (.xlsx)'),
                           onPressed: () => TemplateDownloader.download('class'),
                         ),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.download_for_offline_outlined),
-                          label: const Text('Template lớp + SV (multi-sheet)'),
-                          onPressed: () =>
-                              TemplateDownloader.download('class_enroll'),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 8),

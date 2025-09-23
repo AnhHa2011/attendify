@@ -89,7 +89,14 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
             value: 'bulk',
             child: ListTile(
               leading: Icon(Icons.upload_file),
-              title: Text('Thêm lớp học từ file'),
+              title: Text('Thêm 1 lớp học từ file'),
+            ),
+          ),
+          PopupMenuItem(
+            value: 'bulk_enroll',
+            child: ListTile(
+              leading: Icon(Icons.upload_file),
+              title: Text('Thêm nhiều lớp học từ file'),
             ),
           ),
         ],

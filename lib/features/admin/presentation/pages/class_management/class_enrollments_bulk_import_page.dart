@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 
 import '../../../../common/data/models/course_model.dart';
 import '../../../../common/data/models/user_model.dart';
+import '../../../../common/utils/template_downloader_io.dart'
+    as TemplateDownloader;
 import '../../../data/services/admin_service.dart';
 
 // Sheet structure (per class):
@@ -651,8 +653,11 @@ class _ClassEnrollmentsBulkImportPageState
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Mỗi sheet là 1 lớp: Row1 headers, Row2 values, Row4 headers SV, Row5+ danh sách SV.',
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.download_for_offline_outlined),
+                          label: const Text('Template lớp + SV (multi-sheet)'),
+                          onPressed: () =>
+                              TemplateDownloader.download('class_enroll'),
                         ),
                         const SizedBox(height: 8),
                         Row(
