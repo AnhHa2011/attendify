@@ -1353,26 +1353,58 @@ class _LecturerDashboardStats extends StatelessWidget {
     final lecturerUid = auth.user?.uid;
     if (lecturerUid == null) return const SizedBox.shrink();
 
-    // <<<--- THAY ĐỔI: STREAMBUILDER SỬ DỤNG RICHCLASSMODEL ---<<<
     return StreamBuilder<List<RichClassModel>>(
       stream: classService.getRichClassesStreamForLecturer(lecturerUid),
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          // Hiển thị skeleton loading trong khi chờ dữ liệu
+          return const Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  title: 'Lớp của tôi',
+                  value: '...',
+                  icon: Icons.class_,
+                  color: Colors.orange,
+                ),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: _StatCard(
+                  title: 'Sinh viên',
+                  value: '...',
+                  icon: Icons.people,
+                  color: Colors.purple,
+                ),
+              ),
+            ],
+          );
+        }
+
         final myClasses = snapshot.data ?? [];
+
+        // === TÍNH TOÁN TỔNG SỐ SINH VIÊN ===
+        // Dùng fold để cộng dồn studentCount từ mỗi lớp học
+        final totalStudents = myClasses.fold<int>(
+          0,
+          (sum, item) => sum + item.studentCount,
+        );
+
         return Row(
           children: [
             Expanded(
               child: _StatCard(
                 title: 'Lớp của tôi',
-                value: '${myClasses.length}',
+                value: '${myClasses.length}', // Số lượng lớp
                 icon: Icons.class_,
                 color: Colors.orange,
               ),
             ),
             const SizedBox(width: 16),
-            const Expanded(
+            Expanded(
               child: _StatCard(
                 title: 'Sinh viên',
-                value: '...', // Cần logic mới để đếm tổng SV
+                value: '$totalStudents', // <<<--- HIỂN THỊ TỔNG SỐ SINH VIÊN
                 icon: Icons.people,
                 color: Colors.purple,
               ),
