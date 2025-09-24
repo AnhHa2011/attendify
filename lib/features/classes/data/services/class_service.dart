@@ -2,7 +2,21 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../common/data/models/class_model.dart';
 import '../../../common/data/models/course_model.dart';
+import '../../../common/data/models/user_model.dart';
 import '../../../common/data/models/class_schedule_model.dart';
+
+/// Một "View Model" chứa thông tin đầy đủ của một lớp học để hiển thị trên UI.
+class RichClassModel {
+  final ClassModel classInfo;
+  final List<CourseModel> courses;
+  final UserModel? lecturer;
+
+  RichClassModel({
+    required this.classInfo,
+    required this.courses,
+    this.lecturer,
+  });
+}
 
 class ClassService {
   final _db = FirebaseFirestore.instance;
@@ -11,6 +25,46 @@ class ClassService {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final rnd = Random.secure();
     return List.generate(len, (_) => chars[rnd.nextInt(chars.length)]).join();
+  }
+
+  // Hàm này nhận vào một ClassModel gốc và trả về một RichClassModel đầy đủ thông tin.
+  Future<RichClassModel> _enrichClassModel(ClassModel classModel) async {
+    // 1. Lấy thông tin giảng viên
+    UserModel? lecturer;
+    try {
+      final lecturerDoc = await _db
+          .collection('users')
+          .doc(classModel.lecturerId)
+          .get();
+      if (lecturerDoc.exists) {
+        lecturer = UserModel.fromFirestore(lecturerDoc);
+      }
+    } catch (e) {
+      // Bỏ qua lỗi nếu không tìm thấy giảng viên
+    }
+
+    // 2. Lấy danh sách thông tin các môn học
+    List<CourseModel> courses = [];
+    if (classModel.courseIds.isNotEmpty) {
+      try {
+        final courseSnapshot = await _db
+            .collection('courses')
+            .where(FieldPath.documentId, whereIn: classModel.courseIds)
+            .get();
+        courses = courseSnapshot.docs
+            .map((doc) => CourseModel.fromDoc(doc))
+            .toList();
+      } catch (e) {
+        // Bỏ qua lỗi nếu không tìm thấy môn học
+      }
+    }
+
+    // 3. Trả về model đã được làm giàu
+    return RichClassModel(
+      classInfo: classModel,
+      courses: courses,
+      lecturer: lecturer,
+    );
   }
 
   /// === NÂNG CẤP: TẠO LỊCH HỌC HÀNG LOẠT DỰA TRÊN THỜI KHÓA BIỂU HÀNG TUẦN ===
@@ -179,138 +233,272 @@ class ClassService {
     }
   }
 
-  /// Lắng nghe MỘT lớp học và "làm giàu" nó với thông tin môn học + giảng viên
-  Stream<ClassModel> getRichClassStream(String classId) {
-    // 1. Lắng nghe document class cụ thể
+  // /// Lắng nghe MỘT lớp học và "làm giàu" nó với thông tin môn học + giảng viên
+  // Stream<ClassModel> getRichClassStream(String classId) {
+  //   // 1. Lắng nghe document class cụ thể
+  //   return _db.collection('classes').doc(classId).snapshots().asyncMap((
+  //     classDoc,
+  //   ) async {
+  //     if (!classDoc.exists) {
+  //       throw Exception('Lớp học không tồn tại!');
+  //     }
+
+  //     final classModel = ClassModel.fromDoc(classDoc);
+
+  //     try {
+  //       // 2. Lấy thông tin môn học (một lần)
+  //       final courseDoc = await _db
+  //           .collection('courses')
+  //           .doc(classModel.courseId)
+  //           .get();
+  //       final courseData = courseDoc.data();
+
+  //       // 3. Lấy thông tin giảng viên (một lần)
+  //       final lecturerDoc = await _db
+  //           .collection('users')
+  //           .doc(classModel.lecturerId)
+  //           .get();
+  //       final lecturerData = lecturerDoc.data();
+
+  //       // 4. Trả về model đã được "làm giàu" bằng hàm copyWith
+  //       return classModel.copyWith(
+  //         courseName: courseData?['courseName'],
+  //         courseCode: courseData?['courseCode'],
+  //         lecturerName: lecturerData?['displayName'],
+  //       );
+  //     } catch (e) {
+  //       print('Error enriching class $classId: $e');
+  //       // Trả về dữ liệu gốc nếu có lỗi (ví dụ: môn học bị xóa)
+  //       return classModel;
+  //     }
+  //   });
+  // }
+
+  /// Lắng nghe MỘT lớp học và trả về Stream của RichClassModel
+  Stream<RichClassModel> getRichClassStream(String classId) {
     return _db.collection('classes').doc(classId).snapshots().asyncMap((
       classDoc,
     ) async {
       if (!classDoc.exists) {
         throw Exception('Lớp học không tồn tại!');
       }
-
       final classModel = ClassModel.fromDoc(classDoc);
-
-      try {
-        // 2. Lấy thông tin môn học (một lần)
-        final courseDoc = await _db
-            .collection('courses')
-            .doc(classModel.courseId)
-            .get();
-        final courseData = courseDoc.data();
-
-        // 3. Lấy thông tin giảng viên (một lần)
-        final lecturerDoc = await _db
-            .collection('users')
-            .doc(classModel.lecturerId)
-            .get();
-        final lecturerData = lecturerDoc.data();
-
-        // 4. Trả về model đã được "làm giàu" bằng hàm copyWith
-        return classModel.copyWith(
-          courseName: courseData?['courseName'],
-          courseCode: courseData?['courseCode'],
-          lecturerName: lecturerData?['displayName'],
-        );
-      } catch (e) {
-        print('Error enriching class $classId: $e');
-        // Trả về dữ liệu gốc nếu có lỗi (ví dụ: môn học bị xóa)
-        return classModel;
-      }
+      // Gọi hàm helper để làm giàu dữ liệu
+      return await _enrichClassModel(classModel);
     });
   }
 
+  // /// Lấy danh sách lớp học của MỘT giảng viên
+  // Stream<List<ClassModel>> getRichClassesStreamForLecturer(String lecturerId) {
+  //   return _db
+  //       .collection('classes')
+  //       .where('lecturerId', isEqualTo: lecturerId)
+  //       .where('isArchived', isEqualTo: false)
+  //       // .orderBy('createdAt', descending: true) // (tuỳ, nếu field tồn tại)
+  //       .snapshots()
+  //       .asyncMap((classSnapshot) async {
+  //         final classes = classSnapshot.docs
+  //             .map((doc) => ClassModel.fromDoc(doc))
+  //             .toList();
+  //         if (classes.isEmpty) return [];
+
+  //         final richClassFutures = classes.map((classModel) async {
+  //           try {
+  //             final courseDoc = await _db
+  //                 .collection('courses')
+  //                 .doc(classModel.courseId)
+  //                 .get();
+  //             final lecturerDoc = await _db
+  //                 .collection('users')
+  //                 .doc(classModel.lecturerId)
+  //                 .get();
+  //             return classModel.copyWith(
+  //               courseName: courseDoc.data()?['courseName'],
+  //               courseCode: courseDoc.data()?['courseCode'],
+  //               lecturerName: lecturerDoc.data()?['displayName'],
+  //             );
+  //           } catch (_) {
+  //             return classModel;
+  //           }
+  //         }).toList();
+  //         return Future.wait(richClassFutures);
+  //       });
+  // }
+
   /// Lấy danh sách lớp học của MỘT giảng viên
-  /// Lấy danh sách lớp học của MỘT giảng viên
-  Stream<List<ClassModel>> getRichClassesStreamForLecturer(String lecturerId) {
+  Stream<List<RichClassModel>> getRichClassesStreamForLecturer(
+    String lecturerId,
+  ) {
     return _db
         .collection('classes')
         .where('lecturerId', isEqualTo: lecturerId)
         .where('isArchived', isEqualTo: false)
-        // .orderBy('createdAt', descending: true) // (tuỳ, nếu field tồn tại)
         .snapshots()
         .asyncMap((classSnapshot) async {
-          final classes = classSnapshot.docs
+          final classModels = classSnapshot.docs
               .map((doc) => ClassModel.fromDoc(doc))
               .toList();
-          if (classes.isEmpty) return [];
+          if (classModels.isEmpty) return [];
 
-          final richClassFutures = classes.map((classModel) async {
-            try {
-              final courseDoc = await _db
-                  .collection('courses')
-                  .doc(classModel.courseId)
-                  .get();
-              final lecturerDoc = await _db
-                  .collection('users')
-                  .doc(classModel.lecturerId)
-                  .get();
-              return classModel.copyWith(
-                courseName: courseDoc.data()?['courseName'],
-                courseCode: courseDoc.data()?['courseCode'],
-                lecturerName: lecturerDoc.data()?['displayName'],
-              );
-            } catch (_) {
-              return classModel;
-            }
-          }).toList();
+          // Dùng hàm helper để làm giàu cho mỗi lớp học
+          final richClassFutures = classModels
+              .map((model) => _enrichClassModel(model))
+              .toList();
           return Future.wait(richClassFutures);
         });
   }
 
+  // /// Lấy danh sách các lớp học đã "làm giàu" mà MỘT sinh viên đã tham gia
+  // Stream<List<ClassModel>> getRichEnrolledClassesStream(String studentId) {
+  //   // 1. Lắng nghe collection 'enrollments' để tìm các lớp của sinh viên
+  //   return _db
+  //       .collection('enrollments')
+  //       .where('studentId', isEqualTo: studentId)
+  //       .snapshots()
+  //       .asyncMap((enrollmentSnapshot) async {
+  //         if (enrollmentSnapshot.docs.isEmpty) {
+  //           return []; // Sinh viên này chưa tham gia lớp nào
+  //         }
+
+  //         // 2. Lấy ra danh sách các classId
+  //         final classIds = enrollmentSnapshot.docs
+  //             .map((doc) => doc.data()['classId'] as String)
+  //             .toList();
+
+  //         if (classIds.isEmpty) {
+  //           return [];
+  //         }
+
+  //         // 3. Lấy thông tin chi tiết cho từng lớp học
+  //         // Chúng ta sẽ lấy dữ liệu từ collection 'classes' nơi mà ID nằm trong danh sách classIds
+  //         final classQuery = await _db
+  //             .collection('classes')
+  //             .where(FieldPath.documentId, whereIn: classIds)
+  //             .get();
+
+  //         final classes = classQuery.docs
+  //             .map((doc) => ClassModel.fromDoc(doc))
+  //             .toList();
+
+  //         // 4. "Làm giàu" dữ liệu cho từng lớp (giống như các hàm trước)
+  //         final richClassFutures = classes.map((classModel) async {
+  //           try {
+  //             final courseDoc = await _db
+  //                 .collection('courses')
+  //                 .doc(classModel.courseId)
+  //                 .get();
+  //             final lecturerDoc = await _db
+  //                 .collection('users')
+  //                 .doc(classModel.lecturerId)
+  //                 .get();
+  //             return classModel.copyWith(
+  //               courseName: courseDoc.data()?['courseName'],
+  //               courseCode: courseDoc.data()?['courseCode'],
+  //               lecturerName: lecturerDoc.data()?['displayName'],
+  //             );
+  //           } catch (e) {
+  //             return classModel; // Trả về dữ liệu gốc nếu có lỗi
+  //           }
+  //         }).toList();
+
+  //         return await Future.wait(richClassFutures);
+  //       });
+  // }
+
+  // /// Lấy danh sách lớp học đã được "làm giàu" với thông tin môn học và giảng viên
+  // Stream<List<ClassModel>> getRichClassesStream() {
+  //   // 1. Lắng nghe sự thay đổi từ collection 'classes'
+  //   return _db.collection('classes').snapshots().asyncMap((
+  //     classSnapshot,
+  //   ) async {
+  //     final classes = classSnapshot.docs
+  //         .map((doc) => ClassModel.fromDoc(doc))
+  //         .toList();
+
+  //     if (classes.isEmpty) {
+  //       return []; // Trả về danh sách rỗng nếu không có lớp nào
+  //     }
+
+  //     // 2. Tạo một danh sách các "công việc" cần làm
+  //     final richClassFutures = classes.map((classModel) async {
+  //       try {
+  //         // Lấy thông tin môn học
+  //         final courseDoc = await _db
+  //             .collection('courses')
+  //             .doc(classModel.courseId)
+  //             .get();
+  //         final courseData = courseDoc.data();
+
+  //         // Lấy thông tin giảng viên
+  //         final lecturerDoc = await _db
+  //             .collection('users')
+  //             .doc(classModel.lecturerId)
+  //             .get();
+  //         final lecturerData = lecturerDoc.data();
+
+  //         // 3. Dùng hàm copyWith để tạo ra một ClassModel mới với dữ liệu đã làm giàu
+  //         return classModel.copyWith(
+  //           courseName: courseData?['courseName'],
+  //           courseCode: courseData?['courseCode'],
+  //           lecturerName: lecturerData?['displayName'],
+  //         );
+  //       } catch (e) {
+  //         // Nếu có lỗi (ví dụ: courseId không tồn tại), trả về model gốc
+  //         print('Error enriching class ${classModel.id}: $e');
+  //         return classModel;
+  //       }
+  //     }).toList();
+
+  //     // 4. Chạy tất cả các "công việc" song song và trả về kết quả
+  //     return await Future.wait(richClassFutures);
+  //   });
+  // }
+
+  /// Lấy TẤT CẢ danh sách lớp học đã được "làm giàu"
+  Stream<List<RichClassModel>> getRichClassesStream() {
+    return _db.collection('classes').snapshots().asyncMap((
+      classSnapshot,
+    ) async {
+      final classModels = classSnapshot.docs
+          .map((doc) => ClassModel.fromDoc(doc))
+          .toList();
+      if (classModels.isEmpty) return [];
+
+      // Dùng hàm helper để làm giàu cho mỗi lớp học
+      final richClassFutures = classModels
+          .map((model) => _enrichClassModel(model))
+          .toList();
+      return await Future.wait(richClassFutures);
+    });
+  }
+
   /// Lấy danh sách các lớp học đã "làm giàu" mà MỘT sinh viên đã tham gia
-  Stream<List<ClassModel>> getRichEnrolledClassesStream(String studentId) {
-    // 1. Lắng nghe collection 'enrollments' để tìm các lớp của sinh viên
+  Stream<List<RichClassModel>> getRichEnrolledClassesStream(String studentId) {
     return _db
         .collection('enrollments')
         .where('studentId', isEqualTo: studentId)
         .snapshots()
         .asyncMap((enrollmentSnapshot) async {
-          if (enrollmentSnapshot.docs.isEmpty) {
-            return []; // Sinh viên này chưa tham gia lớp nào
-          }
+          if (enrollmentSnapshot.docs.isEmpty) return [];
 
-          // 2. Lấy ra danh sách các classId
           final classIds = enrollmentSnapshot.docs
               .map((doc) => doc.data()['classId'] as String)
+              .toSet()
               .toList();
+          if (classIds.isEmpty) return [];
 
-          if (classIds.isEmpty) {
-            return [];
-          }
-
-          // 3. Lấy thông tin chi tiết cho từng lớp học
-          // Chúng ta sẽ lấy dữ liệu từ collection 'classes' nơi mà ID nằm trong danh sách classIds
           final classQuery = await _db
               .collection('classes')
               .where(FieldPath.documentId, whereIn: classIds)
               .get();
-
-          final classes = classQuery.docs
+          final classModels = classQuery.docs
               .map((doc) => ClassModel.fromDoc(doc))
               .toList();
 
-          // 4. "Làm giàu" dữ liệu cho từng lớp (giống như các hàm trước)
-          final richClassFutures = classes.map((classModel) async {
-            try {
-              final courseDoc = await _db
-                  .collection('courses')
-                  .doc(classModel.courseId)
-                  .get();
-              final lecturerDoc = await _db
-                  .collection('users')
-                  .doc(classModel.lecturerId)
-                  .get();
-              return classModel.copyWith(
-                courseName: courseDoc.data()?['courseName'],
-                courseCode: courseDoc.data()?['courseCode'],
-                lecturerName: lecturerDoc.data()?['displayName'],
-              );
-            } catch (e) {
-              return classModel; // Trả về dữ liệu gốc nếu có lỗi
-            }
-          }).toList();
-
+          // Dùng hàm helper để làm giàu cho mỗi lớp học
+          final richClassFutures = classModels
+              .map((model) => _enrichClassModel(model))
+              .toList();
           return await Future.wait(richClassFutures);
         });
   }
@@ -365,55 +553,6 @@ class ClassService {
         (_) => chars.codeUnitAt(rnd.nextInt(chars.length)),
       ),
     );
-  }
-
-  /// Lấy danh sách lớp học đã được "làm giàu" với thông tin môn học và giảng viên
-  Stream<List<ClassModel>> getRichClassesStream() {
-    // 1. Lắng nghe sự thay đổi từ collection 'classes'
-    return _db.collection('classes').snapshots().asyncMap((
-      classSnapshot,
-    ) async {
-      final classes = classSnapshot.docs
-          .map((doc) => ClassModel.fromDoc(doc))
-          .toList();
-
-      if (classes.isEmpty) {
-        return []; // Trả về danh sách rỗng nếu không có lớp nào
-      }
-
-      // 2. Tạo một danh sách các "công việc" cần làm
-      final richClassFutures = classes.map((classModel) async {
-        try {
-          // Lấy thông tin môn học
-          final courseDoc = await _db
-              .collection('courses')
-              .doc(classModel.courseId)
-              .get();
-          final courseData = courseDoc.data();
-
-          // Lấy thông tin giảng viên
-          final lecturerDoc = await _db
-              .collection('users')
-              .doc(classModel.lecturerId)
-              .get();
-          final lecturerData = lecturerDoc.data();
-
-          // 3. Dùng hàm copyWith để tạo ra một ClassModel mới với dữ liệu đã làm giàu
-          return classModel.copyWith(
-            courseName: courseData?['courseName'],
-            courseCode: courseData?['courseCode'],
-            lecturerName: lecturerData?['displayName'],
-          );
-        } catch (e) {
-          // Nếu có lỗi (ví dụ: courseId không tồn tại), trả về model gốc
-          print('Error enriching class ${classModel.id}: $e');
-          return classModel;
-        }
-      }).toList();
-
-      // 4. Chạy tất cả các "công việc" song song và trả về kết quả
-      return await Future.wait(richClassFutures);
-    });
   }
 
   // === Streams cho Admin/Lecturer/Student ===

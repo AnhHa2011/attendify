@@ -17,28 +17,32 @@ enum SessionType {
 class SessionModel {
   final String id;
   final String classId;
+  final String courseId; // <<<--- ĐÂY LÀ TRƯỜNG CỐT LÕI CẦN THÊM
+
+  // Các trường denormalized (lưu sẵn để tăng tốc độ đọc)
   final String className;
   final String classCode;
   final String lecturerId;
   final String lecturerName;
-  final String title; // Tiêu đề buổi học
-  final String? description; // Mô tả
-  final DateTime startTime; // Thời gian bắt đầu
-  final DateTime endTime; // Thời gian kết thúc
-  final String location; // Địa điểm (phòng học)
+
+  // Các trường thông tin chính của buổi học
+  final String title;
+  final String? description;
+  final DateTime startTime;
+  final DateTime endTime;
+  final String location;
   final SessionType type;
   final SessionStatus status;
   final DateTime createdAt;
   final DateTime? updatedAt;
-
-  // Attendance data
-  final int totalStudents; // Tổng số sinh viên
-  final int attendedStudents; // Số sinh viên có mặt
-  final bool isAttendanceOpen; // Có đang mở điểm danh không
+  final int totalStudents;
+  final int attendedStudents;
+  final bool isAttendanceOpen;
 
   SessionModel({
     required this.id,
     required this.classId,
+    required this.courseId, // <<<--- THÊM VÀO CONSTRUCTOR
     required this.className,
     required this.classCode,
     required this.lecturerId,
@@ -84,6 +88,7 @@ class SessionModel {
   Map<String, dynamic> toMap() {
     return {
       'classId': classId,
+      'courseId': courseId,
       'className': className,
       'classCode': classCode,
       'lecturerId': lecturerId,
@@ -119,6 +124,7 @@ class SessionModel {
     return SessionModel(
       id: doc.id,
       classId: data['classId'] ?? '',
+      courseId: data['courseId'] ?? '',
       className: data['className'] ?? '',
       classCode: data['classCode'] ?? '',
       lecturerId: data['lecturerId'] ?? '',
@@ -151,6 +157,7 @@ class SessionModel {
   SessionModel copyWith({
     String? id,
     String? classId,
+    String? courseId,
     String? className,
     String? classCode,
     String? lecturerId,
@@ -171,6 +178,7 @@ class SessionModel {
     return SessionModel(
       id: id ?? this.id,
       classId: classId ?? this.classId,
+      courseId: courseId ?? this.courseId,
       className: className ?? this.className,
       classCode: classCode ?? this.classCode,
       lecturerId: lecturerId ?? this.lecturerId,

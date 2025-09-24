@@ -1,5 +1,4 @@
 // lib/features/lecture/presentation/pages/lecture_menu.dart
-
 import 'package:attendify/features/schedule/presentation/pages/schedule_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -15,12 +14,10 @@ import '../../../classes/presentation/pages/class_detail_page.dart';
 import '../../../common/data/models/class_model.dart';
 import '../../../common/data/models/session_model.dart';
 import '../../../common/data/models/user_model.dart';
-// ⛔️ Bỏ import này vì bên dưới bạn tự định nghĩa lại RoleDrawerScaffold
-// import '../../../common/widgets/role_drawer_scaffold.dart';
+import '../../../admin/data/services/admin_service.dart'; // <<<--- Cần cho việc lấy SV
+
 import '../../../sessions/presentation/pages/data/services/session_service.dart';
 import '../../../sessions/presentation/pages/session_detail_page.dart';
-
-// ✨ NHẮC LỊCH: dùng Scheduler để đặt thông báo trước 1 giờ
 import '../../../schedule/data/services/schedule_service.dart';
 import '../../../schedule/domain/reminder_scheduler.dart';
 
@@ -343,8 +340,9 @@ class _LecturerDashboardStats extends StatelessWidget {
     final lecturerUid = auth.user?.uid;
     if (lecturerUid == null) return const SizedBox.shrink();
 
-    return StreamBuilder<List<ClassModel>>(
-      stream: classService.classesOfLecturer(lecturerUid),
+    // <<<--- THAY ĐỔI: STREAMBUILDER SỬ DỤNG RICHCLASSMODEL ---<<<
+    return StreamBuilder<List<RichClassModel>>(
+      stream: classService.getRichClassesStreamForLecturer(lecturerUid),
       builder: (context, snapshot) {
         final myClasses = snapshot.data ?? [];
         return Row(
@@ -361,7 +359,7 @@ class _LecturerDashboardStats extends StatelessWidget {
             const Expanded(
               child: _StatCard(
                 title: 'Sinh viên',
-                value: '0',
+                value: '...', // Cần logic mới để đếm tổng SV
                 icon: Icons.people,
                 color: Colors.purple,
               ),
@@ -448,7 +446,8 @@ class _LecturerAndStudentClassList extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     final classService = context.read<ClassService>();
 
-    Stream<List<ClassModel>> getClassStream() {
+    // <<<--- THAY ĐỔI: STREAMBUILDER SỬ DỤNG RICHCLASSMODEL ---<<<
+    Stream<List<RichClassModel>> getClassStream() {
       if (auth.role == UserRole.lecture) {
         return classService.getRichClassesStreamForLecturer(auth.user!.uid);
       } else {
@@ -461,7 +460,7 @@ class _LecturerAndStudentClassList extends StatelessWidget {
         title: const Text('Danh sách lớp học của tôi'),
         automaticallyImplyLeading: false,
       ),
-      body: StreamBuilder<List<ClassModel>>(
+      body: StreamBuilder<List<RichClassModel>>(
         stream: getClassStream(),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
@@ -470,37 +469,37 @@ class _LecturerAndStudentClassList extends StatelessWidget {
           if (snap.hasError) {
             return Center(child: Text('Lỗi: ${snap.error}'));
           }
-          final classes = snap.data ?? [];
-          if (classes.isEmpty) {
+          final richClasses = snap.data ?? [];
+          if (richClasses.isEmpty) {
             return const Center(child: Text('Bạn chưa có lớp học nào.'));
           }
 
           return ListView.builder(
-            itemCount: classes.length,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: richClasses.length,
             itemBuilder: (context, index) {
-              final classItem = classes[index];
-              final code = classItem.courseCode;
-              final leadingText = (code == null || code.isEmpty)
-                  ? 'C'
-                  : (code.length < 2
-                        ? code.toUpperCase()
-                        : code.substring(0, 2).toUpperCase());
+              final richClass = richClasses[index];
+              final classInfo = richClass.classInfo;
+              final courses = richClass.courses;
+
+              final leadingText = classInfo.classCode.isNotEmpty
+                  ? classInfo.classCode[0].toUpperCase()
+                  : 'L';
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: ListTile(
                   leading: CircleAvatar(child: Text(leadingText)),
                   title: Text(
-                    '${classItem.courseCode ?? "N/A"} • ${classItem.courseName ?? "..."}',
+                    '${classInfo.classCode} - ${classInfo.className}',
                   ),
-                  subtitle: Text('GV: ${classItem.lecturerName ?? "..."}'),
+                  subtitle: Text(courses.map((c) => c.courseCode).join(' | ')),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ClassDetailPage(classId: classItem.id),
-                      ),
+                    // Chuyển sang màn hình ngữ cảnh của lớp học
+                    context.read<NavigationProvider>().navigateToClassContext(
+                      classId: classInfo.id,
+                      className: classInfo.className,
                     );
                   },
                 ),
@@ -513,7 +512,6 @@ class _LecturerAndStudentClassList extends StatelessWidget {
   }
 }
 
-// === ADMIN CLASS LIST (giữ nguyên nếu bạn cần) ===
 class _AdminClassList extends StatefulWidget {
   @override
   State<_AdminClassList> createState() => _AdminClassListState();
@@ -521,19 +519,23 @@ class _AdminClassList extends StatefulWidget {
 
 class _AdminClassListState extends State<_AdminClassList> {
   String? _selectedLecturerUid;
-
   @override
   Widget build(BuildContext context) {
+    // <<<--- THAY ĐỔI 1: LẤY CẢ HAI SERVICE CẦN THIẾT ---<<<
     final classService = context.read<ClassService>();
+    final adminService = context.read<AdminService>();
 
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: StreamBuilder<List<Map<String, String>>>(
-            stream: classService.lecturersStream(),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          // <<<--- THAY ĐỔI 2: SỬA LẠI STREAM LẤY GIẢNG VIÊN ---<<<
+          child: StreamBuilder<List<UserModel>>(
+            // <<<--- Đổi thành UserModel
+            stream: adminService
+                .getAllLecturersStream(), // <<<--- Gọi hàm từ AdminService
             builder: (context, snap) {
-              final list = snap.data ?? [];
+              final lecturers = snap.data ?? [];
               return DropdownButtonFormField<String>(
                 value: _selectedLecturerUid,
                 hint: const Text('Lọc theo giảng viên'),
@@ -549,10 +551,12 @@ class _AdminClassListState extends State<_AdminClassList> {
                     value: null,
                     child: Text('Tất cả giảng viên'),
                   ),
-                  ...list.map(
-                    (m) => DropdownMenuItem<String>(
-                      value: m['uid'],
-                      child: Text('${m['name']} — ${m['email']}'),
+                  ...lecturers.map(
+                    (lecturer) => DropdownMenuItem<String>(
+                      value: lecturer.uid,
+                      child: Text(
+                        '${lecturer.displayName} — ${lecturer.email}',
+                      ),
                     ),
                   ),
                 ],
@@ -561,9 +565,11 @@ class _AdminClassListState extends State<_AdminClassList> {
             },
           ),
         ),
-        const SizedBox(height: 8),
+
+        // <<<--- THAY ĐỔI 3: SỬA LẠI STREAMBUILDER CHÍNH VỚI RICHCLASSMODEL ---<<<
         Expanded(
-          child: StreamBuilder<List<ClassModel>>(
+          child: StreamBuilder<List<RichClassModel>>(
+            // <<<--- Đổi thành RichClassModel
             stream: _selectedLecturerUid == null
                 ? classService.getRichClassesStream()
                 : classService.getRichClassesStreamForLecturer(
@@ -576,22 +582,28 @@ class _AdminClassListState extends State<_AdminClassList> {
               if (snap.hasError) {
                 return Center(child: Text('Lỗi: ${snap.error}'));
               }
-              final classes = snap.data ?? [];
-              if (classes.isEmpty) {
+              final richClasses = snap.data ?? [];
+              if (richClasses.isEmpty) {
                 return const Center(child: Text('Không có lớp học nào'));
               }
 
               return ListView.builder(
                 padding: const EdgeInsets.only(bottom: 80),
-                itemCount: classes.length,
+                itemCount: richClasses.length,
                 itemBuilder: (context, index) {
-                  final classItem = classes[index];
-                  final code = classItem.courseCode;
-                  final leadingText = (code == null || code.isEmpty)
-                      ? 'C'
-                      : (code.length < 2
-                            ? code.toUpperCase()
-                            : code.substring(0, 2).toUpperCase());
+                  // <<<--- THAY ĐỔI 4: BÓC TÁCH VÀ HIỂN THỊ DỮ LIỆU TỪ RICHCLASSMODEL ---<<<
+                  final richClass = richClasses[index];
+                  final classInfo = richClass.classInfo;
+                  final courses = richClass.courses;
+                  final lecturer = richClass.lecturer;
+
+                  final leadingText = classInfo.classCode.isNotEmpty
+                      ? classInfo.classCode[0].toUpperCase()
+                      : 'L';
+
+                  final courseCodes = courses
+                      .map((c) => c.courseCode)
+                      .join(' | ');
 
                   return Card(
                     margin: const EdgeInsets.symmetric(
@@ -601,25 +613,32 @@ class _AdminClassListState extends State<_AdminClassList> {
                     child: ListTile(
                       leading: CircleAvatar(child: Text(leadingText)),
                       title: Text(
-                        '${classItem.courseCode ?? "N/A"} • ${classItem.courseName ?? "..."}',
+                        '${classInfo.classCode} - ${classInfo.className}',
                       ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('GV: ${classItem.lecturerName ?? "..."}'),
-                          Text('Mã tham gia: ${classItem.joinCode}'),
+                          Text(
+                            courseCodes,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text('GV: ${lecturer?.displayName ?? "..."}'),
+                          Text('Mã tham gia: ${classInfo.joinCode}'),
                         ],
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       isThreeLine: true,
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                ClassDetailPage(classId: classItem.id),
-                          ),
-                        );
+                        // Điều hướng sang màn hình ngữ cảnh của lớp học
+                        context
+                            .read<NavigationProvider>()
+                            .navigateToClassContext(
+                              classId: classInfo.id,
+                              className: classInfo.className,
+                            );
                       },
                     ),
                   );
@@ -764,7 +783,8 @@ class _SessionListPageState extends State<_SessionListPage> {
     final sessionService = context.read<SessionService>();
 
     return Scaffold(
-      body: StreamBuilder<ClassModel>(
+      // <<<--- THAY ĐỔI: STREAMBUILDER SỬ DỤNG RICHCLASSMODEL ---<<<
+      body: StreamBuilder<RichClassModel>(
         stream: classService.getRichClassStream(widget.classId),
         builder: (context, classSnapshot) {
           if (classSnapshot.connectionState == ConnectionState.waiting) {
@@ -778,7 +798,10 @@ class _SessionListPageState extends State<_SessionListPage> {
               ),
             );
           }
-          final classData = classSnapshot.data!;
+          final richClass = classSnapshot.data!;
+          final classData = richClass.classInfo; // ClassModel gốc
+          final courses = richClass.courses;
+          final lecturer = richClass.lecturer;
 
           return Column(
             children: [
@@ -817,9 +840,9 @@ class _SessionListPageState extends State<_SessionListPage> {
                       margin: EdgeInsets.zero,
                       child: ListTile(
                         leading: const Icon(Icons.class_),
-                        title: Text(classData.courseName ?? '...'),
+                        title: Text(classData.className),
                         subtitle: Text(
-                          'Mã: ${classData.courseCode ?? "..."} • GV: ${classData.lecturerName ?? "..."}',
+                          'Môn: ${courses.map((c) => c.courseCode).join(', ')} • GV: ${lecturer?.displayName ?? "..."}',
                         ),
                       ),
                     ),
@@ -883,7 +906,6 @@ class _SessionListPageState extends State<_SessionListPage> {
 class _QRAttendancePage extends StatelessWidget {
   final String classId;
   const _QRAttendancePage({required this.classId});
-
   @override
   Widget build(BuildContext context) {
     final classService = context.read<ClassService>();
@@ -898,11 +920,13 @@ class _QRAttendancePage extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
           ),
-          StreamBuilder<ClassModel>(
-            stream: classService.classStream(classId),
+          // <<<--- THAY ĐỔI: STREAMBUILDER SỬ DỤNG RICHCLASSMODEL ---<<<
+          StreamBuilder<RichClassModel>(
+            stream: classService.getRichClassStream(classId),
             builder: (context, snapshot) {
               if (snapshot.hasData) {
-                final classData = snapshot.data!;
+                final classData =
+                    snapshot.data!.classInfo; // Lấy ClassModel gốc
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   child: Padding(
@@ -914,17 +938,7 @@ class _QRAttendancePage extends StatelessWidget {
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 8),
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Center(
-                            child: Icon(Icons.qr_code, size: 60),
-                          ),
-                        ),
+                        QrImageView(data: classData.joinCode, size: 180),
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
                           onPressed: () async {
@@ -974,7 +988,8 @@ class _LeaveRequestPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final classService = context.read<ClassService>();
+    // <<<--- THAY ĐỔI: SỬ DỤNG ADMINSERVICE ĐỂ LẤY SINH VIÊN ---<<<
+    final adminService = context.read<AdminService>();
 
     return Scaffold(
       body: Column(
@@ -986,8 +1001,8 @@ class _LeaveRequestPage extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
           ),
-          StreamBuilder<List<Map<String, dynamic>>>(
-            stream: classService.membersStream(classId),
+          StreamBuilder<List<UserModel>>(
+            stream: adminService.getEnrolledStudentsStream(classId),
             builder: (context, snapshot) {
               if (snapshot.hasData) {
                 final members = snapshot.data!;

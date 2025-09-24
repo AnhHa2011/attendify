@@ -1,13 +1,14 @@
-// lib/presentation/pages/admin/class_management_page.dart
+// lib/features/admin/presentation/pages/class_management_page.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../common/data/models/class_model.dart';
+import '../../../../common/data/models/course_model.dart';
 import '../../../data/services/admin_service.dart';
+import '../admin_class_detail_page.dart';
 import 'class_bulk_import_page.dart';
 import 'class_enrollments_bulk_import_page.dart';
 import 'class_form_page.dart';
-import '../admin_class_detail_page.dart'; // <<<--- IMPORT TRANG MỚI
 
 class ClassManagementPage extends StatefulWidget {
   const ClassManagementPage({super.key});
@@ -43,7 +44,7 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
         title: TextField(
           controller: _searchController,
           decoration: InputDecoration(
-            hintText: 'Tìm theo tên môn, mã môn, GV...',
+            hintText: 'Tìm theo tên lớp, mã lớp, GV...', // Cập nhật hint text
             prefixIcon: const Icon(Icons.search),
             border: const OutlineInputBorder(
               borderRadius: BorderRadius.all(Radius.circular(30)),
@@ -69,7 +70,7 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
               MaterialPageRoute(builder: (_) => const ClassBulkImportPage()),
             );
           } else if (value == 'bulk_enroll') {
-            // NEW: Import lớp + enrollments (multi-sheet)
+            // <<< TÍCH HỢP: Xử lý sự kiện cho mục menu mới
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => const ClassEnrollmentsBulkImportPage(),
@@ -89,9 +90,10 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
             value: 'bulk',
             child: ListTile(
               leading: Icon(Icons.upload_file),
-              title: Text('Thêm 1 lớp học từ file'),
+              title: Text('Thêm lớp học từ file'),
             ),
           ),
+          // <<< TÍCH HỢP: Thêm mục menu để import nhiều lớp học
           PopupMenuItem(
             value: 'bulk_enroll',
             child: ListTile(
@@ -104,7 +106,7 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
           heroTag: 'fab_class_management_page',
           tooltip: 'Thêm lớp học',
           onPressed: null,
-          child: const Icon(Icons.add), // Để PopupMenuButton xử lý
+          child: const Icon(Icons.add),
         ),
       ),
       body: Column(
@@ -123,10 +125,11 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
                 }
 
                 final allClasses = snapshot.data ?? [];
+                // CẬP NHẬT LOGIC TÌM KIẾM
                 final filteredClasses = allClasses.where((c) {
                   final query = _searchQuery.toLowerCase();
-                  return (c.courseName?.toLowerCase() ?? '').contains(query) ||
-                      (c.courseCode?.toLowerCase() ?? '').contains(query) ||
+                  return c.className.toLowerCase().contains(query) ||
+                      c.classCode.toLowerCase().contains(query) ||
                       (c.lecturerName?.toLowerCase() ?? '').contains(query) ||
                       c.semester.toLowerCase().contains(query);
                 }).toList();
@@ -152,25 +155,33 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
                         leading: const CircleAvatar(
                           child: Icon(Icons.class_outlined),
                         ),
-                        title: Text(
-                          '${classInfo.courseCode ?? ''} - ${classInfo.courseName ?? '...'}',
-                        ),
-                        subtitle: Text(
-                          'GV: ${classInfo.lecturerName ?? '...'} | HK: ${classInfo.semester}',
-                        ),
 
-                        // <<<--- THAY ĐỔI QUAN TRỌNG TẠI ĐÂY ---<<<
+                        // === THAY ĐỔI HIỂN THỊ CHÍNH ===
+                        title: Text(
+                          '${classInfo.classCode} - ${classInfo.className}',
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Dùng widget helper để hiển thị danh sách môn học
+                            _ClassCourseInfo(courseIds: classInfo.courseIds),
+                            const SizedBox(height: 4),
+                            Text(
+                              'GV: ${classInfo.lecturerName ?? '...'} | HK: ${classInfo.semester}',
+                            ),
+                          ],
+                        ),
+                        isThreeLine: true, // Cho phép subtitle có 3 dòng
+
                         onTap: () {
-                          // Điều hướng đến trang chi tiết của Admin, truyền theo cả đối tượng classInfo
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) =>
-                                  AdminClassDetailPage(classInfo: classInfo),
+                                  AdminClassDetailPage(classId: classInfo.id),
                             ),
                           );
                         },
-
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -220,8 +231,9 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Xác nhận lưu trữ'),
+        // Cập nhật lại nội dung dialog
         content: Text(
-          'Lớp học "${classInfo.courseName}" sẽ bị ẩn đi. Bạn có chắc chắn?',
+          'Lớp học "${classInfo.className}" sẽ bị ẩn đi. Bạn có chắc chắn?',
         ),
         actions: [
           TextButton(
@@ -258,5 +270,51 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
         }
       }
     }
+  }
+}
+
+// === WIDGET HELPER ĐẶT TẠI ĐÂY CHO TIỆN LỢI ===
+class _ClassCourseInfo extends StatelessWidget {
+  final List<String> courseIds;
+  const _ClassCourseInfo({required this.courseIds});
+
+  @override
+  Widget build(BuildContext context) {
+    if (courseIds.isEmpty) {
+      return const Text(
+        'Chưa có môn học',
+        style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+      );
+    }
+
+    // Sử dụng FutureBuilder để lấy thông tin chi tiết của các môn học từ ID
+    return FutureBuilder<List<CourseModel>>(
+      // Gọi hàm mới trong service mà chúng ta sẽ thêm vào
+      future: context.read<AdminService>().getCoursesByIds(courseIds),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 16,
+            width: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          );
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Text(
+            'Lỗi tải môn học',
+            style: TextStyle(color: Colors.red),
+          );
+        }
+
+        // Ghép mã các môn học lại thành một chuỗi để hiển thị
+        final courseText = snapshot.data!.map((c) => c.courseCode).join(' | ');
+        return Text(
+          courseText,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: Theme.of(context).colorScheme.primary),
+        );
+      },
+    );
   }
 }

@@ -1,5 +1,4 @@
-// lib/presentation/pages/admin/class_form_page.dart
-
+// lib/features/admin/presentation/pages/class_management/class_form_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../common/data/models/class_model.dart';
@@ -17,13 +16,14 @@ class ClassFormPage extends StatefulWidget {
 
 class _ClassFormPageState extends State<ClassFormPage> {
   final _formKey = GlobalKey<FormState>();
-  final _semesterCtrl = TextEditingController();
-  final _classNameCtrl = TextEditingController();
-  String? _selectedCourseId;
-  String? _selectedLecturerId;
-  bool _isLoading = false;
 
-  // Dùng Future.wait để lấy cả 2 danh sách cùng lúc, tối ưu hiệu năng
+  final _classNameCtrl = TextEditingController();
+  final _classCodeCtrl = TextEditingController();
+  final _semesterCtrl = TextEditingController();
+  List<String> _selectedCourseIds = []; // <<<--- LƯU DANH SÁCH ID MÔN HỌC
+  String? _selectedLecturerId;
+
+  bool _isSubmitting = false;
   late Future<List<dynamic>> _dataFuture;
 
   bool get _isEditMode => widget.classInfo != null;
@@ -32,65 +32,74 @@ class _ClassFormPageState extends State<ClassFormPage> {
   void initState() {
     super.initState();
     final adminService = context.read<AdminService>();
+    // Dùng Future.wait để lấy cả 2 danh sách cùng lúc, tối ưu hiệu năng
     _dataFuture = Future.wait([
       adminService.getAllCoursesStream().first,
-      adminService.getAllLecturersStream().first,
+      adminService.getAllLecturersStream().first, // Gọi hàm mới
     ]);
 
+    // Nếu là form sửa, điền dữ liệu cũ vào
     if (_isEditMode) {
       final classInfo = widget.classInfo!;
-      _selectedCourseId = classInfo.courseId;
+      _selectedCourseIds = List<String>.from(
+        classInfo.courseIds,
+      ); // Tạo list mới
       _selectedLecturerId = classInfo.lecturerId;
+      _classNameCtrl.text = classInfo.className;
+      _classCodeCtrl.text = classInfo.classCode;
       _semesterCtrl.text = classInfo.semester;
-      _classNameCtrl.text = classInfo.className ?? '';
     }
   }
 
   @override
   void dispose() {
-    _semesterCtrl.dispose();
     _classNameCtrl.dispose();
+    _classCodeCtrl.dispose();
+    _semesterCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedCourseIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn ít nhất một môn học'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
-    setState(() => _isLoading = true);
+    setState(() => _isSubmitting = true);
     final adminService = context.read<AdminService>();
 
     try {
       final isDuplicate = await adminService.isClassDuplicate(
-        courseId: _selectedCourseId!,
-        semester: _semesterCtrl.text.trim(),
-        className: _classNameCtrl.text.trim().isEmpty
-            ? null
-            : _classNameCtrl.text.trim(),
+        classCode: _classCodeCtrl.text.trim(),
         currentClassId: widget.classInfo?.id,
       );
 
       if (isDuplicate) {
-        throw Exception('Lớp học này (Môn + Học kỳ + Tên lớp) đã tồn tại.');
+        throw Exception('Mã lớp học này đã tồn tại.');
       }
 
       if (_isEditMode) {
         await adminService.updateClass(
           classId: widget.classInfo!.id,
-          courseId: _selectedCourseId!,
+          courseIds: _selectedCourseIds,
           lecturerId: _selectedLecturerId!,
           semester: _semesterCtrl.text.trim(),
-          className: _classNameCtrl.text.trim().isEmpty
-              ? null
-              : _classNameCtrl.text.trim(),
+          className: _classNameCtrl.text.trim(),
+          classCode: _classCodeCtrl.text.trim(),
         );
       } else {
         await adminService.createClass(
-          courseId: _selectedCourseId!,
+          courseIds: _selectedCourseIds,
           lecturerId: _selectedLecturerId!,
           semester: _semesterCtrl.text.trim(),
-          className: _classNameCtrl.text.trim().isEmpty
-              ? null
-              : _classNameCtrl.text.trim(),
+          className: _classNameCtrl.text.trim(),
+          classCode: _classCodeCtrl.text.trim(),
         );
       }
 
@@ -115,7 +124,7 @@ class _ClassFormPageState extends State<ClassFormPage> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -132,46 +141,84 @@ class _ClassFormPageState extends State<ClassFormPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError || !snapshot.hasData) {
-            return Center(
-              child: Text(
-                'Lỗi tải dữ liệu Môn học hoặc Giảng viên: ${snapshot.error}',
-              ),
-            );
+            return Center(child: Text('Lỗi tải dữ liệu: ${snapshot.error}'));
           }
 
           final courses = snapshot.data![0] as List<CourseModel>;
           final lecturers = snapshot.data![1] as List<UserModel>;
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(16.0),
             child: Form(
               key: _formKey,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedCourseId,
+                  TextFormField(
+                    controller: _classNameCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Chọn môn học',
+                      labelText: 'Tên lớp học',
                       border: OutlineInputBorder(),
+                      hintText: 'Ví dụ: Lớp Tín chỉ K15',
                     ),
-                    items: courses
-                        .map(
-                          (course) => DropdownMenuItem(
-                            value: course.id,
-                            child: Text(
-                              '${course.courseCode} - ${course.courseName}',
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) =>
-                        setState(() => _selectedCourseId = value),
                     validator: (v) =>
-                        v == null ? 'Vui lòng chọn môn học' : null,
+                        v!.trim().isEmpty ? 'Vui lòng nhập tên lớp' : null,
                   ),
                   const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _classCodeCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Mã lớp học',
+                      border: OutlineInputBorder(),
+                      hintText: 'Ví dụ: LTC_IT_K15_01',
+                    ),
+                    validator: (v) =>
+                        v!.trim().isEmpty ? 'Vui lòng nhập mã lớp' : null,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // === UI CHỌN NHIỀU MÔN HỌC BẰNG FILTERCHIP ===
+                  const Text(
+                    'Chọn các môn học cho lớp này:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Wrap(
+                      spacing: 8.0,
+                      runSpacing: 4.0,
+                      children: courses.map((course) {
+                        final isSelected = _selectedCourseIds.contains(
+                          course.id,
+                        );
+                        return FilterChip(
+                          label: Text(
+                            '${course.courseCode} - ${course.courseName}',
+                          ),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedCourseIds.add(course.id);
+                              } else {
+                                _selectedCourseIds.remove(course.id);
+                              }
+                            });
+                          },
+                          selectedColor: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer,
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   DropdownButtonFormField<String>(
                     initialValue: _selectedLecturerId,
                     decoration: const InputDecoration(
@@ -199,51 +246,23 @@ class _ClassFormPageState extends State<ClassFormPage> {
                       border: OutlineInputBorder(),
                       hintText: 'Ví dụ: HK1 2025-2026',
                     ),
-                    // === NÂNG CẤP: BẮT FORMAT CHO HỌC KỲ ===
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Vui lòng nhập học kỳ';
-                      }
-                      final semesterRegex = RegExp(r'^HK[1-3]\s\d{4}-\d{4}$');
-                      if (!semesterRegex.hasMatch(value.trim())) {
-                        return 'Sai định dạng. Ví dụ đúng: HK1 2025-2026';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _classNameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Tên lớp (không bắt buộc)',
-                      border: OutlineInputBorder(),
-                      hintText: 'Ví dụ: L01 hoặc CLC02',
-                    ),
-                    // === NÂNG CẤP: BẮT FORMAT CHO TÊN LỚP (NẾU CÓ) ===
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return null; // Bỏ qua nếu không nhập
-                      }
-                      final classNameRegex = RegExp(r'^[A-Z]+\d{2}$');
-                      if (!classNameRegex.hasMatch(
-                        value.trim().toUpperCase(),
-                      )) {
-                        return 'Sai định dạng. Ví dụ đúng: L01, CLC02';
-                      }
-                      return null;
-                    },
+                    validator: (v) =>
+                        v!.trim().isEmpty ? 'Vui lòng nhập học kỳ' : null,
                   ),
                   const SizedBox(height: 32),
                   FilledButton.icon(
-                    onPressed: _isLoading ? null : _submitForm,
-                    icon: _isLoading
+                    onPressed: _isSubmitting ? null : _submitForm,
+                    icon: _isSubmitting
                         ? const SizedBox.shrink()
-                        : const Icon(Icons.add_circle_outline),
-                    label: _isLoading
+                        : const Icon(Icons.save),
+                    label: _isSubmitting
                         ? const SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 3),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 3,
+                            ),
                           )
                         : Text(_isEditMode ? 'Lưu thay đổi' : 'Tạo lớp'),
                     style: FilledButton.styleFrom(

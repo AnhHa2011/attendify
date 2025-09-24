@@ -1,5 +1,7 @@
 // lib/features/admin/data/services/admin_service.dart
 
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -64,31 +66,25 @@ class AdminService {
   }
 
   /// Lấy danh sách tất cả giảng viên (sử dụng hàm trên)
+  // Stream<List<UserModel>> getAllLecturersStream() {
+  //   return getUsersStreamByRole(UserRole.lecture);
+  // }
+
   Stream<List<UserModel>> getAllLecturersStream() {
-    return getUsersStreamByRole(UserRole.lecture);
+    return _db
+        .collection('users')
+        .where('role', isEqualTo: 'lecture')
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList(),
+        );
   }
 
   /// Lấy danh sách tất cả sinh viên (sử dụng hàm trên)
   Stream<List<UserModel>> getAllStudentsStream() {
     return getUsersStreamByRole(UserRole.student);
   }
-
-  /// Lấy danh sách người dùng theo vai trò
-  // Stream<List<UserModel>> getUsersStreamByRole(UserRole role) {
-  //   return _db
-  //       .collection('users')
-  //       .where('role', isEqualTo: role.name)
-  //       .snapshots()
-  //       .map(
-  //         (snapshot) =>
-  //             snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList(),
-  //       );
-  // }
-
-  /// Lấy danh sách tất cả sinh viên
-  // Stream<List<UserModel>> getAllStudentsStream() {
-  //   return getUsersStreamByRole(UserRole.student);
-  // }
 
   /// Tạo một người dùng mới (bao gồm cả Auth và Firestore)
   Future<void> createNewUser({
@@ -149,41 +145,10 @@ class AdminService {
   }
   // === QUẢN LÝ LỚP HỌC (CLASSES) ===
 
-  // /// Tạo (mở) một lớp học mới
-  // Future<void> createClass({
-  //   required String courseId, // ID từ môn học đã có
-  //   required String lecturerId, // UID của giảng viên phụ trách
-  //   required String semester, // Ví dụ: "Học kỳ 1, 2025-2026"
-  //   String? className, // Tên lớp cụ thể, ví dụ "L01", "L02"
-  // }) async {
-  //   // Lấy thông tin của môn học và giảng viên để lưu lại
-  //   final courseDoc = await _db.collection('courses').doc(courseId).get();
-  //   final lecturerDoc = await _db.collection('users').doc(lecturerId).get();
-
-  //   if (!courseDoc.exists || !lecturerDoc.exists) {
-  //     throw Exception('Môn học hoặc Giảng viên không tồn tại.');
-  //   }
-
-  //   final courseData = courseDoc.data()!;
-  //   final lecturerData = lecturerDoc.data()!;
-
-  //   await _db.collection('classes').add({
-  //     'courseId': courseId,
-  //     'courseCode': courseData['courseCode'],
-  //     'courseName': courseData['courseName'],
-  //     'lecturerId': lecturerId,
-  //     'lecturerName': lecturerData['displayName'],
-  //     'semester': semester,
-  //     'className': className,
-  //     'createdAt': FieldValue.serverTimestamp(),
-  //     // Mã tham gia sẽ được tạo bởi ClassService khi cần
-  //     'joinCode': null,
-  //   });
-  // }
-
   /// Tạo lịch học hàng loạt cho nhiều tuần liên tiếp
   Future<void> createRecurringSessions({
     required String classId,
+    required String courseId,
     required String baseTitle,
     required String location,
     required int durationInMinutes,
@@ -211,6 +176,7 @@ class AdminService {
         final docRef = _db.collection('sessions').doc();
         batch.set(docRef, {
           'classId': classId,
+          'courseId': courseId,
           'title':
               '$baseTitle - Buổi ${(week * weeklySchedules.length) + weeklySchedules.indexOf(schedule) + 1}',
           'startTime': Timestamp.fromDate(startTime),
@@ -227,6 +193,23 @@ class AdminService {
 
     await batch.commit();
   }
+
+  // === THÊM HÀM MỚI NÀY VÀO ===
+  /// Lấy danh sách thông tin chi tiết của các môn học dựa vào danh sách ID
+  Future<List<CourseModel>> getCoursesByIds(List<String> ids) async {
+    // Nếu danh sách ID rỗng, trả về danh sách rỗng để tránh lỗi truy vấn
+    if (ids.isEmpty) return [];
+
+    // Firestore cho phép truy vấn tối đa 30 item trong mệnh đề 'whereIn'
+    // Nếu có thể có nhiều hơn, bạn cần chia nhỏ ra thành nhiều truy vấn
+    final snapshot = await _db
+        .collection('courses')
+        .where(FieldPath.documentId, whereIn: ids)
+        .get();
+
+    return snapshot.docs.map((doc) => CourseModel.fromDoc(doc)).toList();
+  }
+
   // === QUẢN LÝ MÔN HỌC (COURSES) ===
 
   /// Tạo một môn học mới
@@ -321,65 +304,83 @@ class AdminService {
   Stream<List<ClassModel>> getAllClassesStream() {
     return _db
         .collection('classes')
-        .where('isArchived', isEqualTo: false) // SỬA LỖI QUERY TẠI ĐÂY
-        .orderBy('createdAt', descending: true)
+        .where('isArchived', isEqualTo: false) // Giữ lại logic lọc
+        .orderBy('createdAt', descending: true) // Giữ lại logic sắp xếp
         .snapshots()
         .asyncMap((snapshot) async {
+          // Chuyển đổi DocumentSnapshot thành List<ClassModel>
           final classFutures = snapshot.docs.map((doc) async {
             final classModel = ClassModel.fromDoc(doc);
+
+            // Chỉ làm giàu thông tin giảng viên
             try {
-              final courseDoc = await _db
-                  .collection('courses')
-                  .doc(classModel.courseId)
-                  .get();
               final lecturerDoc = await _db
                   .collection('users')
                   .doc(classModel.lecturerId)
                   .get();
-              return classModel.copyWith(
-                courseName: courseDoc.data()?['courseName'],
-                courseCode: courseDoc.data()?['courseCode'],
-                lecturerName: lecturerDoc.data()?['displayName'],
+
+              // Tạo một instance mới với thông tin giảng viên được cập nhật
+              // Bằng cách này, chúng ta không cần hàm copyWith nữa
+              return ClassModel(
+                id: classModel.id,
+                courseIds: classModel.courseIds,
+                lecturerId: classModel.lecturerId,
+                semester: classModel.semester,
+                className: classModel.className,
+                classCode: classModel.classCode,
+                joinCode: classModel.joinCode,
+                createdAt: classModel.createdAt,
+                isArchived: classModel.isArchived,
+                lecturerName: lecturerDoc
+                    .data()?['displayName'], // Thêm tên giảng viên
               );
             } catch (e) {
+              // Nếu có lỗi khi lấy thông tin GV, vẫn trả về thông tin lớp học gốc
               return classModel;
             }
           }).toList();
-          return await Future.wait(classFutures);
+
+          // Đợi tất cả các future hoàn thành và trả về kết quả
+          return Future.wait(classFutures);
         });
   }
 
-  /// Tạo một lớp học mới
   Future<void> createClass({
-    required String courseId,
+    required List<String> courseIds, // <<<--- THAY ĐỔI
     required String lecturerId,
     required String semester,
-    String? className,
+    required String className, // <<<--- Bổ sung
+    required String classCode, // <<<--- Bổ sung
   }) async {
+    final joinCode =
+        _generateRandomCode(); // Giả sử bạn có hàm tạo mã ngẫu nhiên
+
     await _db.collection('classes').add({
-      'courseId': courseId,
+      'courseIds': courseIds, // Lưu danh sách ID môn học
       'lecturerId': lecturerId,
       'semester': semester,
       'className': className,
-      'isArchived': false,
+      'classCode': classCode,
+      'joinCode': joinCode,
       'createdAt': FieldValue.serverTimestamp(),
-      'joinCode': '',
+      'isArchived': false,
     });
   }
 
-  /// Cập nhật một lớp học
   Future<void> updateClass({
     required String classId,
-    required String courseId,
+    required List<String> courseIds, // <<<--- THAY ĐỔI
     required String lecturerId,
     required String semester,
-    String? className,
+    required String className, // <<<--- Bổ sung
+    required String classCode, // <<<--- Bổ sung
   }) async {
     await _db.collection('classes').doc(classId).update({
-      'courseId': courseId,
+      'courseIds': courseIds,
       'lecturerId': lecturerId,
       'semester': semester,
       'className': className,
+      'classCode': classCode,
     });
   }
 
@@ -388,25 +389,28 @@ class AdminService {
     return _db.collection('classes').doc(classId).update({'isArchived': true});
   }
 
-  /// Kiểm tra xem lớp học đã tồn tại hay chưa
   Future<bool> isClassDuplicate({
-    required String courseId,
-    required String semester,
-    String? className,
+    required String classCode,
     String? currentClassId,
   }) async {
-    var query = _db
+    Query query = _db
         .collection('classes')
-        .where('courseId', isEqualTo: courseId)
-        .where('semester', isEqualTo: semester.trim())
-        .where('className', isEqualTo: className?.trim());
+        .where('classCode', isEqualTo: classCode);
 
-    final snapshot = await query.get();
-    if (snapshot.docs.isEmpty) return false;
+    // Nếu đang ở chế độ sửa, loại trừ chính lớp hiện tại ra khỏi kiểm tra
     if (currentClassId != null) {
-      return snapshot.docs.first.id != currentClassId;
+      query = query.where(FieldPath.documentId, isNotEqualTo: currentClassId);
     }
-    return true;
+
+    final snapshot = await query.limit(1).get();
+    return snapshot.docs.isNotEmpty;
+  }
+
+  // Bạn có thể cần thêm hàm này nếu chưa có
+  String _generateRandomCode([int len = 6]) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final rnd = Random.secure();
+    return List.generate(len, (_) => chars[rnd.nextInt(chars.length)]).join();
   }
 
   /// Tạo nhiều lớp học từ một danh sách (dùng cho import file)
@@ -458,6 +462,7 @@ class AdminService {
   Future<void> createSingleSession({
     required String classId,
     required String title,
+    required String courseId,
     required DateTime startTime,
     required int durationInMinutes,
     required String location,
@@ -465,6 +470,7 @@ class AdminService {
     await _db.collection('sessions').add({
       'classId': classId,
       'title': title,
+      'courseId': courseId,
       'startTime': Timestamp.fromDate(startTime),
       'endTime': Timestamp.fromDate(
         startTime.add(Duration(minutes: durationInMinutes)),

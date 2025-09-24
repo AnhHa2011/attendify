@@ -1,11 +1,10 @@
-// lib/data/models/user_model.dart
+// lib/features/common/data/models/user_model.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Các role trong hệ thống
 enum UserRole { admin, lecture, student, unknown }
 
-// === KHÔI PHỤC LẠI EXTENSION ĐỂ TƯƠNG THÍCH VỚI CODE CŨ ===
 extension UserRoleX on UserRole {
   /// Key chuẩn để lưu Firestore
   String toKey() {

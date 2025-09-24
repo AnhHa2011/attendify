@@ -1,27 +1,24 @@
-// lib/presentation/pages/classes/class_list_page.dart
+// lib/features/classes/presentation/pages/class_list_page.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../../app/providers/auth_provider.dart';
-
-import '../../../common/data/models/class_model.dart';
+import '../../../../app/providers/auth_provider.dart';
+// === THAY ĐỔI 1: IMPORT RICHCLASSMODEL TỪ CLASS_SERVICE ===
 import '../../data/services/class_service.dart';
 import 'class_detail_page.dart';
-import 'create_class_page.dart';
+// CreateClassPage không cần thiết cho trang này nữa nếu logic tạo lớp đã chuyển đi
+// import 'create_class_page.dart';
 
 class ClassListPage extends StatelessWidget {
   const ClassListPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // === THAY ĐỔI 1: SỬ DỤNG SERVICE VÀ AUTH PROVIDER TRỰC TIẾP ===
-    // Không dùng ClassProvider nữa
     final classService = context.read<ClassService>();
     final auth = context.watch<AuthProvider>();
     final lecturerId = auth.user?.uid;
 
-    // Trường hợp an toàn: nếu không lấy được ID giảng viên thì báo lỗi
     if (lecturerId == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Lớp của tôi')),
@@ -32,22 +29,22 @@ class ClassListPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Lớp của tôi'),
-        actions: [
-          IconButton(
-            onPressed: () {
-              // Chức năng tạo lớp mới không thay đổi
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CreateClassPage()),
-              );
-            },
-            icon: const Icon(Icons.add),
-            tooltip: 'Tạo lớp',
-          ),
-        ],
+        // actions: [ // Cân nhắc bỏ nút tạo lớp ở đây nếu nó đã có ở nơi khác (vd: admin menu)
+        //   IconButton(
+        //     onPressed: () {
+        //       Navigator.push(
+        //         context,
+        //         MaterialPageRoute(builder: (_) => const CreateClassPage()),
+        //       );
+        //     },
+        //     icon: const Icon(Icons.add),
+        //     tooltip: 'Tạo lớp',
+        //   ),
+        // ],
       ),
-      body: StreamBuilder<List<ClassModel>>(
-        // === THAY ĐỔI 2: GỌI HÀM STREAM "LÀM GIÀU" DỮ LIỆU ===
+      // === THAY ĐỔI 2: SỬA LẠI STREAMBUILDER VỚI RICHCLASSMODEL ===
+      body: StreamBuilder<List<RichClassModel>>(
+        // <<<--- Đổi thành RichClassModel
         stream: classService.getRichClassesStreamForLecturer(lecturerId),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
@@ -56,35 +53,54 @@ class ClassListPage extends StatelessWidget {
           if (snap.hasError) {
             return Center(child: Text('Đã xảy ra lỗi: ${snap.error}'));
           }
-          final items = snap.data ?? [];
-          if (items.isEmpty) {
+          final richClasses = snap.data ?? [];
+          if (richClasses.isEmpty) {
             return const Center(
               child: Text('Bạn chưa được phân công lớp nào.'),
             );
           }
 
           return ListView.separated(
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: richClasses.length,
+            separatorBuilder: (_, __) =>
+                const Divider(height: 1, indent: 16, endIndent: 16),
             itemBuilder: (context, i) {
-              final c = items[i];
+              final richClass = richClasses[i];
+              // Bóc tách dữ liệu để dễ sử dụng
+              final classInfo = richClass.classInfo;
+              final courses = richClass.courses;
 
-              // === THAY ĐỔI 3: HIỂN THỊ CÁC TRƯỜNG DỮ LIỆU MỚI ===
+              // === THAY ĐỔI 3: HIỂN THỊ DỮ LIỆU TỪ RICHCLASSMODEL ===
               return ListTile(
-                title: Text(
-                  '${c.courseCode ?? "N/A"} • ${c.courseName ?? "..."}',
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
                 ),
-                subtitle: Text(
-                  'Học kỳ: ${c.semester}\nMã tham gia: ${c.joinCode}',
+                title: Text('${classInfo.classCode} - ${classInfo.className}'),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    // Hiển thị danh sách mã môn học
+                    Text(
+                      'Môn: ${courses.map((c) => c.courseCode).join(', ')}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Học kỳ: ${classInfo.semester} | Mã tham gia: ${classInfo.joinCode}',
+                    ),
+                  ],
                 ),
-                isThreeLine: true, // Cho phép subtitle hiển thị 2 dòng
+                isThreeLine: true,
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   // Điều hướng vẫn giữ nguyên, ClassDetailPage chỉ cần classId
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => ClassDetailPage(classId: c.id),
+                      builder: (_) => ClassDetailPage(classId: classInfo.id),
                     ),
                   );
                 },

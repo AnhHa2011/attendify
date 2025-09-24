@@ -1,12 +1,9 @@
-// lib/presentation/pages/classes/class_detail_page.dart
-
+// lib/features/classes/presentation/pages/class_detail_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
 
-// Thay thế bằng các đường dẫn đúng trong dự án của bạn
-import '../../../common/data/models/class_model.dart';
 import '../../../common/data/models/session_model.dart';
 import '../../../common/data/models/user_model.dart';
 import '../../../../../app/providers/auth_provider.dart';
@@ -124,7 +121,9 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
     final auth = context.watch<AuthProvider>();
     final isLecturer = auth.role == UserRole.lecture;
 
-    return StreamBuilder<ClassModel>(
+    // === THAY ĐỔI 1: STREAMBUILDER CHÍNH SỬ DỤNG RICHCLASSMODEL ===
+    return StreamBuilder<RichClassModel>(
+      // <<<--- Đổi thành RichClassModel
       stream: classSvc.getRichClassStream(widget.classId),
       builder: (context, classSnap) {
         if (classSnap.connectionState == ConnectionState.waiting) {
@@ -134,20 +133,25 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
         }
         if (classSnap.hasError || !classSnap.hasData) {
           return Scaffold(
+            appBar: AppBar(),
             body: Center(
               child: Text(classSnap.error?.toString() ?? 'Không tìm thấy lớp'),
             ),
           );
         }
 
-        final classInfo = classSnap.data!;
+        // Bóc tách dữ liệu để dễ sử dụng
+        final richClass = classSnap.data!;
+        final classInfo = richClass.classInfo;
+        final courses = richClass.courses;
+        final lecturer = richClass.lecturer;
+
+        // Ghép tên các môn học lại thành một chuỗi
+        final courseNames = courses.map((c) => c.courseName).join(' | ');
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text(
-              '${classInfo.courseCode ?? ""} - ${classInfo.courseName ?? "..."}',
-            ),
-          ),
+          // === THAY ĐỔI 2: CẬP NHẬT APPBAR VÀ CÁC PHẦN UI KHÁC ===
+          appBar: AppBar(title: Text(classInfo.className)),
           floatingActionButton: isLecturer
               ? FloatingActionButton.extended(
                   heroTag: 'fab_lecturer_class_detail',
@@ -174,16 +178,18 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
               Card(
                 child: ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.class_)),
-                  title: Text(classInfo.courseName ?? 'Đang tải...'),
+                  title: Text(
+                    courseNames.isNotEmpty ? courseNames : 'Chưa có môn học',
+                  ),
                   subtitle: Text(
-                    'Mã môn: ${classInfo.courseCode ?? "..."}\nGV: ${classInfo.lecturerName ?? "..."}\nHọc kỳ: ${classInfo.semester}',
+                    'Lớp: ${classInfo.className}\nGV: ${lecturer?.displayName ?? "..."}\nHọc kỳ: ${classInfo.semester}',
                   ),
                   isThreeLine: true,
                 ),
               ),
               const SizedBox(height: 16),
 
-              // --- THẺ MÃ THAM GIA LỚP ---
+              // --- THẺ MÃ THAM GIA LỚP (KHÔNG THAY ĐỔI) ---
               Card(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -205,6 +211,67 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                     ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 24),
+
+              // --- DANH SÁCH BUỔI HỌC ---
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(
+                  'Các buổi học',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              const SizedBox(height: 8),
+              StreamBuilder<List<SessionModel>>(
+                stream: sessionSvc.sessionsOfClass(widget.classId),
+                builder: (context, sessionSnap) {
+                  if (sessionSnap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final sessions = sessionSnap.data ?? [];
+                  if (sessions.isEmpty) {
+                    return const Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(
+                          child: Text('Chưa có buổi học nào được tạo.'),
+                        ),
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: sessions.length,
+                    itemBuilder: (context, index) {
+                      final session = sessions[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        child: ListTile(
+                          leading: const Icon(Icons.event_note),
+                          title: Text(session.title),
+                          subtitle: Text(
+                            '${DateFormat('dd/MM/yyyy HH:mm').format(session.startTime)} - Trạng thái: ${session.status.name}',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () {
+                            // === THAY ĐỔI 3: TRUYỀN CLASSINFO (CLASSMODEL) VÀO TRANG CHI TIẾT ===
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => SessionDetailPage(
+                                  session: session,
+                                  classInfo: classInfo, // Truyền ClassModel gốc
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
               const SizedBox(height: 24),
 

@@ -39,4 +39,13 @@ class CourseModel {
       'credits': credits,
     };
   }
+
+  CourseModel.empty()
+    : this(
+        id: '',
+        courseCode: 'N/A',
+        courseName: 'Không rõ',
+        credits: 0,
+        isArchived: false,
+      );
 }

@@ -1,68 +1,66 @@
-// lib/data/models/class_model.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ClassModel {
   // === Dữ liệu gốc, lưu trên Firestore ===
   final String id;
-  final String courseId;
+
+  // THAY ĐỔI CỐT LÕI: Thay vì 1 courseId, giờ là danh sách các courseIds
+  final List<String> courseIds;
+
   final String lecturerId;
   final String semester;
-  final String? className;
+  final String className; // Tên lớp học, ví dụ: "Lớp Tín chỉ IT - K15"
+  final String classCode; // Mã lớp học, ví dụ: "LTC_IT_K15_01"
   final String joinCode;
   final DateTime createdAt;
   final bool isArchived;
 
-  // === Dữ liệu "làm giàu" ===
-  final String? courseName;
-  final String? courseCode;
+  // === Dữ liệu "làm giàu" (lấy từ các collection khác) ===
   final String? lecturerName;
 
   ClassModel({
     required this.id,
-    required this.courseId,
+    required this.courseIds, // <-- THAY ĐỔI
     required this.lecturerId,
     required this.semester,
-    this.className, // <-- THÊM MỚI
+    required this.className, // <-- Giờ là trường bắt buộc
+    required this.classCode, // <-- Thêm mới để định danh lớp
     required this.joinCode,
     required this.createdAt,
-    required this.isArchived, // <-- THÊM MỚI
-    this.courseName,
-    this.courseCode,
+    required this.isArchived,
     this.lecturerName,
   });
 
-  ClassModel copyWith({
-    String? courseName,
-    String? courseCode,
-    String? lecturerName,
-  }) {
-    return ClassModel(
-      id: id,
-      courseId: courseId,
-      lecturerId: lecturerId,
-      semester: semester,
-      className: className,
-      joinCode: joinCode,
-      createdAt: createdAt,
-      isArchived: isArchived,
-      courseName: courseName ?? this.courseName,
-      courseCode: courseCode ?? this.courseCode,
-      lecturerName: lecturerName ?? this.lecturerName,
-    );
-  }
-
+  // Factory constructor để tạo instance từ Firestore document
   factory ClassModel.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
     return ClassModel(
       id: doc.id,
-      courseId: d['courseId'] ?? '',
+      // Đọc danh sách ID môn học từ Firestore
+      courseIds: List<String>.from(d['courseIds'] ?? []),
       lecturerId: d['lecturerId'] ?? '',
       semester: d['semester'] ?? '',
-      className: d['className'], // có thể null
+      className: d['className'] ?? '', // Tên lớp
+      classCode: d['classCode'] ?? '', // Mã lớp
       joinCode: d['joinCode'] ?? '',
       createdAt: ((d['createdAt'] as Timestamp?) ?? Timestamp.now()).toDate(),
-      isArchived: d['isArchived'] ?? false, // Mặc định là false nếu không có
+      isArchived: d['isArchived'] ?? false,
+      // lecturerName có thể được thêm vào sau khi fetch thông tin giảng viên
     );
+  }
+
+  // Hàm để chuyển đổi model thành Map để ghi vào Firestore
+  Map<String, dynamic> toMap() {
+    return {
+      'courseIds': courseIds,
+      'lecturerId': lecturerId,
+      'semester': semester,
+      'className': className,
+      'classCode': classCode,
+      'joinCode': joinCode,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'isArchived': isArchived,
+      'lecturerName': lecturerName, // Lưu sẵn tên GV để đọc nhanh
+    };
   }
 }

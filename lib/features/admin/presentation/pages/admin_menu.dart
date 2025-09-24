@@ -1,3 +1,4 @@
+import 'package:attendify/features/admin/data/services/admin_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -10,6 +11,7 @@ import '../../../classes/data/services/class_service.dart';
 import '../../../classes/presentation/pages/class_detail_page.dart';
 import '../../../common/data/models/class_model.dart';
 import '../../../common/data/models/session_model.dart';
+import '../../../common/data/models/user_model.dart';
 import '../../../sessions/presentation/pages/data/services/session_service.dart';
 import '../../../sessions/presentation/pages/session_detail_page.dart';
 import 'class_management/class_management_page.dart';
@@ -440,19 +442,24 @@ class _AdminClassListState extends State<_AdminClassList> {
 
   @override
   Widget build(BuildContext context) {
+    // === THAY ĐỔI 1: TÁCH SERVICE RA ĐỂ DÙNG LẠI ===
+    // ClassService giờ chỉ dùng cho danh sách lớp
     final classService = context.read<ClassService>();
+    // AdminService dùng cho danh sách giảng viên
+    final adminService = context.read<AdminService>();
 
     return Column(
       children: [
-        // Filter theo giảng viên
+        // === THAY ĐỔI 2: STREAM LẤY GIẢNG VIÊN TỪ ADMINSERVICE ===
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: StreamBuilder<List<Map<String, String>>>(
-            stream: classService.lecturersStream(),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: StreamBuilder<List<UserModel>>(
+            // <<<--- Đổi thành UserModel
+            stream: adminService.getAllLecturersStream(), // <<<--- Gọi hàm mới
             builder: (context, snap) {
-              final list = snap.data ?? [];
+              final lecturers = snap.data ?? [];
               return DropdownButtonFormField<String>(
-                initialValue: _selectedLecturerUid,
+                value: _selectedLecturerUid, // <<<--- Sửa lại thành value
                 hint: const Text('Lọc theo giảng viên'),
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
@@ -466,10 +473,12 @@ class _AdminClassListState extends State<_AdminClassList> {
                     value: null,
                     child: Text('Tất cả giảng viên'),
                   ),
-                  ...list.map(
-                    (m) => DropdownMenuItem<String>(
-                      value: m['uid'],
-                      child: Text('${m['name']} — ${m['email']}'),
+                  ...lecturers.map(
+                    (lecturer) => DropdownMenuItem<String>(
+                      value: lecturer.uid,
+                      child: Text(
+                        '${lecturer.displayName} — ${lecturer.email}',
+                      ),
                     ),
                   ),
                 ],
@@ -478,11 +487,11 @@ class _AdminClassListState extends State<_AdminClassList> {
             },
           ),
         ),
-        const SizedBox(height: 8),
 
-        // Danh sách lớp học
+        // === THAY ĐỔI 3: STREAMBUILDER CHÍNH SỬ DỤNG RICHCLASSMODEL ===
         Expanded(
-          child: StreamBuilder<List<ClassModel>>(
+          child: StreamBuilder<List<RichClassModel>>(
+            // <<<--- Đổi thành RichClassModel
             stream: _selectedLecturerUid == null
                 ? classService.getRichClassesStream()
                 : classService.getRichClassesStreamForLecturer(
@@ -495,27 +504,29 @@ class _AdminClassListState extends State<_AdminClassList> {
               if (snap.hasError) {
                 return Center(child: Text('Lỗi: ${snap.error}'));
               }
-              final classes = snap.data ?? [];
-              if (classes.isEmpty) {
+              final richClasses = snap.data ?? [];
+              if (richClasses.isEmpty) {
                 return const Center(child: Text('Không có lớp học nào'));
               }
 
               return ListView.builder(
                 padding: const EdgeInsets.only(bottom: 80),
-                itemCount: classes.length,
+                itemCount: richClasses.length,
                 itemBuilder: (context, index) {
-                  final classItem = classes[index];
+                  final richClass = richClasses[index];
+                  final classInfo =
+                      richClass.classInfo; // Lấy ra ClassModel gốc
+                  final courses = richClass.courses; // Lấy ra danh sách môn học
+                  final lecturer =
+                      richClass.lecturer; // Lấy ra thông tin giảng viên
 
-                  // === LOGIC AN TOÀN CHO SUBSTRING ===
-                  String leadingText;
-                  final code = classItem.courseCode;
-                  if (code == null || code.isEmpty) {
-                    leadingText = 'C';
-                  } else if (code.length < 2) {
-                    leadingText = code.toUpperCase();
-                  } else {
-                    leadingText = code.substring(0, 2).toUpperCase();
-                  }
+                  // === THAY ĐỔI 4: HIỂN THỊ DỮ LIỆU TỪ RICHCLASSMODEL ===
+                  String leadingText = classInfo.classCode.isNotEmpty
+                      ? classInfo.classCode.substring(0, 1).toUpperCase()
+                      : 'L';
+                  String courseCodes = courses
+                      .map((c) => c.courseCode)
+                      .join(' | ');
 
                   return Card(
                     margin: const EdgeInsets.symmetric(
@@ -525,23 +536,32 @@ class _AdminClassListState extends State<_AdminClassList> {
                     child: ListTile(
                       leading: CircleAvatar(child: Text(leadingText)),
                       title: Text(
-                        '${classItem.courseCode ?? "N/A"} • ${classItem.courseName ?? "..."}',
+                        '${classInfo.classCode} - ${classInfo.className}',
                       ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('GV: ${classItem.lecturerName ?? "..."}'),
-                          Text('Mã tham gia: ${classItem.joinCode}'),
+                          // Hiển thị danh sách mã môn
+                          Text(
+                            courseCodes,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text('GV: ${lecturer?.displayName ?? "..."}'),
+                          Text('Mã tham gia: ${classInfo.joinCode}'),
                         ],
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       isThreeLine: true,
                       onTap: () {
+                        // Truyền vào classId từ classInfo
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) =>
-                                ClassDetailPage(classId: classItem.id),
+                                ClassDetailPage(classId: classInfo.id),
                           ),
                         );
                       },
@@ -691,12 +711,10 @@ class _SessionListPageState extends State<_SessionListPage> {
     final sessionService = context.read<SessionService>();
 
     return Scaffold(
-      // === CẤU TRÚC LẠI HOÀN TOÀN HÀM BUILD ===
-      // StreamBuilder lấy thông tin lớp học sẽ bao bọc toàn bộ nội dung
-      body: StreamBuilder<ClassModel>(
+      body: StreamBuilder<RichClassModel>(
+        // <<<--- THAY ĐỔI 1: Đổi thành RichClassModel
         stream: classService.getRichClassStream(widget.classId),
         builder: (context, classSnapshot) {
-          // Xử lý trạng thái tải và lỗi của thông tin lớp học trước
           if (classSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -708,13 +726,14 @@ class _SessionListPageState extends State<_SessionListPage> {
               ),
             );
           }
-          // Khi đã có thông tin lớp, ta lưu vào biến classData
-          final classData = classSnapshot.data!;
 
-          // Bây giờ, ta xây dựng giao diện dựa trên classData đã có
+          final richClass = classSnapshot.data!;
+          final classData = richClass.classInfo; // Lấy ra ClassModel gốc
+          final courses = richClass.courses; // Lấy ra danh sách môn học
+          final lecturer = richClass.lecturer; // Lấy ra thông tin giảng viên
+
           return Column(
             children: [
-              // --- PHẦN HEADER THÔNG TIN LỚP VÀ NÚT TẠO BUỔI HỌC ---
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -728,6 +747,7 @@ class _SessionListPageState extends State<_SessionListPage> {
                           ),
                         ),
                         FilledButton.icon(
+                          // === THAY ĐỔI 2: Truyền classData (ClassModel) vào hàm ===
                           onPressed: _isCreatingSession
                               ? null
                               : () => _startNewAttendanceSession(classData),
@@ -750,17 +770,16 @@ class _SessionListPageState extends State<_SessionListPage> {
                       margin: EdgeInsets.zero,
                       child: ListTile(
                         leading: const Icon(Icons.class_),
-                        title: Text(classData.courseName ?? '...'),
+                        // === THAY ĐỔI 3: Hiển thị dữ liệu từ RichClassModel ===
+                        title: Text(classData.className),
                         subtitle: Text(
-                          'Mã: ${classData.courseCode ?? "..."} • GV: ${classData.lecturerName ?? "..."}',
+                          'Môn: ${courses.map((c) => c.courseCode).join(', ')} • GV: ${lecturer?.displayName ?? "..."}',
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-
-              // --- PHẦN DANH SÁCH CÁC BUỔI HỌC ---
               Expanded(
                 child: StreamBuilder<List<SessionModel>>(
                   stream: sessionService.sessionsOfClass(widget.classId),
@@ -790,16 +809,14 @@ class _SessionListPageState extends State<_SessionListPage> {
                               'Bắt đầu: ${DateFormat.yMd().add_Hm().format(session.startTime)}',
                             ),
                             trailing: const Icon(Icons.chevron_right),
-                            // === THAY ĐỔI QUAN TRỌNG NHẤT: TRUYỀN CÁC ĐỐI TƯỢNG ĐẦY ĐỦ ===
                             onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => SessionDetailPage(
-                                    session:
-                                        session, // Truyền cả đối tượng session
-                                    classInfo:
-                                        classData, // Truyền đối tượng classData từ StreamBuilder cha
+                                    session: session,
+                                    // === THAY ĐỔI 4: Truyền classData (ClassModel) vào trang chi tiết ===
+                                    classInfo: classData,
                                   ),
                                 ),
                               );
