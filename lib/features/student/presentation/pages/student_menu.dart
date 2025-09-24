@@ -260,10 +260,13 @@ class _NotificationsPageState extends State<_NotificationsPage> {
   bool _sound = true;
   bool _vibrate = true;
   bool _hourBefore = true;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    // Đảm bảo rằng chỉ số luôn được reset về 0 khi widget được khởi tạo
+    _selectedIndex = 0;
     // đảm bảo đã xin quyền (idempotent)
     LocalNotificationService.requestPermissionsIfNeeded();
   }

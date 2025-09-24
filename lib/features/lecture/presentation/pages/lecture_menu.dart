@@ -10,7 +10,6 @@ import '../../../../app/providers/auth_provider.dart';
 import '../../../../app/providers/navigation_provider.dart';
 import '../../../auth/presentation/pages/edit_account_page.dart';
 import '../../../classes/data/services/class_service.dart';
-import '../../../classes/presentation/pages/class_detail_page.dart';
 import '../../../common/data/models/class_model.dart';
 import '../../../common/data/models/session_model.dart';
 import '../../../common/data/models/user_model.dart';
@@ -29,9 +28,13 @@ class LectureMenuPage extends StatefulWidget {
 }
 
 class _LectureMenuPageState extends State<LectureMenuPage> {
+  int _selectedIndex = 0;
+
   @override
   void initState() {
-    super.initState();
+    super
+        .initState(); // Đảm bảo rằng chỉ số luôn được reset về 0 khi widget được khởi tạo
+    _selectedIndex = 0;
     // Đặt thông báo nhắc lịch cho giảng viên đang đăng nhập
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {

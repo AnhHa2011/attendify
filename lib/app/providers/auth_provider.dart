@@ -71,6 +71,13 @@ class AuthProvider extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     await _auth.signOut();
+
+    // <<< THAY ĐỔI QUAN TRỌNG >>>
+    // Chủ động dọn dẹp state ngay lập tức sau khi đăng xuất thành công.
+    // Điều này đảm bảo rằng khi listener được thông báo, state đã hoàn toàn sạch.
+    _user = null;
+    _role = null;
+
     _loading = false;
     notifyListeners();
   }
