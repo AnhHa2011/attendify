@@ -1,9 +1,9 @@
-// lib/presentation/pages/classes/create_class_page.dart
+// lib/features/classes/presentation/pages/create_class_page.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../common/data/models/course_model.dart'; // Import model mới
+import '../../../common/data/models/course_model.dart';
 import '../../data/services/class_service.dart';
 import '../../../common/data/models/class_schedule_model.dart';
 import 'class_detail_page.dart';
@@ -20,34 +20,75 @@ class _CreateClassPageState extends State<CreateClassPage> {
 
   String? _selectedCourseId;
   String? _selectedLecturerId;
-  final _semesterCtrl = TextEditingController(text: 'HK1 2025-2026');
+  String? _selectedSemester; // Dùng biến này thay cho TextEditingController
   final _maxAbsCtrl = TextEditingController(text: '3');
 
-  // Sửa lại state cho lịch học để dễ quản lý
-  int _dayOfWeek = 1; // Thứ 2
+  // State cho lịch học
+  int _dayOfWeek = 1; // Mặc định là Thứ 2
   TimeOfDay _startTime = const TimeOfDay(hour: 7, minute: 30);
 
   bool _submitting = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Khởi tạo giá trị mặc định cho học kỳ là học kỳ gần nhất
+    _selectedSemester = _generateRecentSemesters().first;
+  }
+
+  @override
   void dispose() {
-    _semesterCtrl.dispose();
     _maxAbsCtrl.dispose();
     super.dispose();
   }
 
-  // === HÀM HELPER ĐỂ CHUYỂN ĐỔI STRING SANG TIMEOFDAY ===
-  // (Bạn có thể bỏ qua hàm này nếu bạn dùng TimePicker để chọn giờ)
-  TimeOfDay _parseTime(String time) {
-    final parts = time.split(':');
-    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+  // Hàm helper để tạo danh sách 6 học kỳ gần nhất
+  List<String> _generateRecentSemesters() {
+    final List<String> semesters = [];
+    final now = DateTime.now();
+    int currentYear = now.year;
+    int currentMonth = now.month;
+
+    // Xác định học kỳ và năm học hiện tại
+    int semesterNum;
+    int academicYearStart;
+
+    if (currentMonth >= 9 && currentMonth <= 12) {
+      // Học kỳ 1
+      semesterNum = 1;
+      academicYearStart = currentYear;
+    } else if (currentMonth >= 1 && currentMonth <= 6) {
+      // Học kỳ 2
+      semesterNum = 2;
+      academicYearStart = currentYear - 1;
+    } else {
+      // Học kỳ 3 (Hè)
+      semesterNum = 3;
+      academicYearStart = currentYear - 1;
+    }
+
+    // Sinh ra 6 học kỳ gần nhất bằng cách lùi dần
+    for (int i = 0; i < 6; i++) {
+      semesters.add(
+        'HK$semesterNum ${academicYearStart}-${academicYearStart + 1}',
+      );
+
+      // Lùi học kỳ
+      semesterNum--;
+      if (semesterNum == 0) {
+        semesterNum = 3; // Lùi từ HK1 về HK3
+        academicYearStart--; // Lùi năm học
+      }
+    }
+    return semesters;
   }
 
   Future<void> _submit() async {
+    // Cập nhật điều kiện kiểm tra, thêm _selectedSemester
     if (!_formKey.currentState!.validate() ||
         _selectedCourseId == null ||
-        _selectedLecturerId == null) {
-      // Thêm kiểm tra null cho Dropdown
+        _selectedLecturerId == null ||
+        _selectedSemester == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng điền đầy đủ thông tin')),
       );
@@ -58,12 +99,10 @@ class _CreateClassPageState extends State<CreateClassPage> {
     try {
       final svc = context.read<ClassService>();
 
-      // === PHẦN SỬA LỖI QUAN TRỌNG NHẤT ===
-      // Sử dụng đúng tên tham số (dayOfWeek, startTime) và đúng kiểu dữ liệu.
       final classId = await svc.createClass(
         courseId: _selectedCourseId!,
         lecturerId: _selectedLecturerId!,
-        semester: _semesterCtrl.text.trim(),
+        semester: _selectedSemester!, // Sử dụng giá trị từ state
         schedules: [
           ClassSchedule(dayOfWeek: _dayOfWeek, startTime: _startTime),
         ],
@@ -92,8 +131,8 @@ class _CreateClassPageState extends State<CreateClassPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Để code gọn hơn, có thể khai báo service ở đây
     final classService = context.read<ClassService>();
+    final recentSemesters = _generateRecentSemesters();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Tạo lớp học mới')),
@@ -106,15 +145,19 @@ class _CreateClassPageState extends State<CreateClassPage> {
               key: _formKey,
               child: ListView(
                 children: [
-                  // Dropdown chọn môn học (Code của bạn đã đúng)
+                  // Dropdown chọn môn học
                   StreamBuilder<List<CourseModel>>(
                     stream: classService.getAllCoursesStream(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return const Text('Không có môn học nào.');
+                      if (snapshot.hasError ||
+                          !snapshot.hasData ||
+                          snapshot.data!.isEmpty) {
+                        return const Text(
+                          'Không có môn học nào hoặc đã xảy ra lỗi.',
+                        );
                       }
                       final courses = snapshot.data!;
                       return DropdownButtonFormField<String>(
@@ -141,15 +184,19 @@ class _CreateClassPageState extends State<CreateClassPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Dropdown chọn giảng viên (Code của bạn đã đúng)
+                  // Dropdown chọn giảng viên
                   StreamBuilder<List<Map<String, String>>>(
                     stream: classService.lecturersStream(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return const Text('Không có giảng viên nào.');
+                      if (snapshot.hasError ||
+                          !snapshot.hasData ||
+                          snapshot.data!.isEmpty) {
+                        return const Text(
+                          'Không có giảng viên nào hoặc đã xảy ra lỗi.',
+                        );
                       }
                       final lecturers = snapshot.data!;
                       return DropdownButtonFormField<String>(
@@ -176,28 +223,51 @@ class _CreateClassPageState extends State<CreateClassPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Nhập học kỳ
-                  TextFormField(
-                    controller: _semesterCtrl,
+                  // Dropdown chọn học kỳ
+                  DropdownButtonFormField<String>(
+                    value: _selectedSemester,
+                    items: recentSemesters.map((semester) {
+                      return DropdownMenuItem(
+                        value: semester,
+                        child: Text(semester),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedSemester = value;
+                      });
+                    },
                     decoration: const InputDecoration(
                       labelText: 'Học kỳ',
                       border: OutlineInputBorder(),
                     ),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Nhập học kỳ' : null,
+                    validator: (value) =>
+                        value == null ? 'Vui lòng chọn học kỳ' : null,
                   ),
                   const SizedBox(height: 16),
 
-                  // TODO: Thêm UI để người dùng có thể chọn ngày và giờ ở đây
-                  // Ví dụ đơn giản:
-                  Text(
-                    'Lịch học hiện tại: Thứ ${_dayOfWeek + 1}, lúc ${_startTime.format(context)}',
+                  // Hiển thị lịch học đã chọn
+                  // TODO: Thêm UI để người dùng có thể thay đổi ngày và giờ
+                  ListTile(
+                    leading: const Icon(Icons.schedule),
+                    title: const Text('Lịch học'),
+                    subtitle: Text(
+                      'Thứ ${_dayOfWeek + 1}, lúc ${_startTime.format(context)}',
+                    ),
+                    trailing: const Icon(Icons.edit_outlined),
+                    onTap: () {
+                      // Bạn có thể thêm chức năng cho phép chỉnh sửa lịch học tại đây
+                    },
                   ),
 
                   const SizedBox(height: 24),
                   FilledButton(
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
+                      textStyle: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     onPressed: _submitting ? null : _submit,
                     child: _submitting
