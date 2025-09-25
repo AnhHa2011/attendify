@@ -16,7 +16,7 @@ class HomePage extends StatelessWidget {
         case UserRole.admin:
           return 'Admin';
         case UserRole.lecture:
-          return 'Lecture';
+          return 'Lecturer';
         case UserRole.student:
           return 'Student';
         default:
@@ -27,6 +27,7 @@ class HomePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Trang chủ'),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             onPressed: () => auth.logout(),

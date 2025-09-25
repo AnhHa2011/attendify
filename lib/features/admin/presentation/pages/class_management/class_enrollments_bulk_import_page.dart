@@ -1,71 +1,42 @@
-// lib/features/admin/presentation/pages/class_management/class_enrollments_bulk_import_page.dart
+// lib/features/admin/presentation/pages/class_enrollments_bulk_import_page.dart
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/data/models/class_model.dart';
 import '../../../../common/data/models/course_model.dart';
 import '../../../../common/data/models/user_model.dart';
-import '../../../../common/utils/template_downloader_io.dart'
-    as TemplateDownloader;
+import '../../../../common/utils/template_downloader.dart';
 import '../../../data/services/admin_service.dart';
 
-// Sheet structure (per class):
-// Row1: courseCode | lecturerEmail | semester | className (headers)
-// Row2: values
-// Row4: studentEmail | studentDisplayName | studentCode (headers)
-// Row5+: students
-
-const _classHeaders = ['courseCode', 'lecturerEmail', 'semester', 'className'];
-const _studentHeaders = ['studentEmail', 'studentDisplayName', 'studentCode'];
-const _ignoreSheets = {'README', 'LOOKUPS'};
-
-class _StudentRow {
-  final int rowIndex; // row index in sheet
-  String email;
-  String displayName;
-  String studentCode;
-
-  String? studentUid; // match to existing student
-  bool createStudent = false; // create new user if not matched
-  String? error;
-
-  _StudentRow({
-    required this.rowIndex,
-    required this.email,
-    required this.displayName,
-    required this.studentCode,
-  });
-}
-
-class _ClassSheet {
-  final String sheetName;
-
-  // class meta (row 2)
+/// Mô tả một dòng trong Excel với format:
+/// className, courseCode, lecturerEmail, semester, studentEmails (phân cách bằng dấu ;)
+class _ClassEnrollmentRow {
+  final int rowIndex;
+  String className;
   String courseCode;
   String lecturerEmail;
   String semester;
-  String className;
+  List<String> studentEmails;
 
-  // resolved ids / create flags
+  String? classId; // sẽ được resolve sau khi tạo lớp hoặc tìm thấy lớp existing
   String? courseId;
   String? lecturerId;
+
+  bool createClass = false;
   bool createCourse = false;
   bool createLecturer = false;
+  String? error;
 
-  // students
-  final List<_StudentRow> students;
-
-  String? error; // class-level error
-
-  _ClassSheet({
-    required this.sheetName,
+  _ClassEnrollmentRow({
+    required this.rowIndex,
+    required this.className,
     required this.courseCode,
     required this.lecturerEmail,
     required this.semester,
-    required this.className,
-    required this.students,
+    required this.studentEmails,
   });
 }
 
@@ -79,507 +50,316 @@ class ClassEnrollmentsBulkImportPage extends StatefulWidget {
 
 class _ClassEnrollmentsBulkImportPageState
     extends State<ClassEnrollmentsBulkImportPage> {
-  List<_ClassSheet> _sheets = [];
+  List<_ClassEnrollmentRow> _rows = [];
   String? _fileName;
   bool _submitting = false;
   String? _message;
-  bool _allValid = false;
 
-  // ===== Validation =====
-  bool _validStudent(_StudentRow s) {
-    final okEmail = s.email.trim().isNotEmpty;
-    final okMap = (s.studentUid != null) || s.createStudent;
-    s.error = null;
-    if (!okEmail) s.error = 'Thiếu email sinh viên.';
-    if (!okMap) {
-      s.error = (s.error == null)
-          ? 'Chưa chọn SV hoặc đánh dấu "Tạo SV mới".'
-          : '${s.error} Chưa chọn SV hoặc đánh dấu "Tạo SV mới".';
-    }
-    return s.error == null;
-  }
+  final _expectedHeaders = [
+    'className',
+    'courseCode',
+    'lecturerEmail',
+    'semester',
+    'studentEmails',
+  ];
 
-  bool _validClass(_ClassSheet c) {
-    final okCourse = (c.courseId != null) || c.createCourse;
-    final okLecturer = (c.lecturerId != null) || c.createLecturer;
-    final okSemester = c.semester.trim().isNotEmpty;
-    final okName = c.className.trim().isNotEmpty;
-
-    c.error = null;
-    if (!okCourse) c.error = 'Chưa chọn Course (hoặc tạo mới).';
-    if (!okLecturer) {
-      c.error = (c.error == null)
-          ? 'Chưa chọn Giảng viên (hoặc tạo mới).'
-          : '${c.error} Chưa chọn Giảng viên (hoặc tạo mới).';
-    }
-    if (!okSemester) {
-      c.error = (c.error == null)
-          ? 'Thiếu Semester.'
-          : '${c.error} Thiếu Semester.';
-    }
-    if (!okName) {
-      c.error = (c.error == null)
-          ? 'Thiếu tên lớp.'
-          : '${c.error} Thiếu tên lớp.';
-    }
-
-    // students
-    final okStudents = c.students.isNotEmpty && c.students.every(_validStudent);
-    if (!okStudents) {
-      c.error = (c.error == null)
-          ? 'Danh sách sinh viên có dòng chưa hợp lệ.'
-          : '${c.error} Danh sách sinh viên có dòng chưa hợp lệ.';
-    }
-    return c.error == null;
-  }
-
-  void _recomputeValidity() {
-    for (final s in _sheets) {
-      for (final st in s.students) {
-        _validStudent(st);
-      }
-      _validClass(s);
-    }
-    _allValid = _sheets.isNotEmpty && _sheets.every(_validClass);
-  }
-
-  // ===== File pick & parse =====
   Future<void> _pickFile() async {
     setState(() {
-      _sheets = [];
+      _rows = [];
       _message = null;
       _fileName = null;
-      _allValid = false;
     });
-    final res = await FilePicker.platform.pickFiles(
+
+    final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx'],
       withData: true,
     );
-    if (res == null || res.files.isEmpty || res.files.single.bytes == null) {
+
+    if (result == null ||
+        result.files.isEmpty ||
+        result.files.first.bytes == null) {
       return;
     }
-    final bytes = res.files.single.bytes!;
-    final name = res.files.single.name;
+
+    final bytes = result.files.first.bytes!;
+    final name = result.files.first.name;
 
     try {
-      final parsed = await _parseWorkbook(bytes);
+      final rows = await _parseExcel(bytes);
       setState(() {
-        _sheets = parsed;
+        _rows = rows;
         _fileName = name;
-        _recomputeValidity();
       });
     } catch (e) {
-      setState(() => _message = 'Lỗi đọc file: $e');
+      setState(() {
+        _message = 'Lỗi đọc file: ${e.toString()}';
+      });
     }
   }
 
-  Future<List<_ClassSheet>> _parseWorkbook(Uint8List bytes) async {
-    final excel = Excel.decodeBytes(bytes);
+  Future<List<_ClassEnrollmentRow>> _parseExcel(Uint8List bytes) async {
+    Excel excel;
+    try {
+      excel = Excel.decodeBytes(bytes);
+    } catch (e) {
+      throw Exception('File không hợp lệ hoặc không phải Excel (.xlsx)');
+    }
+
     if (excel.tables.isEmpty) {
-      throw Exception('Workbook không có sheet dữ liệu.');
+      throw Exception('File không chứa sheet nào');
     }
-    final out = <_ClassSheet>[];
 
+    // Tìm sheet có tên phù hợp hoặc lấy sheet đầu tiên
+    Sheet? sheet = excel.tables.values.first;
     for (final entry in excel.tables.entries) {
-      final sheetName = entry.key.toString().trim();
-      if (_ignoreSheets.contains(sheetName.toUpperCase())) continue;
-      final tb = entry.value;
-      if (tb.rows.isEmpty) continue;
+      final name = entry.key.toLowerCase();
+      if (name.contains('class') || name.contains('enrollment')) {
+        sheet = entry.value;
+        break;
+      }
+    }
 
-      // Validate class headers row (row 1)
-      final headerRow = tb.rows.first
-          .map((c) => (c?.value?.toString() ?? '').trim())
+    if (sheet == null || sheet.rows.isEmpty) {
+      throw Exception('Sheet trống hoặc không có dữ liệu');
+    }
+
+    // Đọc header row
+    final headerRow = sheet.rows.first
+        .map((cell) => cell?.value?.toString().trim() ?? '')
+        .toList();
+
+    // Kiểm tra các cột bắt buộc
+    for (final requiredHeader in _expectedHeaders) {
+      if (!headerRow.any(
+        (h) => h.toLowerCase() == requiredHeader.toLowerCase(),
+      )) {
+        throw Exception('Thiếu cột bắt buộc: $requiredHeader');
+      }
+    }
+
+    final rows = <_ClassEnrollmentRow>[];
+
+    for (int i = 1; i < sheet.rows.length; i++) {
+      final row = sheet.rows[i];
+      if (row.every((cell) => cell?.value?.toString().trim().isEmpty ?? true)) {
+        continue; // Skip empty rows
+      }
+
+      final rowData = <String, String>{};
+      for (int j = 0; j < headerRow.length && j < row.length; j++) {
+        final header = headerRow[j];
+        final value = row[j]?.value?.toString().trim() ?? '';
+        if (header.isNotEmpty) {
+          rowData[header] = value;
+        }
+      }
+
+      final className = rowData['className'] ?? '';
+      final courseCode = rowData['courseCode'] ?? '';
+      final lecturerEmail = rowData['lecturerEmail'] ?? '';
+      final semester = rowData['semester'] ?? '';
+      final studentEmailsRaw = rowData['studentEmails'] ?? '';
+
+      if (className.isEmpty ||
+          courseCode.isEmpty ||
+          lecturerEmail.isEmpty ||
+          semester.isEmpty) {
+        continue; // Skip incomplete rows
+      }
+
+      // Parse student emails (separated by semicolon)
+      final studentEmails = studentEmailsRaw
+          .split(';')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty && e.contains('@'))
           .toList();
-      final normalized = headerRow.map((h) => h.toLowerCase()).toList();
-      for (final h in _classHeaders) {
-        if (!normalized.contains(h.toLowerCase())) {
-          // allow empty sheet to be skipped silently
-          continue;
-        }
-      }
 
-      // Values row (row 2)
-      final values = <String, String>{};
-      for (
-        var j = 0;
-        j < headerRow.length &&
-            j < (tb.rows.length >= 2 ? tb.rows[1].length : 0);
-        j++
-      ) {
-        final key = headerRow[j];
-        if (key.isEmpty) continue;
-        values[key] = (tb.rows[1][j]?.value?.toString() ?? '').trim();
-      }
-      final courseCode = (values['courseCode'] ?? '').trim();
-      final lecturerMail = (values['lecturerEmail'] ?? '').trim();
-      final semester = (values['semester'] ?? '').trim();
-      final className = (values['className'] ?? '').trim();
-      if ([
-        courseCode,
-        lecturerMail,
-        semester,
-        className,
-      ].every((e) => e.isEmpty)) {
-        // empty sheet -> skip
-        continue;
-      }
-
-      // Student header at row 4
-      if (tb.rows.length < 4) {
-        throw Exception(
-          'Sheet "$sheetName" thiếu phần danh sách sinh viên (từ hàng 4).',
-        );
-      }
-      final stuHeader = tb.rows[3]
-          .map((c) => (c?.value?.toString() ?? '').trim())
-          .toList();
-      final stuNorm = stuHeader.map((h) => h.toLowerCase()).toList();
-      for (final h in _studentHeaders) {
-        if (!stuNorm.contains(h.toLowerCase())) {
-          throw Exception('Sheet "$sheetName" thiếu cột sinh viên: $h');
-        }
-      }
-
-      // Students from row 5+
-      final students = <_StudentRow>[];
-      for (var i = 4; i < tb.rows.length; i++) {
-        final row = tb.rows[i];
-        if (row.isEmpty) continue;
-        final map = <String, dynamic>{};
-        for (var j = 0; j < stuHeader.length && j < row.length; j++) {
-          final key = stuHeader[j];
-          if (key.isEmpty) continue;
-          map[key] = row[j]?.value;
-        }
-        final email = (map['studentEmail'] ?? '').toString().trim();
-        final name = (map['studentDisplayName'] ?? '').toString().trim();
-        final code = (map['studentCode'] ?? '').toString().trim();
-        if ([email, name, code].every((x) => x.isEmpty)) {
-          continue; // skip empty line
-        }
-        students.add(
-          _StudentRow(
-            rowIndex: i + 1,
-            email: email,
-            displayName: name,
-            studentCode: code,
-          ),
-        );
-      }
-
-      out.add(
-        _ClassSheet(
-          sheetName: sheetName,
-          courseCode: courseCode,
-          lecturerEmail: lecturerMail,
-          semester: semester,
+      rows.add(
+        _ClassEnrollmentRow(
+          rowIndex: i + 1,
           className: className,
-          students: students,
+          courseCode: courseCode,
+          lecturerEmail: lecturerEmail,
+          semester: semester,
+          studentEmails: studentEmails,
         ),
       );
     }
-    return out;
+
+    return rows;
   }
 
-  // ===== create dialogs (course/lecturer/student) =====
-  Future<void> _createCourseDialog(_ClassSheet c) async {
-    final codeCtrl = TextEditingController(text: c.courseCode);
-    final nameCtrl = TextEditingController();
-    final creditsCtrl = TextEditingController(text: '3');
-    final formKey = GlobalKey<FormState>();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Tạo môn học mới'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: codeCtrl,
-                decoration: const InputDecoration(labelText: 'courseCode'),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Bắt buộc' : null,
-              ),
-              TextFormField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'courseName'),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Bắt buộc' : null,
-              ),
-              TextFormField(
-                controller: creditsCtrl,
-                decoration: const InputDecoration(labelText: 'credits'),
-                keyboardType: TextInputType.number,
-                validator: (v) =>
-                    int.tryParse(v ?? '') == null ? 'Nhập số' : null,
-              ),
-            ],
+  void _autoMatch(
+    List<CourseModel> courses,
+    List<UserModel> lecturers,
+    List<ClassModel> classes,
+  ) {
+    for (final row in _rows) {
+      // Auto-match course
+      if (row.courseId == null) {
+        final course = courses.firstWhere(
+          (c) => c.courseCode.toUpperCase() == row.courseCode.toUpperCase(),
+          orElse: () => CourseModel.empty(),
+        );
+        if (course.id.isNotEmpty) {
+          row.courseId = course.id;
+        }
+      }
+
+      // Auto-match lecturer
+      if (row.lecturerId == null) {
+        final lecturer = lecturers.firstWhere(
+          (l) => l.email.toLowerCase() == row.lecturerEmail.toLowerCase(),
+          orElse: () => UserModel(
+            uid: '',
+            email: '',
+            displayName: '',
+            role: UserRole.unknown,
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
+        );
+        if (lecturer.uid.isNotEmpty) {
+          row.lecturerId = lecturer.uid;
+        }
+      }
+
+      // Auto-match existing class (by className + semester + courseCode)
+      if (row.classId == null) {
+        final existingClass = classes.firstWhere(
+          (c) =>
+              c.className.toLowerCase() == row.className.toLowerCase() &&
+              c.semester.toLowerCase() == row.semester.toLowerCase(),
+          orElse: () => ClassModel(
+            id: '',
+            courseIds: [],
+            lecturerId: '',
+            semester: '',
+            className: '',
+            classCode: '',
+            joinCode: '',
+            createdAt: DateTime.now(),
+            isArchived: false,
           ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context, true);
-              }
-            },
-            child: const Text('Tạo'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      final admin = context.read<AdminService>();
-      await admin.createCourse(
-        courseCode: codeCtrl.text.trim(),
-        courseName: nameCtrl.text.trim(),
-        credits: int.parse(creditsCtrl.text.trim()),
-      );
-      setState(() {
-        c.courseCode = codeCtrl.text.trim();
-        c.createCourse = false;
-        _recomputeValidity();
-      });
+        );
+        if (existingClass.id.isNotEmpty) {
+          row.classId = existingClass.id;
+        }
+      }
     }
   }
 
-  Future<void> _createLecturerDialog(_ClassSheet c) async {
-    final emailCtrl = TextEditingController(text: c.lecturerEmail);
-    final nameCtrl = TextEditingController();
-    final passCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Tạo giảng viên mới'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: emailCtrl,
-                decoration: const InputDecoration(labelText: 'email'),
-                validator: (v) => (v == null || !v.contains('@'))
-                    ? 'Email không hợp lệ'
-                    : null,
-              ),
-              TextFormField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'displayName'),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Bắt buộc' : null,
-              ),
-              TextFormField(
-                controller: passCtrl,
-                decoration: const InputDecoration(labelText: 'mật khẩu tạm'),
-                obscureText: true,
-                validator: (v) =>
-                    (v == null || v.length < 6) ? '≥ 6 ký tự' : null,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context, true);
-              }
-            },
-            child: const Text('Tạo'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      final admin = context.read<AdminService>();
-      await admin.createNewUser(
-        email: emailCtrl.text.trim(),
-        password: passCtrl.text.trim(),
-        displayName: nameCtrl.text.trim(),
-        role: UserRole.lecture,
-      );
-      setState(() {
-        c.lecturerEmail = emailCtrl.text.trim();
-        c.createLecturer = false;
-        _recomputeValidity();
-      });
-    }
-  }
-
-  Future<void> _createStudentDialog(_StudentRow s) async {
-    final emailCtrl = TextEditingController(text: s.email);
-    final nameCtrl = TextEditingController(text: s.displayName);
-    final passCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Tạo sinh viên mới'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: emailCtrl,
-                decoration: const InputDecoration(labelText: 'email'),
-                validator: (v) => (v == null || !v.contains('@'))
-                    ? 'Email không hợp lệ'
-                    : null,
-              ),
-              TextFormField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'displayName'),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Bắt buộc' : null,
-              ),
-              TextFormField(
-                controller: passCtrl,
-                decoration: const InputDecoration(labelText: 'mật khẩu tạm'),
-                obscureText: true,
-                validator: (v) =>
-                    (v == null || v.length < 6) ? '≥ 6 ký tự' : null,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context, true);
-              }
-            },
-            child: const Text('Tạo'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      final admin = context.read<AdminService>();
-      await admin.createNewUser(
-        email: emailCtrl.text.trim(),
-        password: passCtrl.text.trim(),
-        displayName: nameCtrl.text.trim(),
-        role: UserRole.student,
-      );
-      setState(() {
-        s.email = emailCtrl.text.trim();
-        s.displayName = nameCtrl.text.trim();
-        s.createStudent = false;
-        _recomputeValidity();
-      });
-    }
-  }
-
-  // ===== Submit =====
   Future<void> _submit(
     List<CourseModel> courses,
     List<UserModel> lecturers,
-    List<UserModel> students,
+    List<ClassModel> classes,
   ) async {
-    _recomputeValidity();
-    setState(() {});
-    if (!_allValid) {
-      setState(() {
-        _message =
-            'Có sheet/dòng chưa hợp lệ. Hãy sửa hoặc xoá trước khi import.';
-      });
-      return;
+    if (_rows.isEmpty) return;
+
+    // Validate all rows
+    for (final row in _rows) {
+      row.error = null;
+      final needsCourse = row.courseId == null && !row.createCourse;
+      final needsLecturer = row.lecturerId == null && !row.createLecturer;
+      final needsClass = row.classId == null && !row.createClass;
+
+      if (needsCourse || needsLecturer || needsClass) {
+        final missing = <String>[];
+        if (needsCourse) missing.add('Course');
+        if (needsLecturer) missing.add('Lecturer');
+        if (needsClass) missing.add('Class');
+        row.error = 'Cần chọn hoặc tạo mới: ${missing.join(', ')}';
+      }
+
+      if (row.studentEmails.isEmpty) {
+        row.error = (row.error?.isEmpty ?? true)
+            ? 'Không có email sinh viên nào'
+            : '${row.error}. Không có email sinh viên nào';
+      }
     }
+
+    setState(() {});
+    if (_rows.any((r) => r.error != null)) return;
 
     setState(() {
       _submitting = true;
       _message = null;
     });
+
     final admin = context.read<AdminService>();
+    int classesCreated = 0;
+    int enrollmentsCreated = 0;
+    int coursesCreated = 0;
+    int lecturersCreated = 0;
 
     try {
-      for (final sheet in _sheets) {
-        // resolve course & lecturer ids (mapping theo current lists)
-        if (sheet.courseId == null) {
-          final ci = courses.indexWhere(
-            (c) =>
-                c.courseCode.toUpperCase().trim() ==
-                sheet.courseCode.toUpperCase().trim(),
-          );
-          if (ci != -1) sheet.courseId = courses[ci].id;
-        }
-        if (sheet.lecturerId == null) {
-          final ui = lecturers.indexWhere(
-            (u) =>
-                u.email.toLowerCase().trim() ==
-                sheet.lecturerEmail.toLowerCase().trim(),
-          );
-          if (ui != -1) sheet.lecturerId = lecturers[ui].uid;
-        }
-
-        // ensure course/lecturer exist if "create" flags are set
-        if (sheet.courseId == null && sheet.createCourse) {
+      for (final row in _rows) {
+        // Step 1: Create course if needed
+        if (row.createCourse) {
           await admin.createCourse(
-            courseCode: sheet.courseCode,
-            courseName: sheet.className,
-            credits: 3,
+            courseCode: row.courseCode,
+            courseName: '${row.courseCode} Course', // Default name
+            credits: 3, // Default credits
           );
-          sheet.courseId = await admin.getCourseIdByCode(sheet.courseCode);
-        }
-        if (sheet.lecturerId == null && sheet.createLecturer) {
-          // không tạo thêm ở đây vì đã có dialog tạo GV; fallback: tìm lại UID theo email
-          sheet.lecturerId = await admin.getUserIdByEmail(sheet.lecturerEmail);
+          coursesCreated++;
+
+          // Re-fetch to get the new course ID
+          final newCourse = await admin.getCourseIdByCode(row.courseCode);
+          row.courseId = newCourse;
         }
 
-        // 1) create class, get classId
-        final classId = await admin.createClassRaw(
-          className: sheet.className,
-          courseId: sheet.courseId!,
-          lecturerId: sheet.lecturerId!,
-          semester: sheet.semester,
-        );
+        // Step 2: Create lecturer if needed
+        if (row.createLecturer) {
+          await admin.createNewUser(
+            email: row.lecturerEmail,
+            password: 'TempPass123!', // Temporary password
+            displayName: row.lecturerEmail.split(
+              '@',
+            )[0], // Use email prefix as name
+            role: UserRole.lecture,
+          );
+          lecturersCreated++;
 
-        // 2) resolve students (and create if asked)
-        for (final s in sheet.students) {
-          if (s.studentUid == null) {
-            final ui = students.indexWhere(
-              (u) =>
-                  u.email.toLowerCase().trim() == s.email.toLowerCase().trim(),
-            );
-            if (ui != -1) s.studentUid = students[ui].uid;
-          }
-          if (s.studentUid == null && s.createStudent) {
-            // đã có dialog tạo; fallback: lookup theo email
-            s.studentUid = await admin.getUserIdByEmail(s.email);
-          }
-          if (s.studentUid != null) {
-            await admin.addEnrollment(
-              classId: classId,
-              studentUid: s.studentUid!,
-            );
+          // Re-fetch to get the new lecturer ID
+          final newLecturer = await admin.getUserIdByEmail(row.lecturerEmail);
+          row.lecturerId = newLecturer;
+        }
+
+        // Step 3: Create class if needed
+        if (row.createClass && row.courseId != null && row.lecturerId != null) {
+          final classId = await admin.createClassRaw(
+            className: row.className,
+            courseId: row.courseId!,
+            lecturerId: row.lecturerId!,
+            semester: row.semester,
+          );
+          row.classId = classId;
+          classesCreated++;
+        }
+
+        // Step 4: Enroll students
+        if (row.classId != null) {
+          for (final email in row.studentEmails) {
+            final studentId = await admin.getUserIdByEmail(email);
+            if (studentId != null) {
+              await admin.addEnrollment(
+                classId: row.classId!,
+                studentUid: studentId,
+              );
+              enrollmentsCreated++;
+            }
           }
         }
       }
+
       setState(() {
-        _message = 'Import thành công: ${_sheets.length} lớp + enrollments.';
+        _message =
+            'Hoàn thành!\n'
+            'Tạo mới: $coursesCreated courses, $lecturersCreated lecturers, $classesCreated classes\n'
+            'Ghi danh: $enrollmentsCreated students';
       });
     } catch (e) {
       setState(() {
-        _message = 'Lỗi khi import: $e';
+        _message = 'Lỗi: ${e.toString()}';
       });
     } finally {
       setState(() {
@@ -588,100 +368,78 @@ class _ClassEnrollmentsBulkImportPageState
     }
   }
 
-  // ===== UI =====
   @override
   Widget build(BuildContext context) {
     final admin = context.read<AdminService>();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Import lớp + enrollments (Excel, multi-sheet)'),
+        automaticallyImplyLeading: false,
+        title: const Text('Import Lớp học + Ghi danh'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: StreamBuilder<List<CourseModel>>(
           stream: admin.getAllCoursesStream(),
-          builder: (_, courseSnap) {
-            final courses = courseSnap.data ?? [];
-
-            // auto-match courseId
-            for (final s in _sheets) {
-              if (s.courseId == null) {
-                final i = courses.indexWhere(
-                  (c) =>
-                      c.courseCode.toUpperCase().trim() ==
-                      s.courseCode.toUpperCase().trim(),
-                );
-                if (i >= 0) s.courseId = courses[i].id;
-              }
-            }
+          builder: (context, courseSnapshot) {
+            final courses = courseSnapshot.data ?? [];
 
             return StreamBuilder<List<UserModel>>(
               stream: admin.getAllLecturersStream(),
-              builder: (_, lecSnap) {
-                final lecturers = lecSnap.data ?? [];
+              builder: (context, lecturerSnapshot) {
+                final lecturers = lecturerSnapshot.data ?? [];
 
-                for (final s in _sheets) {
-                  if (s.lecturerId == null) {
-                    final i = lecturers.indexWhere(
-                      (u) =>
-                          u.email.toLowerCase().trim() ==
-                          s.lecturerEmail.toLowerCase().trim(),
-                    );
-                    if (i >= 0) s.lecturerId = lecturers[i].uid;
-                  }
-                }
+                return StreamBuilder<List<ClassModel>>(
+                  stream: admin.getAllClassesStream(),
+                  builder: (context, classSnapshot) {
+                    final classes = classSnapshot.data ?? [];
 
-                return StreamBuilder<List<UserModel>>(
-                  stream: admin.getUsersStreamByRole(UserRole.student),
-                  builder: (_, stuSnap) {
-                    final students = stuSnap.data ?? [];
-
-                    // auto-match students
-                    for (final sheet in _sheets) {
-                      for (final st in sheet.students) {
-                        if (st.studentUid == null && st.email.isNotEmpty) {
-                          final idx = students.indexWhere(
-                            (u) =>
-                                u.email.toLowerCase().trim() ==
-                                st.email.toLowerCase().trim(),
-                          );
-                          if (idx >= 0) st.studentUid = students[idx].uid;
-                        }
-                      }
-                    }
+                    // Auto-match data
+                    _autoMatch(courses, lecturers, classes);
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Template download button
                         OutlinedButton.icon(
-                          icon: const Icon(Icons.download_for_offline_outlined),
-                          label: const Text('Template lớp + SV (multi-sheet)'),
+                          icon: const Icon(Icons.download_outlined),
+                          label: const Text('Tải template (.xlsx)'),
                           onPressed: () =>
                               TemplateDownloader.download('class_enroll'),
                         ),
-                        const SizedBox(height: 8),
+
+                        const SizedBox(height: 16),
+
+                        // Action buttons
                         Row(
                           children: [
                             ElevatedButton.icon(
                               onPressed: _pickFile,
                               icon: const Icon(Icons.upload_file),
-                              label: const Text('Chọn file .xlsx'),
+                              label: const Text('Chọn file Excel'),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 16),
                             ElevatedButton.icon(
-                              onPressed:
-                                  (_sheets.isNotEmpty &&
-                                      _allValid &&
-                                      !_submitting)
-                                  ? () => _submit(courses, lecturers, students)
+                              onPressed: (_rows.isNotEmpty && !_submitting)
+                                  ? () => _submit(courses, lecturers, classes)
                                   : null,
-                              icon: const Icon(Icons.cloud_upload_outlined),
-                              label: _submitting
-                                  ? const Text('Đang nhập...')
-                                  : const Text('Thực hiện'),
+                              icon: _submitting
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.cloud_upload),
+                              label: Text(
+                                _submitting ? 'Đang xử lý...' : 'Thực hiện',
+                              ),
                             ),
                           ],
                         ),
+
+                        // Status messages
                         if (_fileName != null) ...[
                           const SizedBox(height: 8),
                           Text(
@@ -689,6 +447,7 @@ class _ClassEnrollmentsBulkImportPageState
                             style: const TextStyle(fontStyle: FontStyle.italic),
                           ),
                         ],
+
                         if (_message != null) ...[
                           const SizedBox(height: 8),
                           Text(
@@ -700,77 +459,60 @@ class _ClassEnrollmentsBulkImportPageState
                             ),
                           ),
                         ],
-                        const SizedBox(height: 12),
+
+                        const SizedBox(height: 16),
+
+                        // Data preview
                         Expanded(
-                          child: _sheets.isEmpty
+                          child: _rows.isEmpty
                               ? const Center(
-                                  child: Text('Chưa có dữ liệu xem trước'),
+                                  child: Text(
+                                    'Chưa có dữ liệu.\nChọn file Excel để xem trước.',
+                                    textAlign: TextAlign.center,
+                                  ),
                                 )
                               : ListView.separated(
-                                  itemCount: _sheets.length,
-                                  separatorBuilder: (_, __) =>
-                                      const Divider(height: 1),
-                                  itemBuilder: (_, i) {
-                                    final cs = _sheets[i];
+                                  itemCount: _rows.length,
+                                  separatorBuilder: (context, index) =>
+                                      const Divider(),
+                                  itemBuilder: (context, index) {
+                                    final row = _rows[index];
                                     return Card(
-                                      elevation: 0,
                                       child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: const EdgeInsets.all(12),
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.class_outlined,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    '${cs.sheetName}: ${cs.className} — ${cs.semester}',
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ),
-                                                IconButton(
-                                                  tooltip: 'Xoá sheet',
-                                                  icon: const Icon(
-                                                    Icons.delete_outline,
-                                                  ),
-                                                  onPressed: () {
-                                                    setState(() {
-                                                      _sheets.removeAt(i);
-                                                      _recomputeValidity();
-                                                    });
-                                                  },
-                                                ),
-                                              ],
+                                            Text(
+                                              '${row.rowIndex}. ${row.className} (${row.semester})',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
                                             ),
-                                            const SizedBox(height: 6),
-                                            // Course resolve
+                                            const SizedBox(height: 8),
+
+                                            // Course selection
                                             Row(
                                               children: [
-                                                const Text('Course: '),
-                                                const SizedBox(width: 8),
-                                                Flexible(
-                                                  child: DropdownButtonFormField<String?>(
-                                                    initialValue: cs.courseId,
-                                                    isExpanded: true,
-                                                    items:
-                                                        <
-                                                          DropdownMenuItem<
-                                                            String?
-                                                          >
-                                                        >[
+                                                const SizedBox(
+                                                  width: 100,
+                                                  child: Text('Môn học:'),
+                                                ),
+                                                Expanded(
+                                                  child:
+                                                      DropdownButtonFormField<
+                                                        String?
+                                                      >(
+                                                        value: row.courseId,
+                                                        items: [
                                                           const DropdownMenuItem<
                                                             String?
                                                           >(
                                                             value: null,
                                                             child: Text(
-                                                              '— Chưa chọn —',
+                                                              '-- Chọn môn học --',
                                                             ),
                                                           ),
                                                           ...courses.map(
@@ -780,251 +522,189 @@ class _ClassEnrollmentsBulkImportPageState
                                                                 >(
                                                                   value: c.id,
                                                                   child: Text(
-                                                                    '${c.courseCode} — ${c.courseName}',
+                                                                    '${c.courseCode} - ${c.courseName}',
                                                                   ),
                                                                 ),
                                                           ),
                                                         ],
-                                                    onChanged: (val) {
+                                                        onChanged: (value) {
+                                                          setState(() {
+                                                            row.courseId =
+                                                                value;
+                                                            row.createCourse =
+                                                                false;
+                                                          });
+                                                        },
+                                                      ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                FilterChip(
+                                                  label: const Text('Tạo mới'),
+                                                  selected: row.createCourse,
+                                                  onSelected: (selected) {
+                                                    setState(() {
+                                                      row.createCourse =
+                                                          selected;
+                                                      if (selected)
+                                                        row.courseId = null;
+                                                    });
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+
+                                            const SizedBox(height: 8),
+
+                                            // Lecturer selection
+                                            Row(
+                                              children: [
+                                                const SizedBox(
+                                                  width: 100,
+                                                  child: Text('Giảng viên:'),
+                                                ),
+                                                Expanded(
+                                                  child: DropdownButtonFormField<String?>(
+                                                    value: row.lecturerId,
+                                                    items: [
+                                                      const DropdownMenuItem<
+                                                        String?
+                                                      >(
+                                                        value: null,
+                                                        child: Text(
+                                                          '-- Chọn giảng viên --',
+                                                        ),
+                                                      ),
+                                                      ...lecturers.map(
+                                                        (l) =>
+                                                            DropdownMenuItem<
+                                                              String?
+                                                            >(
+                                                              value: l.uid,
+                                                              child: Text(
+                                                                '${l.displayName} (${l.email})',
+                                                              ),
+                                                            ),
+                                                      ),
+                                                    ],
+                                                    onChanged: (value) {
                                                       setState(() {
-                                                        cs.courseId = val;
-                                                        cs.createCourse = false;
-                                                        _recomputeValidity();
+                                                        row.lecturerId = value;
+                                                        row.createLecturer =
+                                                            false;
                                                       });
                                                     },
                                                   ),
                                                 ),
                                                 const SizedBox(width: 8),
                                                 FilterChip(
-                                                  selected: cs.createCourse,
-                                                  label: const Text(
-                                                    'Tạo course mới',
-                                                  ),
-                                                  onSelected: (v) async {
-                                                    if (v) {
-                                                      await _createCourseDialog(
-                                                        cs,
-                                                      );
-                                                    } else {
-                                                      setState(
-                                                        () => cs.createCourse =
-                                                            false,
-                                                      );
-                                                    }
-                                                    _recomputeValidity();
+                                                  label: const Text('Tạo mới'),
+                                                  selected: row.createLecturer,
+                                                  onSelected: (selected) {
+                                                    setState(() {
+                                                      row.createLecturer =
+                                                          selected;
+                                                      if (selected)
+                                                        row.lecturerId = null;
+                                                    });
                                                   },
                                                 ),
                                               ],
                                             ),
-                                            // Lecturer resolve
+
+                                            const SizedBox(height: 8),
+
+                                            // Class selection
                                             Row(
                                               children: [
-                                                const Text('Giảng viên: '),
-                                                const SizedBox(width: 8),
-                                                Flexible(
-                                                  child: DropdownButtonFormField<String?>(
-                                                    initialValue: cs.lecturerId,
-                                                    isExpanded: true,
-                                                    items:
-                                                        <
-                                                          DropdownMenuItem<
-                                                            String?
-                                                          >
-                                                        >[
+                                                const SizedBox(
+                                                  width: 100,
+                                                  child: Text('Lớp học:'),
+                                                ),
+                                                Expanded(
+                                                  child:
+                                                      DropdownButtonFormField<
+                                                        String?
+                                                      >(
+                                                        value: row.classId,
+                                                        items: [
                                                           const DropdownMenuItem<
                                                             String?
                                                           >(
                                                             value: null,
                                                             child: Text(
-                                                              '— Chưa chọn —',
+                                                              '-- Chọn lớp học --',
                                                             ),
                                                           ),
-                                                          ...lecturers.map(
-                                                            (u) =>
+                                                          ...classes.map(
+                                                            (c) =>
                                                                 DropdownMenuItem<
                                                                   String?
                                                                 >(
-                                                                  value: u.uid,
+                                                                  value: c.id,
                                                                   child: Text(
-                                                                    '${u.displayName} — ${u.email}',
+                                                                    '${c.className} (${c.semester})',
                                                                   ),
                                                                 ),
                                                           ),
                                                         ],
-                                                    onChanged: (val) {
-                                                      setState(() {
-                                                        cs.lecturerId = val;
-                                                        cs.createLecturer =
-                                                            false;
-                                                        _recomputeValidity();
-                                                      });
-                                                    },
-                                                  ),
+                                                        onChanged: (value) {
+                                                          setState(() {
+                                                            row.classId = value;
+                                                            row.createClass =
+                                                                false;
+                                                          });
+                                                        },
+                                                      ),
                                                 ),
                                                 const SizedBox(width: 8),
                                                 FilterChip(
-                                                  selected: cs.createLecturer,
-                                                  label: const Text(
-                                                    'Tạo giảng viên mới',
-                                                  ),
-                                                  onSelected: (v) async {
-                                                    if (v) {
-                                                      await _createLecturerDialog(
-                                                        cs,
-                                                      );
-                                                    } else {
-                                                      setState(
-                                                        () =>
-                                                            cs.createLecturer =
-                                                                false,
-                                                      );
-                                                    }
-                                                    _recomputeValidity();
+                                                  label: const Text('Tạo mới'),
+                                                  selected: row.createClass,
+                                                  onSelected: (selected) {
+                                                    setState(() {
+                                                      row.createClass =
+                                                          selected;
+                                                      if (selected)
+                                                        row.classId = null;
+                                                    });
                                                   },
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 6),
-                                            if (cs.error != null)
-                                              Text(
-                                                cs.error!,
-                                                style: const TextStyle(
-                                                  color: Colors.red,
-                                                ),
-                                              ),
-                                            const SizedBox(height: 6),
-                                            ExpansionTile(
-                                              leading: const Icon(
-                                                Icons.people_outline,
-                                              ),
-                                              title: Text(
-                                                'Danh sách sinh viên (${cs.students.length})',
-                                              ),
+
+                                            const SizedBox(height: 8),
+
+                                            // Student emails
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
-                                                ...cs.students.asMap().entries.map((
-                                                  e,
-                                                ) {
-                                                  final st = e.value;
-                                                  return ListTile(
-                                                    contentPadding:
-                                                        const EdgeInsets.only(
-                                                          left: 12,
-                                                          right: 0,
-                                                        ),
-                                                    title: Text(
-                                                      '${st.rowIndex}. ${st.email}  ${st.displayName.isNotEmpty ? "— ${st.displayName}" : ""}',
+                                                const SizedBox(
+                                                  width: 100,
+                                                  child: Text('Sinh viên:'),
+                                                ),
+                                                Expanded(
+                                                  child: Text(
+                                                    '${row.studentEmails.length} emails: ${row.studentEmails.take(3).join(", ")}${row.studentEmails.length > 3 ? "..." : ""}',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
                                                     ),
-                                                    subtitle: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Row(
-                                                          children: [
-                                                            const Text(
-                                                              'Khớp với: ',
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 8,
-                                                            ),
-                                                            Flexible(
-                                                              child: DropdownButtonFormField<String?>(
-                                                                initialValue: st
-                                                                    .studentUid,
-                                                                isExpanded:
-                                                                    true,
-                                                                items:
-                                                                    <
-                                                                      DropdownMenuItem<
-                                                                        String?
-                                                                      >
-                                                                    >[
-                                                                      const DropdownMenuItem<
-                                                                        String?
-                                                                      >(
-                                                                        value:
-                                                                            null,
-                                                                        child: Text(
-                                                                          '— Chưa chọn —',
-                                                                        ),
-                                                                      ),
-                                                                      ...students.map(
-                                                                        (u) =>
-                                                                            DropdownMenuItem<
-                                                                              String?
-                                                                            >(
-                                                                              value: u.uid,
-                                                                              child: Text(
-                                                                                '${u.displayName} — ${u.email}',
-                                                                              ),
-                                                                            ),
-                                                                      ),
-                                                                    ],
-                                                                onChanged: (val) {
-                                                                  setState(() {
-                                                                    st.studentUid =
-                                                                        val;
-                                                                    st.createStudent =
-                                                                        false;
-                                                                    _recomputeValidity();
-                                                                  });
-                                                                },
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 8,
-                                                            ),
-                                                            FilterChip(
-                                                              selected: st
-                                                                  .createStudent,
-                                                              label: const Text(
-                                                                'Tạo SV mới',
-                                                              ),
-                                                              onSelected: (v) async {
-                                                                if (v) {
-                                                                  await _createStudentDialog(
-                                                                    st,
-                                                                  );
-                                                                } else {
-                                                                  setState(
-                                                                    () => st.createStudent =
-                                                                        false,
-                                                                  );
-                                                                }
-                                                                _recomputeValidity();
-                                                              },
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        if (st.error != null)
-                                                          Text(
-                                                            st.error!,
-                                                            style:
-                                                                const TextStyle(
-                                                                  color: Colors
-                                                                      .red,
-                                                                ),
-                                                          ),
-                                                      ],
-                                                    ),
-                                                    trailing: IconButton(
-                                                      tooltip: 'Xoá SV',
-                                                      icon: const Icon(
-                                                        Icons.delete_outline,
-                                                      ),
-                                                      onPressed: () {
-                                                        setState(() {
-                                                          cs.students.removeAt(
-                                                            e.key,
-                                                          );
-                                                          _recomputeValidity();
-                                                        });
-                                                      },
-                                                    ),
-                                                  );
-                                                }),
+                                                  ),
+                                                ),
                                               ],
                                             ),
+
+                                            // Error display
+                                            if (row.error != null) ...[
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                row.error!,
+                                                style: const TextStyle(
+                                                  color: Colors.red,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
                                           ],
                                         ),
                                       ),

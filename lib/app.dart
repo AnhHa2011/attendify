@@ -1,128 +1,166 @@
-// lib/app.dart - ĐÃ SỬA LỖI
-import 'package:attendify/features/common/data/models/user_model.dart';
+// lib/app.dart - Fixed
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'app/providers/auth_provider.dart';
-import 'features/admin/presentation/pages/admin_menu.dart';
-import 'features/auth/presentation/pages/login_page.dart';
-import 'features/auth/presentation/pages/register_page.dart';
-import 'features/auth/presentation/pages/reset_password_page.dart';
-import 'features/lecture/presentation/pages/lecture_menu.dart';
-import 'features/schedule/data/services/schedule_service.dart';
-import 'features/student/presentation/pages/student_menu.dart';
-import 'features/schedule/presentation/pages/schedule_page.dart';
+import 'routing/route_generator.dart';
+import 'routing/app_routes.dart';
+import 'features/common/data/models/user_model.dart';
 
 class AttendifyApp extends StatelessWidget {
   const AttendifyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    // Router vẫn được build lại mỗi khi auth thay đổi, điều này là đúng.
-    final router = _buildRouter(auth);
+    return Consumer<AuthProvider>(
+      builder: (context, auth, child) {
+        // 1) Giai đoạn loading: chỉ show một MaterialApp tối giản với home
+        if (auth.isLoading) {
+          return MaterialApp(
+            title: 'Attendify - Quản lý điểm danh thông minh',
+            debugShowCheckedModeBanner: false,
+            theme: _lightTheme,
+            darkTheme: _darkTheme,
+            home: const _LoadingScreen(),
+          );
+        }
 
-    return MaterialApp.router(
-      // === PHẦN SỬA LỖI QUAN TRỌNG NHẤT ===
-      // Key này đảm bảo rằng khi trạng thái đăng nhập (isLoggedIn) thay đổi,
-      // toàn bộ MaterialApp sẽ được coi là một widget mới. Điều này buộc
-      // Flutter phải xây dựng lại cây widget từ đầu, và quan trọng nhất là
-      // các provider trong MultiProvider (từ main.dart) cũng sẽ được
-      // khởi tạo lại. Việc này sẽ xóa sạch state cũ của người dùng trước.
-      key: ValueKey(auth.isLoggedIn),
+        // 2) Đã sẵn sàng: dùng routing (không set home đồng thời)
+        return MaterialApp(
+          key: ValueKey(auth.isLoggedIn), // buộc rebuild khi login state đổi
+          title: 'Attendify - Quản lý điểm danh thông minh',
+          debugShowCheckedModeBanner: false,
 
-      title: 'Attendify',
-      debugShowCheckedModeBanner: false,
-      routerConfig: router,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF5A64AF)),
-        // fontFamily: 'Mali',
+          // Routing mới
+          onGenerateRoute: RouteGenerator.generateRoute,
+          initialRoute: _getInitialRoute(auth),
+
+          theme: _lightTheme,
+          darkTheme: _darkTheme,
+        );
+      },
+    );
+  }
+
+  String _getInitialRoute(AuthProvider auth) {
+    return _getRoleMainRoute(auth.role);
+  }
+
+  String _getRoleMainRoute(UserRole? role) {
+    switch (role) {
+      case UserRole.admin:
+        return AppRoutes.adminMain;
+      case UserRole.lecture:
+        return AppRoutes.lecturerMain;
+      case UserRole.student:
+        return AppRoutes.studentMain;
+      default:
+        return AppRoutes.login;
+    }
+  }
+}
+
+// === THEMEs (đã sửa CardThemeData -> CardTheme) ===
+final ThemeData _lightTheme = ThemeData(
+  useMaterial3: true,
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: const Color(0xFF5A64AF),
+    brightness: Brightness.light,
+  ),
+  appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
+  cardTheme: CardThemeData(
+    elevation: 2,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+  filledButtonTheme: FilledButtonThemeData(
+    style: FilledButton.styleFrom(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    ),
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    filled: true,
+  ),
+);
+
+final ThemeData _darkTheme = ThemeData(
+  useMaterial3: true,
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: const Color(0xFF5A64AF),
+    brightness: Brightness.dark,
+  ),
+  appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
+  cardTheme: CardThemeData(
+    elevation: 2,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+);
+
+class _LoadingScreen extends StatelessWidget {
+  const _LoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Scaffold(
+      backgroundColor: cs.surface,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [cs.primary, cs.secondary]),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.primary.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.school_rounded,
+                size: 60,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 32),
+            Text(
+              'Attendify',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Quản lý điểm danh thông minh',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: cs.onSurface.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 48),
+            SizedBox(
+              width: 200,
+              child: LinearProgressIndicator(
+                backgroundColor: cs.surfaceVariant,
+                valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Đang khởi tạo ứng dụng...',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: cs.onSurface.withOpacity(0.6),
+              ),
+            ),
+          ],
+        ),
       ),
     );
-  }
-
-  GoRouter _buildRouter(AuthProvider auth) {
-    return GoRouter(
-      refreshListenable: auth,
-      initialLocation:
-          '/login', // initialLocation có thể được giữ hoặc loại bỏ tuỳ vào logic redirect
-      // Logic redirect của bạn đã rất tốt, không cần thay đổi.
-      redirect: (context, state) {
-        // Tạm thời hiển thị màn hình trống trong khi chờ
-        // Nếu không có dòng này, redirect có thể chạy trước khi có trạng thái auth
-        if (auth.isLoading)
-          return null; // Hoặc trả về một route cho màn hình chờ '/splash'
-
-        final loggedIn = auth.isLoggedIn;
-        final role = auth.roleKey; // 'admin' | 'lecture' | 'student' | null
-        final isAuthRoute = switch (state.matchedLocation) {
-          '/login' || '/register' || '/reset' => true,
-          _ => false,
-        };
-
-        // Nếu chưa đăng nhập và đang không ở trang auth, điều hướng về login
-        if (!loggedIn) {
-          return isAuthRoute ? null : '/login';
-        }
-
-        // Nếu đã đăng nhập và đang ở trang auth, điều hướng về trang chủ theo vai trò
-        if (loggedIn && isAuthRoute) {
-          return _roleHome(role);
-        }
-
-        // Nếu người dùng truy cập vào trang gốc, điều hướng về trang chủ theo vai trò
-        if (state.matchedLocation == '/' || state.matchedLocation == '/home') {
-          return _roleHome(role);
-        }
-
-        // Các trường hợp khác thì không cần redirect
-        return null;
-      },
-      routes: [
-        // Auth
-        GoRoute(path: '/login', builder: (c, s) => const LoginPage()),
-        GoRoute(path: '/register', builder: (c, s) => const RegisterPage()),
-        GoRoute(path: '/reset', builder: (c, s) => const ResetPasswordPage()),
-
-        // Role menus
-        GoRoute(path: '/admin', builder: (c, s) => const AdminMenuPage()),
-        GoRoute(path: '/lecture', builder: (c, s) => const LectureMenuPage()),
-        GoRoute(path: '/student', builder: (c, s) => const StudentMenuPage()),
-
-        GoRoute(
-          path: '/schedule',
-          builder: (ctx, state) {
-            final auth = ctx.read<AuthProvider>();
-            final uid = auth.user?.uid ?? '';
-            final isLecturer = auth.role == UserRole.lecture;
-
-            // Bọc provider cục bộ cho trang
-            return Provider<ScheduleService>(
-              create: (_) => ScheduleService(),
-              child: SchedulePage(currentUid: uid, isLecturer: isLecturer),
-            );
-          },
-        ),
-        // Mặc định
-        GoRoute(
-          path: '/',
-          builder: (c, s) => const SizedBox.shrink(),
-        ), // Màn hình trống để redirect
-      ],
-    );
-  }
-
-  String _roleHome(String? role) {
-    switch (role) {
-      case 'admin':
-        return '/admin';
-      case 'lecture':
-        return '/lecture';
-      case 'student':
-      default:
-        return '/student';
-    }
   }
 }

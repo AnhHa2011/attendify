@@ -137,7 +137,10 @@ class _MyAccountPageState extends State<MyAccountPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Account')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('My Account'),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Padding(

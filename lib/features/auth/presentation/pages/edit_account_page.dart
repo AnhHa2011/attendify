@@ -132,7 +132,10 @@ class _EditAccountPageState extends State<EditAccountPage> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Chỉnh sửa tài khoản')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Chỉnh sửa tài khoản'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(

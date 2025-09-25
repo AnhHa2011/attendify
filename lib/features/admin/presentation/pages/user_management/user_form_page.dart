@@ -150,9 +150,7 @@ class _UserFormPageState extends State<UserFormPage> {
                     .map((UserRole role) {
                       return DropdownMenuItem<UserRole>(
                         value: role,
-                        child: Text(
-                          role.name == 'lecture' ? 'Giảng viên' : 'Sinh viên',
-                        ),
+                        child: Text(role.displayName),
                       );
                     })
                     .toList(),

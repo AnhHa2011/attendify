@@ -190,7 +190,10 @@ class _CourseBulkImportPageState extends State<CourseBulkImportPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Import môn học (Excel)')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Import môn học (Excel)'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: StreamBuilder<List<CourseModel>>(

@@ -21,13 +21,17 @@ class ClassListPage extends StatelessWidget {
 
     if (lecturerId == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Lớp của tôi')),
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: const Text('Lớp của tôi'),
+        ),
         body: const Center(child: Text('Không thể xác thực người dùng.')),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Lớp của tôi'),
         // actions: [ // Cân nhắc bỏ nút tạo lớp ở đây nếu nó đã có ở nơi khác (vd: admin menu)
         //   IconButton(

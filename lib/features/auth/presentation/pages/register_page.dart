@@ -68,7 +68,10 @@ class _RegisterPageState extends State<RegisterPage> {
     final isBusy = _submitting || isLoadingGlobal;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Đăng ký')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Đăng ký'),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),

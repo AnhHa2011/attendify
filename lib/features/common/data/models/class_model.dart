@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../app_imports.dart';
 
 class ClassModel {
   // === Dữ liệu gốc, lưu trên Firestore ===
@@ -62,5 +62,32 @@ class ClassModel {
       'isArchived': isArchived,
       'lecturerName': lecturerName, // Lưu sẵn tên GV để đọc nhanh
     };
+  }
+
+  // Hàm copyWith để tạo instance mới với một số trường thay đổi
+  ClassModel copyWith({
+    String? id,
+    List<String>? courseIds,
+    String? lecturerId,
+    String? semester,
+    String? className,
+    String? classCode,
+    String? joinCode,
+    DateTime? createdAt,
+    bool? isArchived,
+    String? lecturerName,
+  }) {
+    return ClassModel(
+      id: id ?? this.id,
+      courseIds: courseIds ?? this.courseIds,
+      lecturerId: lecturerId ?? this.lecturerId,
+      semester: semester ?? this.semester,
+      className: className ?? this.className,
+      classCode: classCode ?? this.classCode,
+      joinCode: joinCode ?? this.joinCode,
+      createdAt: createdAt ?? this.createdAt,
+      isArchived: isArchived ?? this.isArchived,
+      lecturerName: lecturerName ?? this.lecturerName,
+    );
   }
 }

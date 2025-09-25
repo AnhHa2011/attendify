@@ -71,7 +71,10 @@ class _LoginPageState extends State<LoginPage> {
     final isBusy = _submitting || isLoadingGlobal;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Đăng nhập')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Đăng nhập'),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),

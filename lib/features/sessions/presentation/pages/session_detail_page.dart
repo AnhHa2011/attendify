@@ -33,6 +33,7 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Text(widget.session.title),
         actions: [
           StreamBuilder<SessionModel>(

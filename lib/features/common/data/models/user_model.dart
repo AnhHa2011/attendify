@@ -24,6 +24,20 @@ extension UserRoleX on UserRole {
         return UserRole.unknown;
     }
   }
+
+  /// Display name cho UI
+  String get displayName {
+    switch (this) {
+      case UserRole.admin:
+        return 'Quản trị viên';
+      case UserRole.lecture:
+        return 'Giảng viên';
+      case UserRole.student:
+        return 'Sinh viên';
+      case UserRole.unknown:
+        return 'Chưa xác định';
+    }
+  }
 }
 
 /// Model đại diện cho User trong app

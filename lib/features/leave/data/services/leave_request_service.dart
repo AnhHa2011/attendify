@@ -1,76 +1,94 @@
-import 'dart:typed_data';
+import 'package:attendify/core/constants/firestore_collections.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+
+import '../models/leave_request_model.dart';
 
 class LeaveRequestService {
-  final _db = FirebaseFirestore.instance;
-  final _storage = FirebaseStorage.instance;
+  final _col = FirebaseFirestore.instance.collection(
+    FirestoreCollections.leaveRequests,
+  );
 
-  /// Tạo request + upload ảnh (bytes) → lưu URL vào Firestore
-  /// [files] là danh sách tuple (bytes, suggestedName)
-  Future<String> createLeaveRequest({
-    required String studentUid,
-    required String studentName,
-    required String studentEmail,
-    required String classId,
-    required String sessionId,
-    required String reason,
-    required List<(Uint8List bytes, String fileName)> files,
-  }) async {
-    // 1) Tạo doc trước (để có requestId)
-    final docRef = await _db.collection('leave_requests').add({
-      'studentUid': studentUid,
-      'studentName': studentName,
-      'studentEmail': studentEmail,
-      'classId': classId,
-      'sessionId': sessionId,
-      'reason': reason,
-      'attachmentUrls': [],
-      'status': 'pending',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    final requestId = docRef.id;
-
-    // 2) Upload từng file lên Storage theo path cố định
-    final urls = <String>[];
-    for (var i = 0; i < files.length; i++) {
-      final (bytes, rawName) = files[i];
-      final safeName = rawName.isEmpty ? 'evidence_$i.jpg' : rawName;
-      final ref = _storage.ref().child(
-        'leave_requests/$studentUid/$requestId/$safeName',
-      );
-
-      await ref.putData(
-        bytes,
-        SettableMetadata(contentType: _guessContentType(safeName)),
-      );
-      final url = await ref.getDownloadURL();
-      urls.add(url);
-    }
-
-    // 3) cập nhật URL vào doc
-    await docRef.update({'attachmentUrls': urls});
-
-    return requestId;
+  Future<String> create(LeaveRequestModel m) async {
+    final doc = await _col.add(m.toMap());
+    return doc.id;
   }
 
-  Stream<List<Map<String, dynamic>>> myLeaveRequests(String studentUid) {
-    return _db
-        .collection('leave_requests')
-        .where('studentUid', isEqualTo: studentUid)
+  Stream<List<LeaveRequestModel>> myRequests(String studentId) {
+    return _col
+        .where('studentId', isEqualTo: studentId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map(
-          (snap) => snap.docs.map((d) => (d.data()..['id'] = d.id)).toList(),
-        );
+        .map((s) => s.docs.map((d) => LeaveRequestModel.fromDoc(d)).toList());
   }
 
-  String _guessContentType(String name) {
-    final n = name.toLowerCase();
-    if (n.endsWith('.png')) return 'image/png';
-    if (n.endsWith('.webp')) return 'image/webp';
-    if (n.endsWith('.heic')) return 'image/heic';
-    return 'image/jpeg';
+  Stream<List<LeaveRequestModel>> byClassAndSession(
+    String classId,
+    String sessionId,
+  ) {
+    return _col
+        .where('classId', isEqualTo: classId)
+        .where('sessionId', isEqualTo: sessionId)
+        .snapshots()
+        .map((s) => s.docs.map((d) => LeaveRequestModel.fromDoc(d)).toList());
+  }
+
+  // Stream đơn PENDING theo lớp (và buổi nếu chọn)
+  Stream<List<LeaveRequestModel>> pendingByClass({
+    required String classId,
+    String? sessionId,
+  }) {
+    Query q = _col
+        .where('classId', isEqualTo: classId)
+        .where('status', isEqualTo: 'pending');
+    if (sessionId != null) q = q.where('sessionId', isEqualTo: sessionId);
+    return q.snapshots().map(
+      (s) => s.docs.map((d) => LeaveRequestModel.fromDoc(d)).toList(),
+    );
+  }
+
+  // Duyệt / Từ chối
+  Future<void> updateStatus({
+    required String id,
+    required String status, // 'approved' | 'rejected'
+    required String approverId,
+    String? approverNote,
+  }) async {
+    await _col.doc(id).update({
+      'status': status,
+      'approverId': approverId,
+      'approverNote': approverNote,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // NEW: lấy theo studentId + (optional) status
+  Stream<List<LeaveRequestModel>> myRequestsFiltered({
+    required String studentId,
+    String? status, // null = all
+  }) {
+    Query q = _col.where('studentId', isEqualTo: studentId);
+    if (status != null) q = q.where('status', isEqualTo: status);
+    return q.snapshots().map((s) {
+      final list = s.docs.map((d) => LeaveRequestModel.fromDoc(d)).toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt)); // sort client
+      return list;
+    });
+  }
+
+  // NEW: lấy theo class + (optional) session + status
+  Stream<List<LeaveRequestModel>> byClassFiltered({
+    required String classId,
+    String? sessionId,
+    String? status, // null = all
+  }) {
+    Query q = _col.where('classId', isEqualTo: classId);
+    if (sessionId != null) q = q.where('sessionId', isEqualTo: sessionId);
+    if (status != null) q = q.where('status', isEqualTo: status);
+
+    return q.snapshots().map((s) {
+      final list = s.docs.map((d) => LeaveRequestModel.fromDoc(d)).toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt)); // sort client
+      return list;
+    });
   }
 }

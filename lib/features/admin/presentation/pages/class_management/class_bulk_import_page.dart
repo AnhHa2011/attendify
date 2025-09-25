@@ -396,7 +396,10 @@ class _ClassBulkImportPageState extends State<ClassBulkImportPage> {
     final admin = context.read<AdminService>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Import lớp học (Excel)')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Import lớp học (Excel)'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: StreamBuilder<List<CourseModel>>(

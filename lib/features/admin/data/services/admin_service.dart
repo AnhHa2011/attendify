@@ -1,15 +1,4 @@
-// lib/features/admin/data/services/admin_service.dart
-
-import 'dart:math';
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
-import '../../../common/data/models/class_model.dart';
-import '../../../common/data/models/course_model.dart';
-import '../../../common/data/models/session_model.dart';
-import '../../../common/data/models/user_model.dart';
-import '../../../common/data/models/class_schedule_model.dart';
+import '../../../../app_imports.dart';
 
 class AdminService {
   final _db = FirebaseFirestore.instance;
@@ -56,7 +45,7 @@ class AdminService {
   Stream<List<UserModel>> getUsersStreamByRole(UserRole role) {
     return _db
         .collection('users')
-        .where('role', isEqualTo: role.name)
+        .where('role', isEqualTo: role.toKey())
         .snapshots()
         .map(
           (snapshot) =>
@@ -72,7 +61,7 @@ class AdminService {
 
   Stream<List<UserModel>> getAllLecturersStream() {
     return _db
-        .collection('users')
+        .collection(FirestoreCollections.users)
         .where('role', isEqualTo: 'lecture')
         .snapshots()
         .map(
@@ -108,7 +97,7 @@ class AdminService {
       await _db.collection('users').doc(uid).set({
         'displayName': displayName,
         'email': email,
-        'role': role.name,
+        'role': role.toKey(),
         'createdAt': FieldValue.serverTimestamp(),
       });
     } on FirebaseAuthException catch (e) {
@@ -132,7 +121,7 @@ class AdminService {
   }) {
     return _db.collection('users').doc(uid).update({
       'displayName': displayName,
-      'role': role.name,
+      'role': role.toKey(),
     });
   }
 
@@ -184,8 +173,8 @@ class AdminService {
             startTime.add(Duration(minutes: durationInMinutes)),
           ),
           'location': location,
-          'status': 'scheduled', // Giả sử model của bạn chấp nhận chuỗi
-          'type': 'lecture', // Giả sử model của bạn chấp nhận chuỗi
+          'status': 'scheduled',
+          'type': 'lecture',
           'attendanceOpen': false,
         });
       }
@@ -217,13 +206,25 @@ class AdminService {
     required String courseCode,
     required String courseName,
     required int credits,
+    String? lecturerId, // NEW (optional)
+    int? minStudents, // NEW (optional)
+    int? maxStudents, // NEW (optional)
+    List<Map<String, dynamic>>? weeklySchedule, // NEW (optional)
   }) {
-    return _db.collection('courses').add({
-      'courseCode': courseCode,
-      'courseName': courseName,
+    final data = <String, dynamic>{
+      'courseCode': courseCode.trim().toUpperCase(),
+      'courseName': courseName.trim(),
       'credits': credits,
       'isArchived': false,
-    });
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+
+    if (lecturerId != null) data['lecturerId'] = lecturerId;
+    if (minStudents != null) data['minStudents'] = minStudents;
+    if (maxStudents != null) data['maxStudents'] = maxStudents;
+    if (weeklySchedule != null) data['weeklySchedule'] = weeklySchedule;
+
+    return _db.collection(FirestoreCollections.courses).add(data);
   }
 
   /// ===  Cập nhật thông tin một môn học ===
@@ -232,12 +233,28 @@ class AdminService {
     required String courseCode,
     required String courseName,
     required int credits,
+    String? lecturerId, // NEW (optional)
+    int? minStudents, // NEW (optional)
+    int? maxStudents, // NEW (optional)
+    List<Map<String, dynamic>>? weeklySchedule, // NEW (optional)
   }) {
-    return _db.collection('courses').doc(courseId).update({
-      'courseCode': courseCode,
-      'courseName': courseName,
+    final data = <String, dynamic>{
+      'courseCode': courseCode.trim().toUpperCase(),
+      'courseName': courseName.trim(),
       'credits': credits,
-    });
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    // Chỉ update các trường nếu có truyền vào (tránh xóa dữ liệu cũ)
+    if (lecturerId != null) data['lecturerId'] = lecturerId;
+    if (minStudents != null) data['minStudents'] = minStudents;
+    if (maxStudents != null) data['maxStudents'] = maxStudents;
+    if (weeklySchedule != null) data['weeklySchedule'] = weeklySchedule;
+
+    return _db
+        .collection(FirestoreCollections.courses)
+        .doc(courseId)
+        .update(data);
   }
 
   /// ===  Xoá một môn học ===
@@ -319,20 +336,9 @@ class AdminService {
                   .doc(classModel.lecturerId)
                   .get();
 
-              // Tạo một instance mới với thông tin giảng viên được cập nhật
-              // Bằng cách này, chúng ta không cần hàm copyWith nữa
-              return ClassModel(
-                id: classModel.id,
-                courseIds: classModel.courseIds,
-                lecturerId: classModel.lecturerId,
-                semester: classModel.semester,
-                className: classModel.className,
-                classCode: classModel.classCode,
-                joinCode: classModel.joinCode,
-                createdAt: classModel.createdAt,
-                isArchived: classModel.isArchived,
-                lecturerName: lecturerDoc
-                    .data()?['displayName'], // Thêm tên giảng viên
+              // Sử dụng copyWith để thêm thông tin giảng viên
+              return classModel.copyWith(
+                lecturerName: lecturerDoc.data()?['displayName'],
               );
             } catch (e) {
               // Nếu có lỗi khi lấy thông tin GV, vẫn trả về thông tin lớp học gốc
@@ -476,8 +482,8 @@ class AdminService {
         startTime.add(Duration(minutes: durationInMinutes)),
       ),
       'location': location,
-      'status': SessionStatus.scheduled.name, // Trạng thái ban đầu
-      'type': SessionType.lecture.name,
+      'status': 'scheduled', // Trạng thái ban đầu
+      'type': 'lecture',
       'attendanceOpen': false,
     });
   }
@@ -751,5 +757,21 @@ class AdminService {
       'studentUid': studentUid,
       'joinDate': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Lấy danh sách giảng viên (một lần) cho dropdown
+  Future<List<LecturerLite>> fetchLecturers() async {
+    final snap = await _db
+        .collection(FirestoreCollections.users) // hoặc 'users'
+        .where('role', isEqualTo: 'lecture')
+        .get();
+
+    return snap.docs.map((d) {
+      final data = d.data();
+      final displayName = (data['displayName'] ?? data['email'] ?? 'Giảng viên')
+          .toString();
+      final email = (data['email'] ?? '').toString();
+      return LecturerLite(uid: d.id, displayName: displayName, email: email);
+    }).toList();
   }
 }

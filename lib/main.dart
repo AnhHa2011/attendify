@@ -1,13 +1,15 @@
-// lib/main.dart - Updated version
+// lib/main.dart - Updated version with new routing
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
+import 'routing/route_generator.dart';
+import 'routing/app_routes.dart';
 import 'app/providers/admin_class_provider.dart';
 import 'app/providers/lecturer_class_provider.dart';
 import 'app/providers/student_class_provider.dart';
-import 'app/providers/navigation_provider.dart'; // Thêm navigation provider
+import 'app/providers/navigation_provider.dart';
 import 'app/providers/auth_provider.dart';
 import 'features/admin/data/services/admin_service.dart';
 import 'features/auth/data/services/firebase_auth_service.dart';
@@ -25,6 +27,10 @@ Future<void> main() async {
   await initializeDateFormatting('vi_VN', null);
   await LocalNotificationService.instance.init();
 
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.dumpErrorToConsole(details);
+  };
+
   runApp(
     MultiProvider(
       providers: [
@@ -32,6 +38,7 @@ Future<void> main() async {
         Provider<FirebaseAuthService>(create: (_) => FirebaseAuthService()),
         Provider<SessionService>(create: (_) => SessionService()),
         Provider<ScheduleService>(create: (_) => ScheduleService()),
+
         // Navigation Provider (thêm mới)
         ChangeNotifierProvider<NavigationProvider>(
           create: (_) => NavigationProvider(),

@@ -38,6 +38,8 @@ class SessionModel {
   final int totalStudents;
   final int attendedStudents;
   final bool isAttendanceOpen;
+  final String? qrCode; // QR code for attendance
+  final Map<String, String> attendanceStatus; // studentId -> status (present/absent/late)
 
   SessionModel({
     required this.id,
@@ -59,6 +61,8 @@ class SessionModel {
     this.totalStudents = 0,
     this.attendedStudents = 0,
     this.isAttendanceOpen = false,
+    this.qrCode,
+    this.attendanceStatus = const {},
   });
 
   // Duration of the session
@@ -105,6 +109,8 @@ class SessionModel {
       'totalStudents': totalStudents,
       'attendedStudents': attendedStudents,
       'isAttendanceOpen': isAttendanceOpen,
+      'qrCode': qrCode,
+      'attendanceStatus': attendanceStatus,
     };
   }
 
@@ -151,6 +157,8 @@ class SessionModel {
       totalStudents: data['totalStudents'] ?? 0,
       attendedStudents: data['attendedStudents'] ?? 0,
       isAttendanceOpen: data['isAttendanceOpen'] ?? false,
+      qrCode: data['qrCode'],
+      attendanceStatus: Map<String, String>.from(data['attendanceStatus'] ?? {}),
     );
   }
 
@@ -174,6 +182,8 @@ class SessionModel {
     int? totalStudents,
     int? attendedStudents,
     bool? isAttendanceOpen,
+    String? qrCode,
+    Map<String, String>? attendanceStatus,
   }) {
     return SessionModel(
       id: id ?? this.id,

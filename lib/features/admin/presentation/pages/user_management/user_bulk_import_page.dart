@@ -207,7 +207,10 @@ class _UserBulkImportPageState extends State<UserBulkImportPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Nhập tài khoản từ Excel')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Nhập tài khoản từ Excel'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

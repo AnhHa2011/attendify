@@ -1,11 +1,11 @@
 // lib/features/student/presentation/pages/student_class_list_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/providers/auth_provider.dart';
-// === THAY ĐỔI 1: IMPORT RICHCLASSMODEL TỪ CLASS_SERVICE ===
 import '../../../classes/data/services/class_service.dart';
-import '../../../classes/presentation/pages/class_detail_page.dart';
+import '../classes/student_class_detail_page.dart';
 
 class StudentClassListPage extends StatelessWidget {
   const StudentClassListPage({super.key});
@@ -18,85 +18,317 @@ class StudentClassListPage extends StatelessWidget {
 
     if (studentId == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Các lớp đã tham gia')),
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: const Text('Các lớp đã tham gia'),
+        ),
         body: const Center(child: Text('Không thể xác thực người dùng.')),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Các lớp đã tham gia')),
-      // === THAY ĐỔI 2: SỬA LẠI STREAMBUILDER VỚI RICHCLASSMODEL ===
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Lớp học của tôi'),
+        actions: [
+          IconButton(
+            onPressed: () {
+              // TODO: Add refresh functionality
+            },
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Làm mới',
+          ),
+        ],
+      ),
       body: StreamBuilder<List<RichClassModel>>(
-        // <<<--- Đổi thành RichClassModel
         stream: classService.getRichEnrolledClassesStream(studentId),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+
           if (snap.hasError) {
-            return Center(child: Text('Đã xảy ra lỗi: ${snap.error}'));
-          }
-          final richClasses = snap.data ?? [];
-          if (richClasses.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text(
-                  'Bạn chưa tham gia lớp học nào.\nHãy vào mục "Tham gia lớp" để bắt đầu.',
-                  textAlign: TextAlign.center,
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Đã xảy ra lỗi',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${snap.error}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
               ),
             );
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            itemCount: richClasses.length,
-            separatorBuilder: (_, __) =>
-                const Divider(height: 1, indent: 16, endIndent: 16),
-            itemBuilder: (context, i) {
-              final richClass = richClasses[i];
-              // Bóc tách dữ liệu để dễ sử dụng
-              final classInfo = richClass.classInfo;
-              final courses = richClass.courses;
-              final lecturer = richClass.lecturer;
+          final richClasses = snap.data ?? [];
 
-              // === THAY ĐỔI 3: HIỂN THỊ DỮ LIỆU TỪ RICHCLASSMODEL ===
-              return ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 8.0,
-                ),
-                title: Text('${classInfo.classCode} - ${classInfo.className}'),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          if (richClasses.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 4),
-                    // Hiển thị danh sách tên môn học
-                    Text(
-                      courses.map((c) => c.courseName).join(', '),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    Icon(
+                      Icons.school_outlined,
+                      size: 80,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.6),
                     ),
-                    const SizedBox(height: 2),
-                    Text('GV: ${lecturer?.displayName ?? "..."}'),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Chưa tham gia lớp học nào',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Hãy vào mục "Tham gia lớp" để bắt đầu tham gia các lớp học.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: () {
+                        // Navigate back to join class page
+                        DefaultTabController.of(
+                          context,
+                        )?.animateTo(2); // Index 2 is join class
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Tham gia lớp'),
+                    ),
                   ],
                 ),
-                isThreeLine: true,
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  // Điều hướng không thay đổi, chỉ cần truyền classId
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ClassDetailPage(classId: classInfo.id),
-                    ),
-                  );
-                },
-              );
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              // TODO: Implement refresh logic
             },
+            child: ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: richClasses.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, i) {
+                final richClass = richClasses[i];
+                final classInfo = richClass.classInfo;
+                final courses = richClass.courses;
+                final lecturer = richClass.lecturer;
+
+                return _ClassCard(
+                  richClass: richClass,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            StudentClassDetailPage(classId: classInfo.id),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _ClassCard extends StatelessWidget {
+  final RichClassModel richClass;
+  final VoidCallback onTap;
+
+  const _ClassCard({required this.richClass, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final classInfo = richClass.classInfo;
+    final courses = richClass.courses;
+    final lecturer = richClass.lecturer;
+
+    return Card(
+      elevation: 2,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Class Icon
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.class_,
+                      color: colorScheme.onPrimaryContainer,
+                      size: 28,
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  // Class Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          classInfo.classCode,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          classInfo.className,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Arrow Icon
+                  Icon(
+                    Icons.chevron_right,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Course Names
+              if (courses.isNotEmpty) ...[
+                Row(
+                  children: [
+                    Icon(
+                      Icons.book,
+                      size: 16,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        courses.map((c) => c.courseName).join(', '),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+
+              // Lecturer Info
+              Row(
+                children: [
+                  Icon(
+                    Icons.person,
+                    size: 16,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'GV: ${lecturer?.displayName ?? "Chưa phân công"}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              // Credits Info
+              if (courses.isNotEmpty) ...[
+                Row(
+                  children: [
+                    Icon(
+                      Icons.credit_score,
+                      size: 16,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${courses.fold<int>(0, (sum, course) => sum + course.credits)} tín chỉ',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.secondary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: colorScheme.secondary.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Text(
+                        '${courses.length} môn',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.secondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
+              // Description (if available)
+              // Description không có trong ClassModel hiện tại
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -5,10 +5,10 @@ import 'package:provider/provider.dart';
 import '../../../../common/data/models/class_model.dart';
 import '../../../../common/data/models/course_model.dart';
 import '../../../data/services/admin_service.dart';
-import '../admin_class_detail_page.dart';
 import 'class_bulk_import_page.dart';
 import 'class_enrollments_bulk_import_page.dart';
 import 'class_form_page.dart';
+import 'admin_class_detail_page.dart';
 
 class ClassManagementPage extends StatefulWidget {
   const ClassManagementPage({super.key});
@@ -41,6 +41,7 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: TextField(
           controller: _searchController,
           decoration: InputDecoration(
@@ -251,7 +252,7 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
       ),
     );
 
-    if (confirm == true) {
+    if (confirm == true && mounted) {
       try {
         await service.archiveClass(classInfo.id);
         if (mounted) {

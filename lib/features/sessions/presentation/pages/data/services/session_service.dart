@@ -1,5 +1,3 @@
-// lib/features/sessions/presentation/pages/data/services/session_service.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../../../common/data/models/session_model.dart';
@@ -44,29 +42,6 @@ class SessionService {
         .where('classId', isEqualTo: classId)
         .where('status', isEqualTo: SessionStatus.scheduled.name)
         .orderBy('startTime')
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => SessionModel.fromFirestore(doc))
-              .toList(),
-        );
-  }
-
-  /// Lấy TẤT CẢ các buổi học của một lớp trong ngày hôm nay
-  Stream<List<SessionModel>> getTodaySessionsForClass(String classId) {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
-
-    return _db
-        .collection('sessions')
-        .where('classId', isEqualTo: classId)
-        .where(
-          'startTime',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-        )
-        .where('startTime', isLessThan: Timestamp.fromDate(endOfDay))
-        .orderBy('startTime') // Sắp xếp theo thứ tự thời gian trong ngày
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
