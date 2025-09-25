@@ -151,25 +151,6 @@ class _LecturerProfileState extends State<LecturerProfile>
                     ),
 
                     const SizedBox(height: 20),
-
-                    // Statistics
-                    AnimatedBuilder(
-                      animation: _cardAnimations[3],
-                      builder: (context, child) {
-                        return Transform.translate(
-                          offset: Offset(
-                            0,
-                            30 * (1 - _cardAnimations[3].value),
-                          ),
-                          child: Opacity(
-                            opacity: _cardAnimations[3].value,
-                            child: _buildStatsSection(theme),
-                          ),
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 40),
                   ]),
                 ),
               ),
@@ -407,63 +388,6 @@ class _LecturerProfileState extends State<LecturerProfile>
           subtitle: 'Phiên bản v1.0.0 (mới nhất)',
           trailing: Icons.check_circle_rounded,
           trailingColor: Colors.green,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatsSection(ThemeData theme) {
-    return _buildGlassCard(
-      theme: theme,
-      title: 'Thống kê hoạt động',
-      icon: Icons.analytics_rounded,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatItem(
-                theme: theme,
-                title: 'Phiên làm việc',
-                value: '156',
-                icon: Icons.work_outline_rounded,
-                color: Colors.blue,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatItem(
-                theme: theme,
-                title: 'Thao tác',
-                value: '2,847',
-                icon: Icons.touch_app_rounded,
-                color: Colors.green,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatItem(
-                theme: theme,
-                title: 'Uptime',
-                value: '99.8%',
-                icon: Icons.trending_up_rounded,
-                color: Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatItem(
-                theme: theme,
-                title: 'Hiệu suất',
-                value: 'Tuyệt vời',
-                icon: Icons.star_rounded,
-                color: Colors.purple,
-              ),
-            ),
-          ],
         ),
       ],
     );

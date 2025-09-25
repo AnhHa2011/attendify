@@ -38,6 +38,5 @@ android {
 }
 
 dependencies {
-    // *** QUAN TRỌNG: thêm desugar jdk libs ở ĐÂY (module :app) ***
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }
