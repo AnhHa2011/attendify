@@ -66,10 +66,10 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
             Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const ClassFormPage()));
-          } else if (value == 'bulk') {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ClassBulkImportPage()),
-            );
+            // } else if (value == 'bulk') {
+            //   Navigator.of(context).push(
+            //     MaterialPageRoute(builder: (_) => const ClassBulkImportPage()),
+            //   );
           } else if (value == 'bulk_enroll') {
             // <<< TÍCH HỢP: Xử lý sự kiện cho mục menu mới
             Navigator.of(context).push(
@@ -87,13 +87,13 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
               title: Text('Thêm 1 lớp học'),
             ),
           ),
-          PopupMenuItem(
-            value: 'bulk',
-            child: ListTile(
-              leading: Icon(Icons.upload_file),
-              title: Text('Thêm lớp học từ file'),
-            ),
-          ),
+          // PopupMenuItem(
+          //   value: 'bulk',
+          //   child: ListTile(
+          //     leading: Icon(Icons.upload_file),
+          //     title: Text('Thêm lớp học từ file'),
+          //   ),
+          // ),
           // <<< TÍCH HỢP: Thêm mục menu để import nhiều lớp học
           PopupMenuItem(
             value: 'bulk_enroll',
@@ -130,9 +130,7 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
                 final filteredClasses = allClasses.where((c) {
                   final query = _searchQuery.toLowerCase();
                   return c.className.toLowerCase().contains(query) ||
-                      c.classCode.toLowerCase().contains(query) ||
-                      (c.lecturerName?.toLowerCase() ?? '').contains(query) ||
-                      c.semester.toLowerCase().contains(query);
+                      c.classCode.toLowerCase().contains(query);
                 }).toList();
 
                 if (filteredClasses.isEmpty) {
@@ -161,19 +159,6 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
                         title: Text(
                           '${classInfo.classCode} - ${classInfo.className}',
                         ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Dùng widget helper để hiển thị danh sách môn học
-                            _ClassCourseInfo(courseIds: classInfo.courseIds),
-                            const SizedBox(height: 4),
-                            Text(
-                              'GV: ${classInfo.lecturerName ?? '...'} | HK: ${classInfo.semester}',
-                            ),
-                          ],
-                        ),
-                        isThreeLine: true, // Cho phép subtitle có 3 dòng
-
                         onTap: () {
                           Navigator.push(
                             context,

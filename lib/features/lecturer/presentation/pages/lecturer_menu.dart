@@ -713,7 +713,7 @@ class ProfilePage extends StatelessWidget {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 title: const Text('Vai trò'),
-                subtitle: const Text('Quản trị viên hệ thống'),
+                subtitle: const Text('Giảng viên'),
               ),
             ),
           ],

@@ -79,7 +79,7 @@ class _LoginPageState extends State<LoginPage> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(8),
             child: AutofillGroup(
               child: Form(
                 key: _formKey,

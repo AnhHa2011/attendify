@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../common/data/models/course_model.dart';
 import '../../../data/services/admin_service.dart';
-import 'course_bulk_import_page.dart';
 import 'course_form_page.dart';
+import 'course_import_page.dart';
 
 class CourseManagementPage extends StatefulWidget {
   const CourseManagementPage({super.key});
@@ -63,9 +63,9 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
               context,
             ).push(MaterialPageRoute(builder: (_) => const CourseFormPage()));
           } else if (value == 'bulk') {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const CourseBulkImportPage()),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const CourseImportPage()));
           }
         },
         itemBuilder: (context) => const [

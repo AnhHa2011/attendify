@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
 
+import '../../../common/data/models/class_model.dart';
 import '../../../common/data/models/session_model.dart';
 import '../../../common/data/models/user_model.dart';
 import '../../../../../app/providers/auth_provider.dart';
@@ -122,7 +123,7 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
     final isLecturer = auth.role == UserRole.lecture;
 
     // === THAY ĐỔI 1: STREAMBUILDER CHÍNH SỬ DỤNG RICHCLASSMODEL ===
-    return StreamBuilder<RichClassModel>(
+    return StreamBuilder<ClassModel>(
       // <<<--- Đổi thành RichClassModel
       stream: classSvc.getRichClassStream(widget.classId),
       builder: (context, classSnap) {
@@ -141,13 +142,7 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
         }
 
         // Bóc tách dữ liệu để dễ sử dụng
-        final richClass = classSnap.data!;
-        final classInfo = richClass.classInfo;
-        final courses = richClass.courses;
-        final lecturer = richClass.lecturer;
-
-        // Ghép tên các môn học lại thành một chuỗi
-        final courseNames = courses.map((c) => c.courseName).join(' | ');
+        final classInfo = classSnap.data!;
 
         return Scaffold(
           // === THAY ĐỔI 2: CẬP NHẬT APPBAR VÀ CÁC PHẦN UI KHÁC ===
@@ -181,11 +176,9 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
               Card(
                 child: ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.class_)),
-                  title: Text(
-                    courseNames.isNotEmpty ? courseNames : 'Chưa có môn học',
-                  ),
+
                   subtitle: Text(
-                    'Lớp: ${classInfo.className}\nGV: ${lecturer?.displayName ?? "..."}\nHọc kỳ: ${classInfo.semester}',
+                    'Lớp: ${classInfo.classCode} ${classInfo.className}',
                   ),
                   isThreeLine: true,
                 ),

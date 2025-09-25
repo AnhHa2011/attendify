@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../classes/data/services/class_service.dart';
+import '../../../../common/data/models/class_model.dart';
 import '../../../../common/data/models/class_schedule_model.dart';
 import '../../../../common/data/models/course_model.dart';
 import '../../../../common/data/models/session_model.dart';
@@ -19,7 +20,7 @@ class AdminClassDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final classService = context.read<ClassService>();
 
-    return StreamBuilder<RichClassModel>(
+    return StreamBuilder<ClassModel>(
       stream: classService.getRichClassStream(classId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -38,17 +39,11 @@ class AdminClassDetailPage extends StatelessWidget {
           );
         }
 
-        final richClass = snapshot.data!;
-        final classInfo = richClass.classInfo;
-        final courses = richClass.courses;
-        final lecturer = richClass.lecturer;
+        final classInfo = snapshot.data!;
         final adminSvc = context.read<AdminService>();
 
         return Scaffold(
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            title: Text(classInfo.className),
-          ),
+          appBar: AppBar(title: Text('Thông tin lớp học')),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
             children: [
@@ -65,89 +60,12 @@ class AdminClassDetailPage extends StatelessWidget {
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
-                      const SizedBox(height: 8),
-                      _buildInfoRow(
-                        Icons.book_outlined,
-                        'Môn học:',
-                        courses.map((c) => c.courseName).join(' | '),
-                      ),
-                      _buildInfoRow(
-                        Icons.person_outline,
-                        'Giảng viên:',
-                        lecturer?.displayName ?? '...',
-                      ),
-                      _buildInfoRow(
-                        Icons.calendar_today_outlined,
-                        'Học kỳ:',
-                        classInfo.semester,
-                      ),
                       _buildInfoRow(Icons.tag, 'Mã lớp:', classInfo.classCode),
                     ],
                   ),
                 ),
               ),
               const Divider(height: 32, indent: 16, endIndent: 16),
-
-              // === PHẦN QUẢN LÝ LỊCH HỌC ===
-              _buildSectionHeader(
-                context,
-                title: 'Lịch học',
-                onSelected: (_) => _showCourseSelectorForSessionDialog(
-                  context,
-                  adminSvc,
-                  classInfo.id,
-                  courses,
-                ),
-              ),
-              const SizedBox(height: 8),
-              StreamBuilder<List<SessionModel>>(
-                stream: adminSvc.getSessionsForClassStream(classInfo.id),
-                builder: (context, sessionSnap) {
-                  if (sessionSnap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: LinearProgressIndicator());
-                  }
-                  if (sessionSnap.hasError) {
-                    return Center(
-                      child: Text('Lỗi tải buổi học: ${sessionSnap.error}'),
-                    );
-                  }
-                  final sessions = sessionSnap.data ?? [];
-                  if (sessions.isEmpty) {
-                    return const Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Center(
-                          child: Text('Chưa có buổi học nào được tạo.'),
-                        ),
-                      ),
-                    );
-                  }
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: sessions.length,
-                    itemBuilder: (context, index) {
-                      final session = sessions[index];
-                      final courseOfSession = courses.firstWhere(
-                        (c) => c.id == session.courseId,
-                        orElse: () => CourseModel.empty(),
-                      );
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 6),
-                        child: ListTile(
-                          leading: const Icon(Icons.event_available_outlined),
-                          title: Text(session.title),
-                          subtitle: Text(
-                            'Môn: ${courseOfSession.courseCode} | ${DateFormat('dd/MM/yyyy HH:mm').format(session.startTime)}',
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-              const Divider(height: 32, indent: 16, endIndent: 16),
-
               // === PHẦN QUẢN LÝ SINH VIÊN ===
               _buildSectionHeader(
                 context,

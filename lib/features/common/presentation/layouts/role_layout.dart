@@ -82,24 +82,71 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
         appBar: AppBar(
           title: Text(widget.title ?? ''),
           automaticallyImplyLeading: false,
-        ),
-        body: IndexedStack(index: _selectedIndex, children: pages),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: (i) => setState(() => _selectedIndex = i),
-          type: BottomNavigationBarType.fixed,
-          iconSize: 20, // 👈 icon nhỏ
-          selectedFontSize: 12, // 👈 chữ nhỏ
-          unselectedFontSize: 10, // 👈 chữ nhỏ
-          items: [
-            for (final it in widget.items)
-              BottomNavigationBarItem(
-                icon: Icon(it.icon),
-                activeIcon: Icon(it.activeIcon ?? it.icon),
-                label: it.label,
-                tooltip: it.label,
-              ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.red),
+              tooltip: 'Đăng xuất',
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Đăng xuất'),
+                    content: const Text('Bạn có chắc muốn đăng xuất không?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Hủy'),
+                      ),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.red,
+                        ),
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Đăng xuất'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirmed == true && context.mounted) {
+                  await context.read<AuthProvider>().logout();
+                }
+              },
+            ),
           ],
+        ),
+        body: SafeArea(
+          bottom: false, // Không thêm padding bottom vì có BottomNavigationBar
+          child: IndexedStack(index: _selectedIndex, children: pages),
+        ),
+        bottomNavigationBar: SafeArea(
+          child: BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            onTap: (i) => setState(() => _selectedIndex = i),
+            type: BottomNavigationBarType.fixed,
+            iconSize: 18, // 👈 giảm size icon
+            selectedFontSize: 11, // 👈 giảm size font
+            unselectedFontSize: 9, // 👈 giảm size font
+            elevation: 8,
+            backgroundColor: theme.colorScheme.surface,
+            selectedItemColor: theme.colorScheme.primary,
+            unselectedItemColor: theme.colorScheme.onSurface.withOpacity(0.6),
+            items: [
+              for (final it in widget.items)
+                BottomNavigationBarItem(
+                  icon: Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Icon(it.icon, size: 18),
+                  ),
+                  activeIcon: Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Icon(it.activeIcon ?? it.icon, size: 18),
+                  ),
+                  label: it.label,
+                  tooltip: it.label,
+                ),
+            ],
+          ),
         ),
       );
     }

@@ -1,6 +1,7 @@
 // lib/features/admin/presentation/pages/admin_profile.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:math' as math;
 
 import '../../../../app/providers/auth_provider.dart';
 import '../../../auth/presentation/pages/edit_account_page.dart';
@@ -42,7 +43,7 @@ class _AdminProfileState extends State<AdminProfile>
           curve: Interval(
             index * 0.2,
             0.6 + (index * 0.1),
-            curve: Curves.easeOutBack,
+            curve: Curves.fastOutSlowIn, // Thay đổi từ Curves.easeOutBack để tránh vượt 1.0
           ),
         ),
       );
@@ -101,7 +102,7 @@ class _AdminProfileState extends State<AdminProfile>
                     return Transform.translate(
                       offset: Offset(0, 30 * (1 - _cardAnimations[0].value)),
                       child: Opacity(
-                        opacity: _cardAnimations[0].value,
+                        opacity: math.min(1.0, math.max(0.0, _cardAnimations[0].value)),
                         child: _buildProfileHeader(theme, user),
                       ),
                     );
@@ -124,7 +125,7 @@ class _AdminProfileState extends State<AdminProfile>
                             30 * (1 - _cardAnimations[1].value),
                           ),
                           child: Opacity(
-                            opacity: _cardAnimations[1].value,
+                            opacity: math.min(1.0, math.max(0.0, _cardAnimations[1].value)),
                             child: _buildPersonalInfoSection(theme, user),
                           ),
                         );
@@ -143,7 +144,7 @@ class _AdminProfileState extends State<AdminProfile>
                             30 * (1 - _cardAnimations[2].value),
                           ),
                           child: Opacity(
-                            opacity: _cardAnimations[2].value,
+                            opacity: math.min(1.0, math.max(0.0, _cardAnimations[2].value)),
                             child: _buildSystemSection(theme),
                           ),
                         );

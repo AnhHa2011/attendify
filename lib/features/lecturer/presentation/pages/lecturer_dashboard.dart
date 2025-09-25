@@ -55,7 +55,8 @@ class _LecturerDashboardState extends State<LecturerDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
-      body: RefreshIndicator(
+      body: SafeArea(
+        child: RefreshIndicator(
         onRefresh: _loadDashboardData,
         child: CustomScrollView(
           slivers: [
@@ -111,6 +112,7 @@ class _LecturerDashboardState extends State<LecturerDashboard> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

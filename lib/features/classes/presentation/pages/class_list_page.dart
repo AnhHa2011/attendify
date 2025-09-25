@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../app/providers/auth_provider.dart';
 // === THAY ĐỔI 1: IMPORT RICHCLASSMODEL TỪ CLASS_SERVICE ===
+import '../../../common/data/models/class_model.dart';
 import '../../data/services/class_service.dart';
 import 'class_detail_page.dart';
 // CreateClassPage không cần thiết cho trang này nữa nếu logic tạo lớp đã chuyển đi
@@ -47,7 +48,7 @@ class ClassListPage extends StatelessWidget {
         // ],
       ),
       // === THAY ĐỔI 2: SỬA LẠI STREAMBUILDER VỚI RICHCLASSMODEL ===
-      body: StreamBuilder<List<RichClassModel>>(
+      body: StreamBuilder<List<ClassModel>>(
         // <<<--- Đổi thành RichClassModel
         stream: classService.getRichClassesStreamForLecturer(lecturerId),
         builder: (context, snap) {
@@ -70,10 +71,8 @@ class ClassListPage extends StatelessWidget {
             separatorBuilder: (_, __) =>
                 const Divider(height: 1, indent: 16, endIndent: 16),
             itemBuilder: (context, i) {
-              final richClass = richClasses[i];
+              final classInfo = richClasses[i];
               // Bóc tách dữ liệu để dễ sử dụng
-              final classInfo = richClass.classInfo;
-              final courses = richClass.courses;
 
               // === THAY ĐỔI 3: HIỂN THỊ DỮ LIỆU TỪ RICHCLASSMODEL ===
               return ListTile(
@@ -82,21 +81,6 @@ class ClassListPage extends StatelessWidget {
                   vertical: 8,
                 ),
                 title: Text('${classInfo.classCode} - ${classInfo.className}'),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 4),
-                    // Hiển thị danh sách mã môn học
-                    Text(
-                      'Môn: ${courses.map((c) => c.courseCode).join(', ')}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Học kỳ: ${classInfo.semester} | Mã tham gia: ${classInfo.joinCode}',
-                    ),
-                  ],
-                ),
                 isThreeLine: true,
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {

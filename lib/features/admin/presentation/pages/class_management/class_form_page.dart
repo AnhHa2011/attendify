@@ -13,9 +13,8 @@ class _ClassFormPageState extends State<ClassFormPage> {
 
   final _classNameCtrl = TextEditingController();
   final _classCodeCtrl = TextEditingController();
-  final _semesterCtrl = TextEditingController();
-  List<String> _selectedCourseIds = []; // <<<--- LƯU DANH SÁCH ID MÔN HỌC
-  String? _selectedLecturerId;
+  int? _startYear;
+  int? _endYear;
 
   bool _isSubmitting = false;
   late Future<List<dynamic>> _dataFuture;
@@ -35,13 +34,10 @@ class _ClassFormPageState extends State<ClassFormPage> {
     // Nếu là form sửa, điền dữ liệu cũ vào
     if (_isEditMode) {
       final classInfo = widget.classInfo!;
-      _selectedCourseIds = List<String>.from(
-        classInfo.courseIds,
-      ); // Tạo list mới
-      _selectedLecturerId = classInfo.lecturerId;
       _classNameCtrl.text = classInfo.className;
       _classCodeCtrl.text = classInfo.classCode;
-      _semesterCtrl.text = classInfo.semester;
+      _startYear = classInfo.academicYearStart;
+      _endYear = classInfo.academicYearEnd;
     }
   }
 
@@ -49,18 +45,16 @@ class _ClassFormPageState extends State<ClassFormPage> {
   void dispose() {
     _classNameCtrl.dispose();
     _classCodeCtrl.dispose();
-    _semesterCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedCourseIds.isEmpty) {
+
+    // validate năm học
+    if ((_startYear ?? 0) > (_endYear ?? 9999)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn ít nhất một môn học'),
-          backgroundColor: Colors.orange,
-        ),
+        const SnackBar(content: Text('Năm kết thúc phải ≥ năm bắt đầu')),
       );
       return;
     }
@@ -71,29 +65,28 @@ class _ClassFormPageState extends State<ClassFormPage> {
     try {
       final isDuplicate = await adminService.isClassDuplicate(
         classCode: _classCodeCtrl.text.trim(),
-        currentClassId: widget.classInfo?.id,
+        currentClassId: widget.classInfo?.id, // đúng: bỏ qua chính nó khi edit
       );
-
       if (isDuplicate) {
         throw Exception('Mã lớp học này đã tồn tại.');
       }
 
       if (_isEditMode) {
+        // ✅ dùng id hiện có của document
         await adminService.updateClass(
           classId: widget.classInfo!.id,
-          courseIds: _selectedCourseIds,
-          lecturerId: _selectedLecturerId!,
-          semester: _semesterCtrl.text.trim(),
           className: _classNameCtrl.text.trim(),
-          classCode: _classCodeCtrl.text.trim(),
+          academicYearStart: _startYear ?? DateTime.now().year,
+          academicYearEnd: _endYear ?? DateTime.now().year,
+          classCode: _classCodeCtrl.text.trim(), // nếu cho phép đổi mã lớp
         );
       } else {
+        //  tạo mới: KHÔNG truyền id, để service tự tạo doc
         await adminService.createClass(
-          courseIds: _selectedCourseIds,
-          lecturerId: _selectedLecturerId!,
-          semester: _semesterCtrl.text.trim(),
           className: _classNameCtrl.text.trim(),
           classCode: _classCodeCtrl.text.trim(),
+          academicYearStart: _startYear ?? DateTime.now().year,
+          academicYearEnd: _endYear ?? DateTime.now().year,
         );
       }
 
@@ -112,7 +105,7 @@ class _ClassFormPageState extends State<ClassFormPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceFirst("Exception: ", "")),
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
             backgroundColor: Colors.red,
           ),
         );
@@ -126,7 +119,6 @@ class _ClassFormPageState extends State<ClassFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
         title: Text(_isEditMode ? 'Cập nhật lớp học' : 'Tạo lớp học mới'),
       ),
       body: FutureBuilder<List<dynamic>>(
@@ -138,9 +130,6 @@ class _ClassFormPageState extends State<ClassFormPage> {
           if (snapshot.hasError || !snapshot.hasData) {
             return Center(child: Text('Lỗi tải dữ liệu: ${snapshot.error}'));
           }
-
-          final courses = snapshot.data![0] as List<CourseModel>;
-          final lecturers = snapshot.data![1] as List<UserModel>;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -171,78 +160,48 @@ class _ClassFormPageState extends State<ClassFormPage> {
                         v!.trim().isEmpty ? 'Vui lòng nhập mã lớp' : null,
                   ),
                   const SizedBox(height: 16),
-
-                  // === UI CHỌN NHIỀU MÔN HỌC BẰNG FILTERCHIP ===
-                  // const Text(
-                  //   'Chọn các môn học cho lớp này:',
-                  //   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  // ),
-                  // const SizedBox(height: 8),
-                  // Container(
-                  //   padding: const EdgeInsets.all(12),
-                  //   decoration: BoxDecoration(
-                  //     border: Border.all(color: Colors.grey.shade400),
-                  //     borderRadius: BorderRadius.circular(8),
-                  //   ),
-                  //   child: Wrap(
-                  //     spacing: 8.0,
-                  //     runSpacing: 4.0,
-                  //     children: courses.map((course) {
-                  //       final isSelected = _selectedCourseIds.contains(
-                  //         course.id,
-                  //       );
-                  //       return FilterChip(
-                  //         label: Text(
-                  //           '${course.courseCode} - ${course.courseName}',
-                  //         ),
-                  //         selected: isSelected,
-                  //         onSelected: (selected) {
-                  //           setState(() {
-                  //             if (selected) {
-                  //               _selectedCourseIds.add(course.id);
-                  //             } else {
-                  //               _selectedCourseIds.remove(course.id);
-                  //             }
-                  //           });
-                  //         },
-                  //         selectedColor: Theme.of(
-                  //           context,
-                  //         ).colorScheme.primaryContainer,
-                  //       );
-                  //     }).toList(),
-                  //   ),
-                  // ),
-                  // const SizedBox(height: 16),
-
-                  // DropdownButtonFormField<String>(
-                  //   initialValue: _selectedLecturerId,
-                  //   decoration: const InputDecoration(
-                  //     labelText: 'Chọn giảng viên phụ trách',
-                  //     border: OutlineInputBorder(),
-                  //   ),
-                  //   items: lecturers
-                  //       .map(
-                  //         (lecturer) => DropdownMenuItem(
-                  //           value: lecturer.uid,
-                  //           child: Text(lecturer.displayName),
-                  //         ),
-                  //       )
-                  //       .toList(),
-                  //   onChanged: (value) =>
-                  //       setState(() => _selectedLecturerId = value),
-                  //   validator: (v) =>
-                  //       v == null ? 'Vui lòng chọn giảng viên' : null,
-                  // ),
-                  // const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _semesterCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Học kỳ',
-                      border: OutlineInputBorder(),
-                      hintText: 'Ví dụ: HK1 2025-2026',
-                    ),
-                    validator: (v) =>
-                        v!.trim().isEmpty ? 'Vui lòng nhập học kỳ' : null,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          value: _startYear, // <-- sửa ở đây
+                          items: List.generate(10, (i) {
+                            final year = DateTime.now().year - 1 + i;
+                            return DropdownMenuItem(
+                              value: year,
+                              child: Text(year.toString()),
+                            );
+                          }),
+                          onChanged: (v) => setState(() => _startYear = v),
+                          decoration: const InputDecoration(
+                            labelText: 'Năm bắt đầu',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (v) =>
+                              v == null ? 'Chọn năm bắt đầu' : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          value: _endYear, // <-- sửa ở đây
+                          items: List.generate(10, (i) {
+                            final year = DateTime.now().year - 1 + i;
+                            return DropdownMenuItem(
+                              value: year,
+                              child: Text(year.toString()),
+                            );
+                          }),
+                          onChanged: (v) => setState(() => _endYear = v),
+                          decoration: const InputDecoration(
+                            labelText: 'Năm kết thúc',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (v) =>
+                              v == null ? 'Chọn năm kết thúc' : null,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 32),
                   FilledButton.icon(

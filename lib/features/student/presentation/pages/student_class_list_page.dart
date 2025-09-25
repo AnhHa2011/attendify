@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../app/providers/auth_provider.dart';
 import '../../../classes/data/services/class_service.dart';
+import '../../../common/data/models/class_model.dart';
 import '../classes/student_class_detail_page.dart';
 
 class StudentClassListPage extends StatelessWidget {
@@ -40,7 +41,7 @@ class StudentClassListPage extends StatelessWidget {
           ),
         ],
       ),
-      body: StreamBuilder<List<RichClassModel>>(
+      body: StreamBuilder<List<ClassModel>>(
         stream: classService.getRichEnrolledClassesStream(studentId),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
@@ -131,13 +132,10 @@ class StudentClassListPage extends StatelessWidget {
               itemCount: richClasses.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, i) {
-                final richClass = richClasses[i];
-                final classInfo = richClass.classInfo;
-                final courses = richClass.courses;
-                final lecturer = richClass.lecturer;
+                final classInfo = richClasses[i];
 
                 return _ClassCard(
-                  richClass: richClass,
+                  classInfo: classInfo,
                   onTap: () {
                     Navigator.push(
                       context,
@@ -158,18 +156,15 @@ class StudentClassListPage extends StatelessWidget {
 }
 
 class _ClassCard extends StatelessWidget {
-  final RichClassModel richClass;
+  final ClassModel classInfo;
   final VoidCallback onTap;
 
-  const _ClassCard({required this.richClass, required this.onTap});
+  const _ClassCard({required this.classInfo, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final classInfo = richClass.classInfo;
-    final courses = richClass.courses;
-    final lecturer = richClass.lecturer;
 
     return Card(
       elevation: 2,
@@ -232,100 +227,7 @@ class _ClassCard extends StatelessWidget {
                   ),
                 ],
               ),
-
-              const SizedBox(height: 16),
-
-              // Course Names
-              if (courses.isNotEmpty) ...[
-                Row(
-                  children: [
-                    Icon(
-                      Icons.book,
-                      size: 16,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        courses.map((c) => c.courseName).join(', '),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-              ],
-
-              // Lecturer Info
-              Row(
-                children: [
-                  Icon(
-                    Icons.person,
-                    size: 16,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'GV: ${lecturer?.displayName ?? "Chưa phân công"}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-
               const SizedBox(height: 8),
-
-              // Credits Info
-              if (courses.isNotEmpty) ...[
-                Row(
-                  children: [
-                    Icon(
-                      Icons.credit_score,
-                      size: 16,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${courses.fold<int>(0, (sum, course) => sum + course.credits)} tín chỉ',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: colorScheme.secondary.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Text(
-                        '${courses.length} môn',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.secondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-
-              // Description (if available)
-              // Description không có trong ClassModel hiện tại
             ],
           ),
         ),

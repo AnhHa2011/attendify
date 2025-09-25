@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../app/providers/auth_provider.dart';
+import '../../../common/data/models/class_model.dart';
 import '../../data/models/student_attendance_stats.dart';
 import '../../data/models/student_session_detail.dart';
 import '../../data/services/student_service.dart';
@@ -54,7 +55,7 @@ class _StudentClassDetailPageState extends State<StudentClassDetailPage>
       );
     }
 
-    return StreamBuilder<RichClassModel?>(
+    return StreamBuilder<ClassModel?>(
       stream: classService.getRichClassStream(widget.classId),
       builder: (context, classSnapshot) {
         if (classSnapshot.connectionState == ConnectionState.waiting) {
@@ -90,8 +91,7 @@ class _StudentClassDetailPageState extends State<StudentClassDetailPage>
           );
         }
 
-        final richClass = classSnapshot.data!;
-        final classInfo = richClass.classInfo;
+        final classInfo = classSnapshot.data!;
 
         return Scaffold(
           appBar: AppBar(
@@ -107,7 +107,7 @@ class _StudentClassDetailPageState extends State<StudentClassDetailPage>
           body: TabBarView(
             controller: _tabController,
             children: [
-              _ClassInfoTab(richClass: richClass, studentId: studentId),
+              _ClassInfoTab(classInfo: classInfo, studentId: studentId),
               _AttendanceTab(classId: widget.classId, studentId: studentId),
             ],
           ),
@@ -118,18 +118,15 @@ class _StudentClassDetailPageState extends State<StudentClassDetailPage>
 }
 
 class _ClassInfoTab extends StatelessWidget {
-  final RichClassModel richClass;
+  final ClassModel classInfo;
   final String studentId;
 
-  const _ClassInfoTab({required this.richClass, required this.studentId});
+  const _ClassInfoTab({required this.classInfo, required this.studentId});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final classInfo = richClass.classInfo;
-    final courses = richClass.courses;
-    final lecturer = richClass.lecturer;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -208,145 +205,6 @@ class _ClassInfoTab extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-
-                  if (courses.isEmpty)
-                    Text(
-                      'Chưa có môn học nào được gán cho lớp này.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    )
-                  else
-                    ...courses
-                        .map(
-                          (course) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceVariant.withOpacity(
-                                  0.5,
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          course.courseCode,
-                                          style: theme.textTheme.titleSmall
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          course.courseName,
-                                          style: theme.textTheme.bodyMedium,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.primary.withOpacity(
-                                        0.1,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      '${course.credits} tín chỉ',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: colorScheme.primary,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Lecturer Information
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.person, color: colorScheme.primary),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Giảng viên',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  if (lecturer == null)
-                    Text(
-                      'Chưa có giảng viên được phân công.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    )
-                  else
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: colorScheme.primary.withOpacity(0.1),
-                          child: Icon(Icons.person, color: colorScheme.primary),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                lecturer.displayName ?? 'N/A',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              if (lecturer.email != null) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  lecturer.email!,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
                 ],
               ),
             ),

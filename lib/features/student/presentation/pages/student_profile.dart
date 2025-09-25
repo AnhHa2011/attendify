@@ -1,6 +1,7 @@
-// lib/features/admin/presentation/pages/admin_profile.dart
+// lib/features/student/presentation/pages/student_profile.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:math' as math;
 
 import '../../../../app/providers/auth_provider.dart';
 import '../../../auth/presentation/pages/edit_account_page.dart';
@@ -42,7 +43,7 @@ class _StudentProfileState extends State<StudentProfile>
           curve: Interval(
             index * 0.2,
             0.6 + (index * 0.1),
-            curve: Curves.easeOutBack,
+            curve: Curves.fastOutSlowIn,
           ),
         ),
       );
@@ -101,7 +102,10 @@ class _StudentProfileState extends State<StudentProfile>
                     return Transform.translate(
                       offset: Offset(0, 30 * (1 - _cardAnimations[0].value)),
                       child: Opacity(
-                        opacity: _cardAnimations[0].value,
+                        opacity: math.min(
+                          1.0,
+                          math.max(0.0, _cardAnimations[0].value),
+                        ),
                         child: _buildProfileHeader(theme, user),
                       ),
                     );
@@ -124,7 +128,10 @@ class _StudentProfileState extends State<StudentProfile>
                             30 * (1 - _cardAnimations[1].value),
                           ),
                           child: Opacity(
-                            opacity: _cardAnimations[1].value,
+                            opacity: math.min(
+                              1.0,
+                              math.max(0.0, _cardAnimations[1].value),
+                            ),
                             child: _buildPersonalInfoSection(theme, user),
                           ),
                         );
@@ -143,7 +150,10 @@ class _StudentProfileState extends State<StudentProfile>
                             30 * (1 - _cardAnimations[2].value),
                           ),
                           child: Opacity(
-                            opacity: _cardAnimations[2].value,
+                            opacity: math.min(
+                              1.0,
+                              math.max(0.0, _cardAnimations[2].value),
+                            ),
                             child: _buildSystemSection(theme),
                           ),
                         );
@@ -334,7 +344,7 @@ class _StudentProfileState extends State<StudentProfile>
           theme: theme,
           icon: Icons.shield_rounded,
           title: 'Vai trò',
-          subtitle: 'Quản trị viên hệ thống',
+          subtitle: 'Sinh viên',
           trailing: Icons.admin_panel_settings_rounded,
           trailingColor: theme.colorScheme.primary,
         ),

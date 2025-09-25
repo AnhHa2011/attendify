@@ -1,6 +1,7 @@
 // lib/features/lecturer/presentation/pages/lecturer_profile.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:math' as math;
 
 import '../../../../app/providers/auth_provider.dart';
 import '../../../auth/presentation/pages/edit_account_page.dart';
@@ -42,7 +43,7 @@ class _LecturerProfileState extends State<LecturerProfile>
           curve: Interval(
             index * 0.2,
             0.6 + (index * 0.1),
-            curve: Curves.easeOutBack,
+            curve: Curves.fastOutSlowIn,
           ),
         ),
       );
@@ -101,7 +102,7 @@ class _LecturerProfileState extends State<LecturerProfile>
                     return Transform.translate(
                       offset: Offset(0, 30 * (1 - _cardAnimations[0].value)),
                       child: Opacity(
-                        opacity: _cardAnimations[0].value,
+                        opacity: math.min(1.0, math.max(0.0, _cardAnimations[0].value)),
                         child: _buildProfileHeader(theme, user),
                       ),
                     );
@@ -124,7 +125,7 @@ class _LecturerProfileState extends State<LecturerProfile>
                             30 * (1 - _cardAnimations[1].value),
                           ),
                           child: Opacity(
-                            opacity: _cardAnimations[1].value,
+                            opacity: math.min(1.0, math.max(0.0, _cardAnimations[1].value)),
                             child: _buildPersonalInfoSection(theme, user),
                           ),
                         );
@@ -143,7 +144,7 @@ class _LecturerProfileState extends State<LecturerProfile>
                             30 * (1 - _cardAnimations[2].value),
                           ),
                           child: Opacity(
-                            opacity: _cardAnimations[2].value,
+                            opacity: math.min(1.0, math.max(0.0, _cardAnimations[2].value)),
                             child: _buildSystemSection(theme),
                           ),
                         );

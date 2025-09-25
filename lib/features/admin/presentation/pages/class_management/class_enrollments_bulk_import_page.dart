@@ -226,19 +226,16 @@ class _ClassEnrollmentsBulkImportPageState
       // Auto-match existing class (by className + semester + courseCode)
       if (row.classId == null) {
         final existingClass = classes.firstWhere(
-          (c) =>
-              c.className.toLowerCase() == row.className.toLowerCase() &&
-              c.semester.toLowerCase() == row.semester.toLowerCase(),
+          (c) => c.className.toLowerCase() == row.className.toLowerCase(),
           orElse: () => ClassModel(
             id: '',
-            courseIds: [],
-            lecturerId: '',
-            semester: '',
             className: '',
             classCode: '',
             joinCode: '',
             createdAt: DateTime.now(),
             isArchived: false,
+            academicYearStart: 1990,
+            academicYearEnd: 1990,
           ),
         );
         if (existingClass.id.isNotEmpty) {
@@ -634,17 +631,6 @@ class _ClassEnrollmentsBulkImportPageState
                                                             child: Text(
                                                               '-- Chọn lớp học --',
                                                             ),
-                                                          ),
-                                                          ...classes.map(
-                                                            (c) =>
-                                                                DropdownMenuItem<
-                                                                  String?
-                                                                >(
-                                                                  value: c.id,
-                                                                  child: Text(
-                                                                    '${c.className} (${c.semester})',
-                                                                  ),
-                                                                ),
                                                           ),
                                                         ],
                                                         onChanged: (value) {
