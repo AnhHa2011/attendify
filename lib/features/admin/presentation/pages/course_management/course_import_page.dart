@@ -8,6 +8,21 @@ import '../../../data/models/course_import_model.dart';
 import '../../../data/services/admin_service.dart';
 import '../../../data/services/course_import_service.dart';
 
+/// Định dạng ngày dd/MM/yyyy
+final _dmy = DateFormat('dd/MM/yyyy');
+
+/// Item đơn giản cho dropdown giảng viên
+class _LecturerItem {
+  final String id;
+  final String name;
+  final String email;
+  const _LecturerItem({
+    required this.id,
+    required this.name,
+    required this.email,
+  });
+}
+
 class _RowEditors {
   final TextEditingController code;
   final TextEditingController name;
@@ -27,21 +42,19 @@ class _RowEditors {
       name = TextEditingController(text: m.courseName),
       credits = TextEditingController(text: m.credits.toString()),
       lecturerName = TextEditingController(text: m.lecturerName ?? ''),
-      lecturerEmail = TextEditingController(text: m.lecturerEmail ?? ''),
+      lecturerEmail = TextEditingController(
+        text: (m.lecturerEmail ?? '').trim().toLowerCase(),
+      ),
       minStudents = TextEditingController(text: m.minStudents.toString()),
       maxStudents = TextEditingController(text: m.maxStudents.toString()),
-      startDate = TextEditingController(
-        text: DateFormat('dd/MM/yyyy').format(m.startDate),
-      ),
-      endDate = TextEditingController(
-        text: DateFormat('dd/MM/yyyy').format(m.endDate),
-      ),
+      startDate = TextEditingController(text: _dmy.format(m.startDate)),
+      endDate = TextEditingController(text: _dmy.format(m.endDate)),
       notes = TextEditingController(text: m.notes ?? ''),
       description = TextEditingController(text: m.description ?? ''),
       weeklySchedule = List<WeeklySlot>.from(m.weeklySchedule);
 
   CourseImportModel toModel() {
-    DateTime parseDmy(String s) => DateFormat('dd/MM/yyyy').parseStrict(s);
+    DateTime parseDmy(String s) => _dmy.parseStrict(s);
     int parseInt(String s, {int fallback = 0}) =>
         int.tryParse(s.trim().isEmpty ? '$fallback' : s) ?? fallback;
 
@@ -61,7 +74,7 @@ class _RowEditors {
           : lecturerName.text.trim(),
       lecturerEmail: lecturerEmail.text.trim().isEmpty
           ? null
-          : lecturerEmail.text.trim(),
+          : lecturerEmail.text.trim().toLowerCase(),
       notes: notes.text.trim().isEmpty ? null : notes.text.trim(),
       weeklySchedule: weeklySchedule,
     );
@@ -76,17 +89,181 @@ class CourseImportPage extends StatefulWidget {
 }
 
 class _CourseImportPageState extends State<CourseImportPage> {
+  // ================== STATE CHÍNH ==================
   final List<_RowEditors> _rows = [];
+  final List<String> _errors = [];
   bool _isLoading = false;
   String? _fileName;
-  final List<String> _errors = [];
 
+  // lecturers dropdown
+  List<_LecturerItem> _lecturers = [];
+  bool _lecturerLoading = true;
+
+  // validate theo ô
+  final Map<int, Map<String, String?>> _cellErrors =
+      {}; // rowIndex -> field -> error
+  final _reCode = RegExp(r'^[A-Za-z0-9_]{1,20}$'); // mã: chữ-số-gạch dưới, ≤20
+  final _reEmail = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+  // check tồn tại code
+  Set<String> _existingCodes =
+      {}; // courseCode đã có trong hệ thống (normalized)
+  bool _loadingCodes = true;
+
+  String _norm(String s) => s.trim().toLowerCase();
+
+  DateTime? _parseDmy(String s) {
+    try {
+      return _dmy.parseStrict(s);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool get _hasAnyError => _cellErrors.values.any((m) => m.isNotEmpty);
+
+  // đếm số lần một mã xuất hiện trong bảng đang edit
+  int _dupCountInFile(String codeNorm) {
+    int c = 0;
+    for (final r in _rows) {
+      if (_norm(r.code.text) == codeNorm && codeNorm.isNotEmpty) c++;
+    }
+    return c;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLecturers();
+    _loadExistingCodes();
+  }
+
+  Future<void> _loadLecturers() async {
+    try {
+      final list = await context
+          .read<AdminService>()
+          .getAllLecturersStream()
+          .first;
+
+      final seen = <String>{};
+      _lecturers = [];
+
+      for (final e in list) {
+        final id = e.uid;
+        final name = (e.displayName ?? '').trim();
+        final email = (e.email ?? '').trim().toLowerCase();
+        if (email.isEmpty) continue;
+        if (!seen.add(email)) continue; // khử trùng theo email
+        _lecturers.add(_LecturerItem(id: id, name: name, email: email));
+      }
+
+      _lecturers.sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
+    } finally {
+      if (mounted) setState(() => _lecturerLoading = false);
+    }
+  }
+
+  Future<void> _loadExistingCodes() async {
+    try {
+      final courses = await context
+          .read<AdminService>()
+          .getAllCoursesStream()
+          .first;
+      _existingCodes = courses
+          .map((c) => _norm(c.courseCode ?? ''))
+          .where((s) => s.isNotEmpty)
+          .toSet();
+    } catch (_) {
+      _existingCodes = {};
+    } finally {
+      if (mounted) setState(() => _loadingCodes = false);
+    }
+  }
+
+  // ================== VALIDATE ==================
+  bool _validateRow(int i) {
+    final r = _rows[i];
+    final errs = <String, String?>{};
+
+    // code
+    final rawCode = r.code.text.trim();
+    final codeNorm = _norm(rawCode);
+    if (rawCode.isEmpty) {
+      errs['code'] = 'Bắt buộc';
+    } else if (!_reCode.hasMatch(rawCode)) {
+      errs['code'] = 'Chỉ chữ-số-gạch dưới, ≤ 20';
+    } else {
+      // trùng trong file?
+      if (_dupCountInFile(codeNorm) > 1) {
+        errs['code'] = 'Mã bị trùng trong file';
+      }
+      // đã tồn tại trên hệ thống?
+      else if (_existingCodes.contains(codeNorm)) {
+        errs['code'] = 'Mã đã tồn tại trong hệ thống';
+      }
+    }
+
+    // name
+    final name = r.name.text.trim();
+    if (name.isEmpty)
+      errs['name'] = 'Bắt buộc';
+    else if (name.length > 100)
+      errs['name'] = '≤ 100 ký tự';
+
+    // credits
+    final credits = int.tryParse(r.credits.text.trim());
+    if (credits == null)
+      errs['credits'] = 'Phải là số';
+    else if (credits < 1 || credits > 6)
+      errs['credits'] = '1–6';
+
+    // email (nếu nhập)
+    final email = r.lecturerEmail.text.trim();
+    if (email.isNotEmpty && !_reEmail.hasMatch(email)) {
+      errs['email'] = 'Email không hợp lệ';
+    }
+
+    // min/max
+    final minSv = int.tryParse(r.minStudents.text.trim());
+    final maxSv = int.tryParse(r.maxStudents.text.trim());
+    if (minSv == null || minSv <= 0) errs['min'] = 'Số nguyên dương';
+    if (maxSv == null || maxSv <= 0) errs['max'] = 'Số nguyên dương';
+    if (minSv != null && maxSv != null && maxSv < minSv) {
+      errs['max'] = 'Phải ≥ Min';
+    }
+
+    // dates
+    final start = _parseDmy(r.startDate.text.trim());
+    final end = _parseDmy(r.endDate.text.trim());
+    if (start == null) errs['start'] = 'Định dạng dd/MM/yyyy';
+    if (end == null) errs['end'] = 'Định dạng dd/MM/yyyy';
+    if (start != null && end != null && end.isBefore(start)) {
+      errs['end'] = 'Kết thúc ≥ Bắt đầu';
+    }
+
+    _cellErrors[i] = errs;
+    return errs.isEmpty;
+  }
+
+  bool _validateAll() {
+    bool ok = true;
+    for (var i = 0; i < _rows.length; i++) {
+      if (!_validateRow(i)) ok = false;
+    }
+    setState(() {}); // refresh error UI
+    return ok;
+  }
+
+  // ================== FILE PICK & IMPORT ==================
   Future<void> _pickXlsx() async {
     setState(() {
       _errors.clear();
       _rows.clear();
       _fileName = null;
     });
+
     final res = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx'],
@@ -96,6 +273,7 @@ class _CourseImportPageState extends State<CourseImportPage> {
       setState(() => _errors.add('Không có file nào được chọn'));
       return;
     }
+
     final bytes = res.files.single.bytes!;
     final name = res.files.single.name;
     setState(() => _fileName = name);
@@ -103,40 +281,27 @@ class _CourseImportPageState extends State<CourseImportPage> {
     try {
       final models = await CourseImportService.parseCoursesXlsx(bytes);
       if (mounted) {
-        setState(() => _rows.addAll(models.map((e) => _RowEditors(e))));
+        setState(() {
+          _rows.addAll(models.map((e) => _RowEditors(e)));
+          for (var i = 0; i < _rows.length; i++) {
+            _validateRow(i); // pre-validate
+          }
+        });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _errors.add('Lỗi khi đọc Excel: $e'));
-      }
+      if (mounted) setState(() => _errors.add('Lỗi khi đọc Excel: $e'));
     }
   }
 
   Future<void> _import() async {
-    if (_rows.isEmpty) {
-      setState(() => _errors.add('Không có bản ghi hợp lệ để import'));
-      return;
-    }
-    // Validate cơ bản
-    final List<String> localErrors = [];
-    for (var i = 0; i < _rows.length; i++) {
-      final r = _rows[i].toModel();
-      if (r.courseCode.isEmpty)
-        localErrors.add('Dòng ${i + 1}: Mã môn học trống.');
-      if (r.courseName.isEmpty)
-        localErrors.add('Dòng ${i + 1}: Tên môn học trống.');
-      if (r.credits < 1 || r.credits > 6)
-        localErrors.add('Dòng ${i + 1}: Tín chỉ phải 1–6.');
-      if (r.endDate.isBefore(r.startDate))
-        localErrors.add('Dòng ${i + 1}: Kết thúc phải ≥ Bắt đầu.');
-      if (r.maxStudents < r.minStudents)
-        localErrors.add('Dòng ${i + 1}: Max SV phải ≥ Min SV.');
-    }
-    if (localErrors.isNotEmpty) {
+    // Khoá import nếu còn lỗi
+    if (!_validateAll()) {
       setState(() {
         _errors
           ..clear()
-          ..addAll(localErrors);
+          ..add(
+            'Có ô chưa hợp lệ (trùng mã, sai định dạng…). Vui lòng sửa các ô viền đỏ trước khi import.',
+          );
       });
       return;
     }
@@ -152,16 +317,18 @@ class _CourseImportPageState extends State<CourseImportPage> {
         ).showSnackBar(const SnackBar(content: Text('Import thành công!')));
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _errors.add('Import thất bại: $e'));
-      }
+      if (mounted) setState(() => _errors.add('Import thất bại: $e'));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  // ================== UI ==================
   @override
   Widget build(BuildContext context) {
+    const rowMin = 56.0; // tránh lỗi BoxConstraints
+    const rowMax = 64.0;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Import Môn Học (.xlsx) - Chỉnh sửa trước khi lưu'),
@@ -185,7 +352,13 @@ class _CourseImportPageState extends State<CourseImportPage> {
                   ),
                 const Spacer(),
                 FilledButton.icon(
-                  onPressed: _rows.isEmpty || _isLoading ? null : _import,
+                  onPressed:
+                      _rows.isEmpty ||
+                          _isLoading ||
+                          _hasAnyError ||
+                          _loadingCodes
+                      ? null
+                      : _import,
                   icon: const Icon(Icons.check),
                   label: const Text('Xác nhận import'),
                 ),
@@ -225,16 +398,16 @@ class _CourseImportPageState extends State<CourseImportPage> {
                   : SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(minWidth: 1100),
+                        constraints: const BoxConstraints(minWidth: 1200),
                         child: DataTable(
                           headingRowHeight: 44,
-                          dataRowMinHeight: 56,
+                          dataRowMinHeight: rowMin,
+                          dataRowMaxHeight: rowMax,
                           columns: const [
                             DataColumn(label: Text('Mã')),
                             DataColumn(label: Text('Tên')),
                             DataColumn(label: Text('Tín chỉ')),
-                            DataColumn(label: Text('GV')),
-                            DataColumn(label: Text('Email GV')),
+                            DataColumn(label: Text('Giảng viên (email)')),
                             DataColumn(label: Text('Min SV')),
                             DataColumn(label: Text('Max SV')),
                             DataColumn(label: Text('Bắt đầu')),
@@ -244,23 +417,102 @@ class _CourseImportPageState extends State<CourseImportPage> {
                           ],
                           rows: List.generate(_rows.length, (i) {
                             final r = _rows[i];
+                            final hasErr =
+                                (_cellErrors[i]?.isNotEmpty ?? false);
                             return DataRow(
+                              color: hasErr
+                                  ? MaterialStatePropertyAll(
+                                      Theme.of(context)
+                                          .colorScheme
+                                          .errorContainer
+                                          .withOpacity(.15),
+                                    )
+                                  : null,
                               cells: [
-                                DataCell(_cellText(r.code, width: 120)),
-                                DataCell(_cellText(r.name, width: 200)),
-                                DataCell(_cellNumber(r.credits, width: 64)),
-                                DataCell(_cellText(r.lecturerName, width: 140)),
                                 DataCell(
-                                  _cellText(r.lecturerEmail, width: 180),
+                                  _cellText(
+                                    r.code,
+                                    rowIndex: i,
+                                    fieldKey: 'code',
+                                    width: 120,
+                                    minHeight: rowMin,
+                                  ),
                                 ),
-                                DataCell(_cellNumber(r.minStudents, width: 80)),
-                                DataCell(_cellNumber(r.maxStudents, width: 80)),
                                 DataCell(
-                                  _cellText(r.startDate, width: 110),
-                                ), // dd/MM/yyyy
-                                DataCell(_cellText(r.endDate, width: 110)),
-                                DataCell(_scheduleEditorButton(context, r)),
-                                DataCell(_cellText(r.notes, width: 200)),
+                                  _cellText(
+                                    r.name,
+                                    rowIndex: i,
+                                    fieldKey: 'name',
+                                    width: 200,
+                                    minHeight: rowMin,
+                                  ),
+                                ),
+                                DataCell(
+                                  _cellNumber(
+                                    r.credits,
+                                    rowIndex: i,
+                                    fieldKey: 'credits',
+                                    width: 64,
+                                    minHeight: rowMin,
+                                  ),
+                                ),
+                                DataCell(
+                                  _lecturerDropdownCell(
+                                    r,
+                                    rowIndex: i,
+                                    minHeight: rowMin,
+                                  ),
+                                ),
+                                DataCell(
+                                  _cellNumber(
+                                    r.minStudents,
+                                    rowIndex: i,
+                                    fieldKey: 'min',
+                                    width: 80,
+                                    minHeight: rowMin,
+                                  ),
+                                ),
+                                DataCell(
+                                  _cellNumber(
+                                    r.maxStudents,
+                                    rowIndex: i,
+                                    fieldKey: 'max',
+                                    width: 80,
+                                    minHeight: rowMin,
+                                  ),
+                                ),
+                                DataCell(
+                                  _datePickerCell(
+                                    r.startDate,
+                                    rowIndex: i,
+                                    fieldKey: 'start',
+                                    minHeight: rowMin,
+                                  ),
+                                ),
+                                DataCell(
+                                  _datePickerCell(
+                                    r.endDate,
+                                    rowIndex: i,
+                                    fieldKey: 'end',
+                                    minHeight: rowMin,
+                                  ),
+                                ),
+                                DataCell(
+                                  _scheduleEditorButton(
+                                    context,
+                                    r,
+                                    minHeight: rowMin,
+                                  ),
+                                ),
+                                DataCell(
+                                  _cellText(
+                                    r.notes,
+                                    rowIndex: i,
+                                    fieldKey: 'notes',
+                                    width: 200,
+                                    minHeight: rowMin,
+                                  ),
+                                ),
                               ],
                             );
                           }),
@@ -274,36 +526,188 @@ class _CourseImportPageState extends State<CourseImportPage> {
     );
   }
 
-  Widget _cellText(TextEditingController c, {double? width}) {
+  // ===== Cells helpers =====
+  Widget _cellText(
+    TextEditingController c, {
+    required int rowIndex,
+    required String fieldKey,
+    double? width,
+    double? minHeight,
+  }) {
+    final err = _cellErrors[rowIndex]?[fieldKey];
     return SizedBox(
       width: width,
+      height: minHeight,
       child: TextField(
         controller: c,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
+        onChanged: (_) => setState(() => _validateRow(rowIndex)),
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
           isDense: true,
-          contentPadding: EdgeInsets.all(8),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 8,
+            horizontal: 8,
+          ),
+          errorText: err,
         ),
       ),
     );
   }
 
-  Widget _cellNumber(TextEditingController c, {double? width}) {
+  Widget _cellNumber(
+    TextEditingController c, {
+    required int rowIndex,
+    required String fieldKey,
+    double? width,
+    double? minHeight,
+  }) {
+    final err = _cellErrors[rowIndex]?[fieldKey];
     return SizedBox(
       width: width,
+      height: minHeight,
       child: TextField(
         controller: c,
         keyboardType: TextInputType.number,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
+        onChanged: (_) => setState(() => _validateRow(rowIndex)),
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
           isDense: true,
-          contentPadding: EdgeInsets.all(8),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 8,
+            horizontal: 8,
+          ),
+          errorText: err,
         ),
       ),
     );
   }
 
-  Widget _scheduleEditorButton(BuildContext context, _RowEditors r) {
+  /// Dropdown giảng viên: hiển thị "Tên (email)", lưu email + tự điền name
+  Widget _lecturerDropdownCell(
+    _RowEditors r, {
+    required int rowIndex,
+    double? minHeight,
+  }) {
+    final err = _cellErrors[rowIndex]?['email'];
+
+    // giá trị hiện tại chuẩn hoá
+    final currentRaw = r.lecturerEmail.text.trim().toLowerCase();
+    final hasMatch = _lecturers.any((x) => x.email == currentRaw);
+    final effectiveValue = hasMatch ? currentRaw : null;
+
+    final items = _lecturers
+        .map(
+          (e) => DropdownMenuItem<String>(
+            value: e.email,
+            child: Text(
+              '${e.name} (${e.email})',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        )
+        .toList();
+
+    return SizedBox(
+      height: minHeight,
+      width: 300,
+      child: _lecturerLoading
+          ? const Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          : DropdownButtonFormField<String>(
+              value: effectiveValue,
+              items: items,
+              onChanged: (val) {
+                setState(() {
+                  final v = (val ?? '').trim().toLowerCase();
+                  r.lecturerEmail.text = v;
+                  final found = _lecturers.firstWhere(
+                    (x) => x.email == v,
+                    orElse: () =>
+                        const _LecturerItem(id: '', name: '', email: ''),
+                  );
+                  r.lecturerName.text = found.name;
+                  _validateRow(rowIndex);
+                });
+              },
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 8,
+                  horizontal: 8,
+                ),
+                hintText: 'Chọn giảng viên',
+                errorText: err,
+              ),
+            ),
+    );
+  }
+
+  /// Nút chọn ngày -> ghi về controller theo dd/MM/yyyy + hiển thị lỗi dưới nút
+  Widget _datePickerCell(
+    TextEditingController ctrl, {
+    required int rowIndex,
+    required String fieldKey,
+    double? minHeight,
+  }) {
+    final err = _cellErrors[rowIndex]?[fieldKey];
+    return SizedBox(
+      height: minHeight,
+      width: 160,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.calendar_today, size: 16),
+            label: Text(
+              ctrl.text.isEmpty ? 'Chọn ngày' : ctrl.text,
+              overflow: TextOverflow.ellipsis,
+            ),
+            onPressed: () async {
+              final init = _parseDmy(ctrl.text) ?? DateTime.now();
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: init,
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+                helpText: 'Chọn ngày',
+                confirmText: 'OK',
+                cancelText: 'Hủy',
+              );
+              if (picked != null) {
+                setState(() {
+                  ctrl.text = _dmy.format(picked);
+                  _validateRow(rowIndex);
+                });
+              }
+            },
+          ),
+          if (err != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                err,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _scheduleEditorButton(
+    BuildContext context,
+    _RowEditors r, {
+    double? minHeight,
+  }) {
     final preview = r.weeklySchedule.isEmpty
         ? 'Chưa có'
         : r.weeklySchedule
@@ -311,31 +715,36 @@ class _CourseImportPageState extends State<CourseImportPage> {
                 (s) => 'T${s.dayOfWeek} ${s.startTime}-${s.endTime} ${s.room}',
               )
               .join(' | ');
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Flexible(
-          child: Text(preview, overflow: TextOverflow.ellipsis, maxLines: 2),
-        ),
-        const SizedBox(width: 8),
-        OutlinedButton.icon(
-          onPressed: () async {
-            final updated = await showDialog<List<WeeklySlot>>(
-              context: context,
-              builder: (_) => _ScheduleEditorDialog(initial: r.weeklySchedule),
-            );
-            if (updated != null) {
-              setState(() => r.weeklySchedule = updated);
-            }
-          },
-          icon: const Icon(Icons.edit_calendar),
-          label: const Text('Sửa'),
-        ),
-      ],
+
+    return SizedBox(
+      height: minHeight,
+      width: 340,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Expanded(
+            child: Text(preview, overflow: TextOverflow.ellipsis, maxLines: 2),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final updated = await showDialog<List<WeeklySlot>>(
+                context: context,
+                builder: (_) =>
+                    _ScheduleEditorDialog(initial: r.weeklySchedule),
+              );
+              if (updated != null) setState(() => r.weeklySchedule = updated);
+            },
+            icon: const Icon(Icons.edit_calendar),
+            label: const Text('Sửa'),
+          ),
+        ],
+      ),
     );
   }
 }
 
+// ===== Schedule editor dialog =====
 class _ScheduleEditorDialog extends StatefulWidget {
   final List<WeeklySlot> initial;
   const _ScheduleEditorDialog({required this.initial});
