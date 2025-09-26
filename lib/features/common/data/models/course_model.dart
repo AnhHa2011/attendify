@@ -16,6 +16,7 @@ class CourseModel {
   final DateTime? endDate;
   final String? lecturerId; // Assigned lecturer
   final String? lecturerName; // Populated from lecturer info
+  final String? lecturerEmail; // Populated from lecturer info
   final List<String> enrolledStudents; // Student UIDs enrolled in this course
   final String? description;
   final String? semester;
@@ -32,6 +33,7 @@ class CourseModel {
     this.endDate,
     this.lecturerId,
     this.lecturerName,
+    this.lecturerEmail,
     this.enrolledStudents = const [],
     this.description,
     this.semester,
@@ -56,6 +58,7 @@ class CourseModel {
           : null,
       lecturerId: data['lecturerId'],
       lecturerName: data['lecturerName'],
+      lecturerEmail: data['lecturerEmail'],
       enrolledStudents: List<String>.from(data['enrolledStudents'] ?? []),
       description: data['description'],
       semester: data['semester'],
@@ -75,6 +78,7 @@ class CourseModel {
       'endDate': endDate != null ? Timestamp.fromDate(endDate!) : null,
       'lecturerId': lecturerId,
       'lecturerName': lecturerName,
+      'lecturerEmail': lecturerEmail,
       'enrolledStudents': enrolledStudents,
       'description': description,
       'semester': semester,
@@ -94,6 +98,7 @@ class CourseModel {
     DateTime? endDate,
     String? lecturerId,
     String? lecturerName,
+    String? lecturerEmail,
     List<String>? enrolledStudents,
     String? description,
     String? semester,
@@ -110,6 +115,7 @@ class CourseModel {
       endDate: endDate ?? this.endDate,
       lecturerId: lecturerId ?? this.lecturerId,
       lecturerName: lecturerName ?? this.lecturerName,
+      lecturerEmail: lecturerEmail ?? this.lecturerEmail,
       enrolledStudents: enrolledStudents ?? this.enrolledStudents,
       description: description ?? this.description,
       semester: semester ?? this.semester,

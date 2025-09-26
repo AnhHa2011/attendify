@@ -1,4 +1,6 @@
 import '../../../../app_imports.dart';
+import '../../../common/data/models/course_enrollment_model.dart';
+import '../../../common/data/models/enrollment_model.dart';
 import '../models/course_import_model.dart';
 
 class AdminService {
@@ -73,6 +75,11 @@ class AdminService {
 
   /// Lấy danh sách tất cả sinh viên (sử dụng hàm trên)
   Stream<List<UserModel>> getAllStudentsStream() {
+    return getUsersStreamByRole(UserRole.student);
+  }
+
+  /// Lấy danh sách tất cả sinh viên (sử dụng hàm trên)
+  Stream<List<UserModel>> getAllStudentsByCourseStream() {
     return getUsersStreamByRole(UserRole.student);
   }
 
@@ -470,6 +477,17 @@ class AdminService {
   // === THÊM MỚI: CÁC HÀM QUẢN LÝ VIỆC GHI DANH (ENROLLMENT) ===
 
   /// Lấy danh sách sinh viên ĐÃ CÓ trong một lớp học
+  Stream<List<EnrollmentModel>> getAllEnrolledStudentsStream() {
+    return _db
+        .collection('enrollments')
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => EnrollmentModel.fromDoc(doc)).toList(),
+        );
+  }
+
+  /// Lấy danh sách sinh viên ĐÃ CÓ trong một lớp học
   Stream<List<UserModel>> getEnrolledStudentsStream(String classId) {
     return _db
         .collection('enrollments')
@@ -486,6 +504,28 @@ class AdminService {
               .get();
           return studentsSnapshot.docs
               .map((doc) => UserModel.fromFirestore(doc))
+              .toList();
+        });
+  }
+
+  Stream<List<CourseEnrollmentModel>> getCourseEnrolledStudentsStream(
+    String courseCode,
+  ) {
+    return _db
+        .collection('course_enrollments')
+        .where('courseCode', isEqualTo: courseCode)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          if (snapshot.docs.isEmpty) return [];
+          final studentIds = snapshot.docs
+              .map((doc) => doc['studentUid'] as String)
+              .toList();
+          final studentsSnapshot = await _db
+              .collection('users')
+              .where(FieldPath.documentId, whereIn: studentIds)
+              .get();
+          return studentsSnapshot.docs
+              .map((doc) => CourseEnrollmentModel.fromDoc(doc))
               .toList();
         });
   }
@@ -622,6 +662,45 @@ class AdminService {
         .get();
     if (snap.docs.isEmpty) return null;
     return snap.docs.first.id;
+  }
+
+  Stream<CourseModel> getRichCourseByIdStream(String courseId) {
+    return _db.collection('courses').doc(courseId).snapshots().asyncMap((
+      courseDoc,
+    ) async {
+      if (!courseDoc.exists) {
+        throw Exception('Môn học không tồn tại!');
+      }
+      // Parse course
+      final course = CourseModel.fromDoc(courseDoc);
+      final lecturerSnap = await _db
+          .collection('users')
+          .doc(course.lecturerId)
+          .get();
+
+      if (!lecturerSnap.exists) {
+        // Nếu không có lecturer thì vẫn trả course nhưng lecturer = null
+        return course.copyWith(lecturerName: '', lecturerEmail: '');
+      }
+
+      final lecturer = UserModel.fromFirestore(lecturerSnap);
+      // Gắn lecturer vào course (copyWith)
+      return course.copyWith(
+        lecturerName: lecturer.displayName,
+        lecturerEmail: lecturer.email,
+      );
+    });
+  }
+
+  Stream<CourseModel> getCourseByIdStream(String courseId) {
+    return _db.collection('courses').doc(courseId).snapshots().asyncMap((
+      classDoc,
+    ) async {
+      if (!classDoc.exists) {
+        throw Exception('Môn học không tồn tại!');
+      }
+      return CourseModel.fromDoc(classDoc);
+    });
   }
 
   Future<String?> getUserIdByEmail(String email) async {

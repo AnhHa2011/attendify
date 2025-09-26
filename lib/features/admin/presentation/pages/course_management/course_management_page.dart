@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../common/data/models/course_model.dart';
 import '../../../data/services/admin_service.dart';
+import 'admin_course_detail_page.dart';
 import 'course_form_page.dart';
 import 'course_import_page.dart';
 
@@ -144,6 +145,15 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
                   subtitle: Text(
                     '${course.courseCode} - ${course.credits} tín chỉ',
                   ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            AdminCourseDetailPage(courseId: course.id),
+                      ),
+                    );
+                  },
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
