@@ -661,6 +661,7 @@ class _AdminDashboardState extends State<AdminDashboard>
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(24),
+          width: double.infinity,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
