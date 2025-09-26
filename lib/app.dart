@@ -153,7 +153,7 @@ class _LoadingScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Đang khởi tạo ứng dụng...',
+              'Loading...',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: cs.onSurface.withOpacity(0.6),
               ),

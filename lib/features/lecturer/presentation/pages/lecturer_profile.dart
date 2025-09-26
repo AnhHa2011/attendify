@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import '../../../../app/providers/auth_provider.dart';
 import '../../../auth/presentation/pages/edit_account_page.dart';
+import '../../../auth/presentation/pages/update_my_password.dart';
 
 class LecturerProfile extends StatefulWidget {
   const LecturerProfile({super.key});
@@ -102,7 +103,10 @@ class _LecturerProfileState extends State<LecturerProfile>
                     return Transform.translate(
                       offset: Offset(0, 30 * (1 - _cardAnimations[0].value)),
                       child: Opacity(
-                        opacity: math.min(1.0, math.max(0.0, _cardAnimations[0].value)),
+                        opacity: math.min(
+                          1.0,
+                          math.max(0.0, _cardAnimations[0].value),
+                        ),
                         child: _buildProfileHeader(theme, user),
                       ),
                     );
@@ -125,7 +129,10 @@ class _LecturerProfileState extends State<LecturerProfile>
                             30 * (1 - _cardAnimations[1].value),
                           ),
                           child: Opacity(
-                            opacity: math.min(1.0, math.max(0.0, _cardAnimations[1].value)),
+                            opacity: math.min(
+                              1.0,
+                              math.max(0.0, _cardAnimations[1].value),
+                            ),
                             child: _buildPersonalInfoSection(theme, user),
                           ),
                         );
@@ -144,7 +151,10 @@ class _LecturerProfileState extends State<LecturerProfile>
                             30 * (1 - _cardAnimations[2].value),
                           ),
                           child: Opacity(
-                            opacity: math.min(1.0, math.max(0.0, _cardAnimations[2].value)),
+                            opacity: math.min(
+                              1.0,
+                              math.max(0.0, _cardAnimations[2].value),
+                            ),
                             child: _buildSystemSection(theme),
                           ),
                         );
@@ -362,9 +372,16 @@ class _LecturerProfileState extends State<LecturerProfile>
           theme: theme,
           icon: Icons.security_rounded,
           title: 'Bảo mật',
-          subtitle: 'Quản lý mật khẩu và xác thực',
+          subtitle: 'Thay đổi mật khẩu',
           trailing: Icons.chevron_right_rounded,
-          onTap: () => _showSecurityDialog(),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const UpdateMyPassWordPage(),
+              ),
+            );
+          },
         ),
         _buildInfoTile(
           theme: theme,

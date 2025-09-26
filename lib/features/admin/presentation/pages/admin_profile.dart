@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import '../../../../app/providers/auth_provider.dart';
 import '../../../auth/presentation/pages/edit_account_page.dart';
+import '../../../auth/presentation/pages/update_my_password.dart';
 
 class AdminProfile extends StatefulWidget {
   const AdminProfile({super.key});
@@ -43,7 +44,8 @@ class _AdminProfileState extends State<AdminProfile>
           curve: Interval(
             index * 0.2,
             0.6 + (index * 0.1),
-            curve: Curves.fastOutSlowIn, // Thay đổi từ Curves.easeOutBack để tránh vượt 1.0
+            curve: Curves
+                .fastOutSlowIn, // Thay đổi từ Curves.easeOutBack để tránh vượt 1.0
           ),
         ),
       );
@@ -102,7 +104,10 @@ class _AdminProfileState extends State<AdminProfile>
                     return Transform.translate(
                       offset: Offset(0, 30 * (1 - _cardAnimations[0].value)),
                       child: Opacity(
-                        opacity: math.min(1.0, math.max(0.0, _cardAnimations[0].value)),
+                        opacity: math.min(
+                          1.0,
+                          math.max(0.0, _cardAnimations[0].value),
+                        ),
                         child: _buildProfileHeader(theme, user),
                       ),
                     );
@@ -125,7 +130,10 @@ class _AdminProfileState extends State<AdminProfile>
                             30 * (1 - _cardAnimations[1].value),
                           ),
                           child: Opacity(
-                            opacity: math.min(1.0, math.max(0.0, _cardAnimations[1].value)),
+                            opacity: math.min(
+                              1.0,
+                              math.max(0.0, _cardAnimations[1].value),
+                            ),
                             child: _buildPersonalInfoSection(theme, user),
                           ),
                         );
@@ -144,7 +152,10 @@ class _AdminProfileState extends State<AdminProfile>
                             30 * (1 - _cardAnimations[2].value),
                           ),
                           child: Opacity(
-                            opacity: math.min(1.0, math.max(0.0, _cardAnimations[2].value)),
+                            opacity: math.min(
+                              1.0,
+                              math.max(0.0, _cardAnimations[2].value),
+                            ),
                             child: _buildSystemSection(theme),
                           ),
                         );
@@ -361,18 +372,25 @@ class _AdminProfileState extends State<AdminProfile>
           theme: theme,
           icon: Icons.security_rounded,
           title: 'Bảo mật',
-          subtitle: 'Quản lý mật khẩu và xác thực',
+          subtitle: 'Thay đổi mật khẩu',
           trailing: Icons.chevron_right_rounded,
-          onTap: () => _showSecurityDialog(),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const UpdateMyPassWordPage(),
+              ),
+            );
+          },
         ),
-        _buildInfoTile(
-          theme: theme,
-          icon: Icons.backup_rounded,
-          title: 'Sao lưu dữ liệu',
-          subtitle: 'Export toàn bộ dữ liệu hệ thống',
-          trailing: Icons.chevron_right_rounded,
-          onTap: () => _showBackupDialog(),
-        ),
+        // _buildInfoTile(
+        //   theme: theme,
+        //   icon: Icons.backup_rounded,
+        //   title: 'Sao lưu dữ liệu',
+        //   subtitle: 'Export toàn bộ dữ liệu hệ thống',
+        //   trailing: Icons.chevron_right_rounded,
+        //   onTap: () => _showBackupDialog(),
+        // ),
         _buildInfoTile(
           theme: theme,
           icon: Icons.notifications_rounded,

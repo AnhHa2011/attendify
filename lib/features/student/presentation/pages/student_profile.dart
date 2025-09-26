@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import '../../../../app/providers/auth_provider.dart';
 import '../../../auth/presentation/pages/edit_account_page.dart';
+import '../../../auth/presentation/pages/update_my_password.dart';
 
 class StudentProfile extends StatefulWidget {
   const StudentProfile({super.key});
@@ -370,9 +371,16 @@ class _StudentProfileState extends State<StudentProfile>
           theme: theme,
           icon: Icons.security_rounded,
           title: 'Bảo mật',
-          subtitle: 'Quản lý mật khẩu và xác thực',
+          subtitle: 'Thay đổi mật khẩu',
           trailing: Icons.chevron_right_rounded,
-          onTap: () => _showSecurityDialog(),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const UpdateMyPassWordPage(),
+              ),
+            );
+          },
         ),
         _buildInfoTile(
           theme: theme,
