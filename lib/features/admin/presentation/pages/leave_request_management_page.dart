@@ -48,7 +48,10 @@ class _LeaveRequestManagementPageState
             decoration: const InputDecoration(
               labelText: 'Tìm kiếm theo tên sinh viên...',
               prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(30)),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12.0),
             ),
           ),
           const SizedBox(height: 12),
@@ -56,7 +59,10 @@ class _LeaveRequestManagementPageState
             value: _selectedStatus,
             decoration: const InputDecoration(
               labelText: 'Lọc theo trạng thái',
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(30)),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12.0),
             ),
             items: const [
               DropdownMenuItem(value: 'all', child: Text('Tất cả')),

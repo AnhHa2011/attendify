@@ -45,7 +45,7 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
         title: TextField(
           controller: _searchController,
           decoration: InputDecoration(
-            hintText: 'Tìm theo tên lớp, mã lớp, GV...', // Cập nhật hint text
+            hintText: 'Tìm theo tên lớp, mã lớp,...', // Cập nhật hint text
             prefixIcon: const Icon(Icons.search),
             border: const OutlineInputBorder(
               borderRadius: BorderRadius.all(Radius.circular(30)),

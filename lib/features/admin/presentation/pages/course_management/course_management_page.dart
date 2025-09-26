@@ -46,8 +46,11 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
           controller: _searchController,
           decoration: InputDecoration(
             hintText: 'Tìm kiếm theo tên hoặc mã môn...',
-            border: InputBorder.none,
             prefixIcon: const Icon(Icons.search),
+            border: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(30)),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12.0),
             suffixIcon: _searchQuery.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.clear),
