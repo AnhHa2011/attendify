@@ -1,8 +1,11 @@
 // lib/features/admin/presentation/pages/admin_dashboard.dart
+import 'package:attendify/features/admin/presentation/pages/class_management/class_form_page.dart';
 import 'package:attendify/features/admin/presentation/pages/class_management/class_management_page.dart';
+import 'package:attendify/features/admin/presentation/pages/course_management/course_form_page.dart';
 import 'package:attendify/features/admin/presentation/pages/course_management/course_management_page.dart';
 import 'package:attendify/features/admin/presentation/pages/user_management/user_management_page.dart';
 import 'package:attendify/features/classes/presentation/pages/class_list_page.dart';
+import 'package:attendify/features/common/widgets/large_screen_quick_action.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -11,9 +14,13 @@ import '../../../../app/providers/auth_provider.dart';
 import '../../../../app/providers/navigation_provider.dart';
 import '../../../common/data/models/user_model.dart';
 import '../../../common/data/models/class_model.dart';
+import '../../../common/widgets/large_screen_content.dart';
+import '../../../common/widgets/small_screen_content.dart';
+import '../../../common/widgets/small_screen_quick_action.dart';
 import '../../data/services/admin_service.dart';
 import 'admin_ui_components.dart';
 import 'course_management/course_import_page.dart';
+import 'user_management/user_form_page.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -105,28 +112,6 @@ class _AdminDashboardState extends State<AdminDashboard>
           ],
         ),
       ),
-      floatingActionButton: AnimatedBuilder(
-        animation: _fabAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _fabAnimation.value,
-            child: Transform.rotate(
-              angle: _fabAnimation.value * 2 * 3.14159,
-              child: FloatingActionButton.extended(
-                onPressed: () => _showQuickActionsSheet(context),
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                elevation: 8,
-                icon: const Icon(Icons.add_rounded, size: 24),
-                label: const Text(
-                  'Thao tác nhanh',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 
@@ -155,107 +140,112 @@ class _AdminDashboardState extends State<AdminDashboard>
           ),
         ),
         padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Hero(
-                  tag: 'admin-avatar',
-                  child: Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.white.withOpacity(0.3),
-                          Colors.white.withOpacity(0.1),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 15,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.admin_panel_settings_rounded,
-                      size: 35,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Xin chào, ${user?.displayName?.split(' ').last ?? 'Admin'}! 👋',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withOpacity(0.3),
-                              offset: const Offset(0, 2),
-                              blurRadius: 4,
-                            ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Hero(
+                    tag: 'admin-avatar',
+                    child: Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withOpacity(0.3),
+                            Colors.white.withOpacity(0.1),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Quản trị viên hệ thống',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: Colors.white.withOpacity(0.9),
-                          fontWeight: FontWeight.w500,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 2,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
-                    ],
+                      child: const Icon(
+                        Icons.admin_panel_settings_rounded,
+                        size: 35,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.today_rounded,
-                    size: 18,
-                    color: Colors.white.withOpacity(0.9),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    DateFormat(
-                      'EEEE, dd MMMM yyyy',
-                      'vi_VN',
-                    ).format(DateTime.now()),
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Xin chào, ${user?.displayName?.split(' ').last ?? 'Admin'}! 👋',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withOpacity(0.3),
+                                offset: const Offset(0, 2),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Quản trị viên hệ thống',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: Colors.white.withOpacity(0.9),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.today_rounded,
+                      size: 18,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      DateFormat(
+                        'EEEE, dd MMMM yyyy',
+                        'vi_VN',
+                      ).format(DateTime.now()),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -298,7 +288,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                     final screenWidth = MediaQuery.of(context).size.width;
                     double aspectRatio;
                     if (screenWidth < 350) {
-                      aspectRatio = 3.0; // Nexus 4 và các màn hình nhỏ hơn
+                      aspectRatio = 3.6; // Nexus 4 và các màn hình nhỏ hơn
                     } else if (screenWidth < 400) {
                       aspectRatio = 2.2; // Màn hình nhỏ
                     } else if (screenWidth < 500) {
@@ -308,65 +298,76 @@ class _AdminDashboardState extends State<AdminDashboard>
                     }
                     final isSmallScreen = screenWidth < 400;
 
-                    return GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: aspectRatio,
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildGlassCard(
-                          title: 'Giảng viên',
-                          value: '${lecturers.length}',
-                          icon: Icons.person_outline_rounded,
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.blue.shade400,
-                              Colors.blue.shade600,
-                            ],
-                          ),
-                          delay: const Duration(milliseconds: 100),
-                          isSmallScreen: isSmallScreen,
+                        Text(
+                          'Tổng quan',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
-                        _buildGlassCard(
-                          title: 'Sinh viên',
-                          value: '${students.length}',
-                          icon: Icons.groups_rounded,
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.green.shade400,
-                              Colors.green.shade600,
-                            ],
-                          ),
-                          delay: const Duration(milliseconds: 200),
-                          isSmallScreen: isSmallScreen,
-                        ),
-                        _buildGlassCard(
-                          title: 'Lớp học',
-                          value: '${classes.length}',
-                          icon: Icons.school_rounded,
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.orange.shade400,
-                              Colors.orange.shade600,
-                            ],
-                          ),
-                          delay: const Duration(milliseconds: 300),
-                          isSmallScreen: isSmallScreen,
-                        ),
-                        _buildGlassCard(
-                          title: 'Hoạt động',
-                          value: '${(classes.length * 0.85).round()}%',
-                          icon: Icons.trending_up_rounded,
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.purple.shade400,
-                              Colors.purple.shade600,
-                            ],
-                          ),
-                          delay: const Duration(milliseconds: 400),
-                          isSmallScreen: isSmallScreen,
+                        const SizedBox(height: 16),
+                        GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: aspectRatio,
+                          children: [
+                            _buildGlassCard(
+                              title: 'Giảng viên',
+                              value: '${lecturers.length}',
+                              icon: Icons.person_outline_rounded,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.blue.shade400,
+                                  Colors.blue.shade600,
+                                ],
+                              ),
+                              delay: const Duration(milliseconds: 100),
+                              isSmallScreen: isSmallScreen,
+                            ),
+                            _buildGlassCard(
+                              title: 'Sinh viên',
+                              value: '${students.length}',
+                              icon: Icons.groups_rounded,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.green.shade400,
+                                  Colors.green.shade600,
+                                ],
+                              ),
+                              delay: const Duration(milliseconds: 200),
+                              isSmallScreen: isSmallScreen,
+                            ),
+                            _buildGlassCard(
+                              title: 'Lớp học',
+                              value: '${classes.length}',
+                              icon: Icons.school_rounded,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.orange.shade400,
+                                  Colors.orange.shade600,
+                                ],
+                              ),
+                              delay: const Duration(milliseconds: 300),
+                              isSmallScreen: isSmallScreen,
+                            ),
+                            _buildGlassCard(
+                              title: 'Hoạt động',
+                              value: '${(classes.length * 0.85).round()}%',
+                              icon: Icons.trending_up_rounded,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.purple.shade400,
+                                  Colors.purple.shade600,
+                                ],
+                              ),
+                              delay: const Duration(milliseconds: 400),
+                              isSmallScreen: isSmallScreen,
+                            ),
+                          ],
                         ),
                       ],
                     );
@@ -375,6 +376,80 @@ class _AdminDashboardState extends State<AdminDashboard>
               },
             );
           },
+        );
+      },
+    );
+  }
+
+  Widget _buildActionCard({
+    required String title,
+    required String subTitle,
+    required IconData icon,
+    required LinearGradient gradient,
+    required Duration delay,
+    required bool isSmallScreen,
+    VoidCallback? onTap,
+  }) {
+    return TweenAnimationBuilder(
+      duration: const Duration(milliseconds: 800),
+      tween: Tween<double>(begin: 0, end: 1),
+      builder: (context, double animation, child) {
+        return Transform.translate(
+          offset: Offset(0, 30 * (1 - animation)),
+          child: Transform.scale(
+            scale: 0.8 + (0.2 * animation),
+            child: Opacity(
+              opacity: animation,
+              child: InkWell(
+                onTap: onTap,
+                child: Container(
+                  height: isSmallScreen
+                      ? 50
+                      : null, // ✅ Chiều cao cố định cho small screen
+                  decoration: BoxDecoration(
+                    gradient: gradient,
+                    borderRadius: BorderRadius.circular(
+                      isSmallScreen ? 12 : 20,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: gradient.colors.first.withOpacity(0.3),
+                        blurRadius: isSmallScreen ? 8 : 15,
+                        offset: Offset(0, isSmallScreen ? 4 : 8),
+                      ),
+                    ],
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(
+                        isSmallScreen ? 12 : 20,
+                      ),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withOpacity(0.1),
+                          Colors.white.withOpacity(0.05),
+                        ],
+                      ),
+                    ),
+                    padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
+                    child: isSmallScreen
+                        ? SmallScreenQuickAction(
+                            icon: icon,
+                            title: title,
+                            subTitle: subTitle,
+                          )
+                        : LargeScreenQuickAction(
+                            icon: icon,
+                            subTitle: subTitle,
+                            title: title,
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         );
       },
     );
@@ -402,20 +477,27 @@ class _AdminDashboardState extends State<AdminDashboard>
               child: GestureDetector(
                 onTap: onTap,
                 child: Container(
+                  height: isSmallScreen
+                      ? 50
+                      : null, // ✅ Chiều cao cố định cho small screen
                   decoration: BoxDecoration(
                     gradient: gradient,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(
+                      isSmallScreen ? 12 : 20,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: gradient.colors.first.withOpacity(0.3),
-                        blurRadius: 15,
-                        offset: const Offset(0, 8),
+                        blurRadius: isSmallScreen ? 8 : 15,
+                        offset: Offset(0, isSmallScreen ? 4 : 8),
                       ),
                     ],
                   ),
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(
+                        isSmallScreen ? 12 : 20,
+                      ),
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -425,66 +507,20 @@ class _AdminDashboardState extends State<AdminDashboard>
                         ],
                       ),
                     ),
-                    padding: EdgeInsets.all(isSmallScreen ? 6 : 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(isSmallScreen ? 4 : 6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(
-                                  isSmallScreen ? 8 : 10,
-                                ),
-                              ),
-                              child: Icon(
-                                icon,
-                                color: Colors.white,
-                                size: isSmallScreen ? 16 : 18,
-                              ),
-                            ),
-                            if (onTap != null)
-                              Icon(
-                                Icons.arrow_forward_ios_rounded,
-                                color: Colors.white.withOpacity(0.7),
-                                size: 14,
-                              ),
-                          ],
-                        ),
-                        SizedBox(height: isSmallScreen ? 4 : 6),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Text(
-                                value,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: isSmallScreen ? 18 : 22,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: isSmallScreen ? 0 : 1),
-                              Text(
-                                title,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: isSmallScreen ? 10 : 11,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                    padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
+                    child: isSmallScreen
+                        ? SmallScreenContent(
+                            icon: icon,
+                            value: value,
+                            title: title,
+                            onTap: onTap,
+                          )
+                        : LargeScreenContent(
+                            icon: icon,
+                            value: value,
+                            title: title,
+                            onTap: onTap,
                           ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               ),
@@ -496,173 +532,119 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _buildQuickActions() {
-    final actions = [
-      {
-        'title': 'Tạo tài khoản',
-        'subtitle': 'Thêm user mới',
-        'icon': Icons.person_add_rounded,
-        'color': Colors.blue,
-        'route': '/admin/users/create',
-      },
-      {
-        'title': 'Thêm môn học',
-        'subtitle': 'Tạo course mới',
-        'icon': Icons.menu_book_rounded,
-        'color': Colors.green,
-        'route': '/admin/courses/create',
-      },
-      {
-        'title': 'Tạo lớp học',
-        'subtitle': 'Setup class',
-        'icon': Icons.school_rounded,
-        'color': Colors.orange,
-        'route': '/admin/classes/create',
-      },
-      {
-        'title': 'Import môn học',
-        'subtitle': 'Từ file CSV',
-        'icon': Icons.upload_file_rounded,
-        'color': Colors.purple,
-        'route': '/admin/courses/import',
-      },
-    ];
+    return TweenAnimationBuilder(
+      duration: const Duration(milliseconds: 800),
+      tween: Tween<double>(begin: 0, end: 1),
+      builder: (context, double animation, child) {
+        return Transform.translate(
+          offset: Offset(0, 30 * (1 - animation)),
+          child: Transform.scale(
+            scale: 0.8 + (0.2 * animation),
+            child: Opacity(
+              opacity: animation,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final screenWidth = MediaQuery.of(context).size.width;
+                  double aspectRatio;
+                  if (screenWidth < 350) {
+                    aspectRatio = 3.6;
+                  } else if (screenWidth < 400) {
+                    aspectRatio = 2.2;
+                  } else if (screenWidth < 500) {
+                    aspectRatio = 1.8;
+                  } else {
+                    aspectRatio = 1.6;
+                  }
+                  final isSmallScreen = screenWidth < 400;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Thao tác nhanh',
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 5.0,
-          ),
-          itemCount: actions.length,
-          itemBuilder: (context, index) {
-            final action = actions[index];
-            return TweenAnimationBuilder(
-              duration: Duration(milliseconds: 600 + (index * 100)),
-              tween: Tween<double>(begin: 0, end: 1),
-              builder: (context, double animation, child) {
-                return Transform.translate(
-                  offset: Offset(30 * (1 - animation), 0),
-                  child: Opacity(
-                    opacity: animation,
-                    child: Builder(
-                      builder: (context) {
-                        final screenWidth = MediaQuery.of(context).size.width;
-                        final isSmallScreen = screenWidth < 400;
-
-                        return _buildActionCard(
-                          title: action['title'] as String,
-                          subtitle: action['subtitle'] as String,
-                          icon: action['icon'] as IconData,
-                          color: action['color'] as Color,
-                          onTap: () =>
-                              _handleQuickAction(action['route'] as String),
-                          isSmallScreen: isSmallScreen,
-                        );
-                      },
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-    required bool isSmallScreen,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: color,
-                    size: isSmallScreen ? 14 : 18,
-                  ),
-                ),
-                SizedBox(width: isSmallScreen ? 8 : 10),
-                Expanded(
-                  child: Column(
+                  return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        title,
-                        style: TextStyle(
-                          color: color,
-                          fontWeight: FontWeight.w600,
-                          fontSize: isSmallScreen ? 10 : 13,
+                        'Thao tác nhanh',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: color.withOpacity(0.7),
-                          fontSize: isSmallScreen ? 8 : 11,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      const SizedBox(height: 16),
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: aspectRatio,
+                        children: [
+                          _buildActionCard(
+                            title: 'Tạo tài khoản',
+                            subTitle: 'Thêm user mới',
+                            icon: Icons.person_add_rounded,
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.blue.shade400,
+                                Colors.blue.shade600,
+                              ],
+                            ),
+                            // ✅ FIX: Navigation function thay vì Widget
+                            onTap: () => _navigateToUserForm(context),
+                            delay: const Duration(milliseconds: 100),
+                            isSmallScreen: isSmallScreen,
+                          ),
+                          _buildActionCard(
+                            title: 'Tạo môn học',
+                            subTitle: 'Thêm 1 môn học',
+                            icon: Icons.menu_book_rounded,
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.green.shade400,
+                                Colors.green.shade600,
+                              ],
+                            ),
+                            // ✅ FIX: Navigation function
+                            onTap: () => _navigateToCourseForm(context),
+                            delay: const Duration(milliseconds: 200),
+                            isSmallScreen: isSmallScreen,
+                          ),
+                          _buildActionCard(
+                            title: 'Tạo lớp học',
+                            subTitle: 'Thêm 1 lớp học',
+                            icon: Icons.school_rounded,
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.orange.shade400,
+                                Colors.orange.shade600,
+                              ],
+                            ),
+                            // ✅ FIX: Navigation function
+                            onTap: () => _navigateToClassForm(context),
+                            delay: const Duration(milliseconds: 300),
+                            isSmallScreen: isSmallScreen,
+                          ),
+                          _buildActionCard(
+                            title: 'Import môn học',
+                            subTitle: 'Từ file EXCEL',
+                            icon: Icons.upload_file_rounded,
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.purple.shade400,
+                                Colors.purple.shade600,
+                              ],
+                            ),
+                            // ✅ FIX: Navigation function
+                            onTap: () => _navigateToCourseImport(context),
+                            delay: const Duration(milliseconds: 400),
+                            isSmallScreen: isSmallScreen,
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: color.withOpacity(0.5),
-                  size: 14,
-                ),
-              ],
+                  );
+                },
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -694,6 +676,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             ),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               TweenAnimationBuilder(
                 duration: const Duration(milliseconds: 1000),
@@ -749,58 +732,32 @@ class _AdminDashboardState extends State<AdminDashboard>
   Widget _buildAnalyticsTab() {
     return const CourseManagementPage();
   }
+}
 
-  void _showQuickActionsSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Thao tác nhanh',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 24),
-            const Text('Các tính năng sẽ sớm được bổ sung...'),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
+void _navigateToUserForm(BuildContext context) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const UserFormPage()),
+  );
+}
 
-  void _handleQuickAction(String route) {
-    if (route == '/admin/courses/import') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const CourseImportPage()),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Navigating to $route - Coming Soon'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
+void _navigateToCourseForm(BuildContext context) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const CourseFormPage()),
+  );
+}
+
+void _navigateToClassForm(BuildContext context) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const ClassFormPage()),
+  );
+}
+
+void _navigateToCourseImport(BuildContext context) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const CourseImportPage()),
+  );
 }

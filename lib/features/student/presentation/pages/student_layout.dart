@@ -94,7 +94,7 @@ class StudentLayout extends StatelessWidget {
     ];
 
     return RoleLayout(
-      title: 'Bảng điều khiển (Giảng viên)',
+      title: 'Bảng điều khiển (Sinh viên)',
       items: items,
       pages: pages,
       onLogout: (ctx) async => ctx.read<AuthProvider>().logout(),

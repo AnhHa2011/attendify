@@ -514,7 +514,7 @@ class DashboardPage extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Admin Dashboard',
+                          'Giảng viên Dashboard',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onPrimaryContainer
                                 .withOpacity(0.8),

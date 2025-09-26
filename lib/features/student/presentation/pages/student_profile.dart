@@ -240,7 +240,7 @@ class _StudentProfileState extends State<StudentProfile>
             duration: const Duration(milliseconds: 1500),
             tween: Tween<double>(begin: 0, end: 1),
             builder: (context, double value, child) {
-              final displayName = user?.displayName ?? 'System Administrator';
+              final displayName = user?.displayName ?? 'Sinh viên';
               final visibleLength = (displayName.length * value).round();
               return Column(
                 children: [
@@ -280,7 +280,7 @@ class _StudentProfileState extends State<StudentProfile>
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'System Administrator',
+                            'Sinh viên',
                             style: TextStyle(
                               color: theme.colorScheme.primary,
                               fontWeight: FontWeight.w600,
@@ -298,7 +298,7 @@ class _StudentProfileState extends State<StudentProfile>
 
           const SizedBox(height: 12),
           Text(
-            user?.email ?? 'admin@attendify.com',
+            user?.email,
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurface.withOpacity(0.7),
             ),
