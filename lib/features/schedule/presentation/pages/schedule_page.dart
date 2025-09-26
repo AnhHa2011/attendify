@@ -185,8 +185,10 @@ class _AppBarTitle extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
-  Widget build(BuildContext context) =>
-      AppBar(title: const Text('Thời khoá biểu'));
+  Widget build(BuildContext context) => AppBar(
+    automaticallyImplyLeading: false,
+    title: const Text('Thời khoá biểu'),
+  );
 }
 
 /// Header gọn cho mobile: prev / label / next / hôm nay (icon) / dropdown (Ngày–Tuần–Tháng)

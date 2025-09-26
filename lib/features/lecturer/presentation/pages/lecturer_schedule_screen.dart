@@ -146,7 +146,6 @@ class _LecturerScheduleScreenState extends State<LecturerScheduleScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Thời khóa biểu'),
-        automaticallyImplyLeading: false,
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         actions: [
           IconButton(
