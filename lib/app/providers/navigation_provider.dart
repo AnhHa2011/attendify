@@ -2,32 +2,32 @@ import 'package:flutter/material.dart';
 
 enum NavigationLevel {
   main, // Level 1: Tổng quan, Lớp học, Tài khoản
-  classContext, // Level 2: Buổi học, QR điểm danh, Xin nghỉ (cho 1 lớp cụ thể)
+  courseContext, // Level 2: Buổi học, QR điểm danh, Xin nghỉ (cho 1 lớp cụ thể)
 }
 
 class NavigationState {
   final NavigationLevel level;
-  final String? selectedClassId;
-  final String? selectedClassName;
+  final String? selectedcourseCode;
+  final String? selectedCourseName;
   final int currentIndex;
 
   const NavigationState({
     required this.level,
-    this.selectedClassId,
-    this.selectedClassName,
+    this.selectedcourseCode,
+    this.selectedCourseName,
     this.currentIndex = 0,
   });
 
   NavigationState copyWith({
     NavigationLevel? level,
-    String? selectedClassId,
-    String? selectedClassName,
+    String? selectedcourseCode,
+    String? selectedCourseName,
     int? currentIndex,
   }) {
     return NavigationState(
       level: level ?? this.level,
-      selectedClassId: selectedClassId ?? this.selectedClassId,
-      selectedClassName: selectedClassName ?? this.selectedClassName,
+      selectedcourseCode: selectedcourseCode ?? this.selectedcourseCode,
+      selectedCourseName: selectedCourseName ?? this.selectedCourseName,
       currentIndex: currentIndex ?? this.currentIndex,
     );
   }
@@ -38,8 +38,8 @@ class NavigationProvider extends ChangeNotifier {
 
   NavigationState get state => _state;
   NavigationLevel get currentLevel => _state.level;
-  String? get selectedClassId => _state.selectedClassId;
-  String? get selectedClassName => _state.selectedClassName;
+  String? get selectedcourseCode => _state.selectedcourseCode;
+  String? get selectedCourseName => _state.selectedCourseName;
   int get currentIndex => _state.currentIndex;
 
   // Navigate to main level (Level 1)
@@ -48,16 +48,16 @@ class NavigationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Navigate to class context level (Level 2)
-  void navigateToClassContext({
-    required String classId,
-    required String className,
+  // Navigate to course context level (Level 2)
+  void navigateToCourseContext({
+    required String courseCode,
+    required String courseName,
     int index = 0,
   }) {
     _state = NavigationState(
-      level: NavigationLevel.classContext,
-      selectedClassId: classId,
-      selectedClassName: className,
+      level: NavigationLevel.courseContext,
+      selectedcourseCode: courseCode,
+      selectedCourseName: courseName,
       currentIndex: index,
     );
     notifyListeners();

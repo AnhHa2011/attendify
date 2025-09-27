@@ -1,12 +1,13 @@
-// lib/presentation/pages/admin/course_management_page.dart
+// lib/features/admin/presentation/pages/course_management_page.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../../common/data/models/course_model.dart';
+import '../../../../../core/data/models/course_model.dart';
 import '../../../data/services/admin_service.dart';
-import 'admin_course_detail_page.dart';
+import 'course_bulk_import_page.dart';
+import 'course_enrollments_bulk_import_page.dart';
 import 'course_form_page.dart';
-import 'course_import_page.dart';
+import 'admin_course_detail_page.dart';
 
 class CourseManagementPage extends StatefulWidget {
   const CourseManagementPage({super.key});
@@ -22,11 +23,9 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text;
-      });
-    });
+    _searchController.addListener(
+      () => setState(() => _searchQuery = _searchController.text),
+    );
   }
 
   @override
@@ -45,7 +44,7 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
         title: TextField(
           controller: _searchController,
           decoration: InputDecoration(
-            hintText: 'Tìm kiếm theo tên hoặc mã môn...',
+            hintText: 'Tìm theo tên môn, mã môn, GV...', // Cập nhật hint text
             prefixIcon: const Icon(Icons.search),
             border: const OutlineInputBorder(
               borderRadius: BorderRadius.all(Radius.circular(30)),
@@ -67,9 +66,16 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
               context,
             ).push(MaterialPageRoute(builder: (_) => const CourseFormPage()));
           } else if (value == 'bulk') {
-            Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const CourseImportPage()));
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CourseBulkImportPage()),
+            );
+          } else if (value == 'bulk_enroll') {
+            // <<< TÍCH HỢP: Xử lý sự kiện cho mục menu mới
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const CourseEnrollmentsBulkImportPage(),
+              ),
+            );
           }
         },
         itemBuilder: (context) => const [
@@ -84,7 +90,15 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
             value: 'bulk',
             child: ListTile(
               leading: Icon(Icons.upload_file),
-              title: Text('Thêm danh sách môn học từ file'),
+              title: Text('Thêm môn học từ file'),
+            ),
+          ),
+          // <<< TÍCH HỢP: Thêm mục menu để import nhiều môn học
+          PopupMenuItem(
+            value: 'bulk_enroll',
+            child: ListTile(
+              leading: Icon(Icons.upload_file),
+              title: Text('Thêm nhiều môn học từ file'),
             ),
           ),
         ],
@@ -92,120 +106,133 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
           heroTag: 'fab_course_management_page',
           tooltip: 'Thêm môn học',
           onPressed: null,
-          child: const Icon(Icons.add), // Để PopupMenuButton xử lý
+          child: const Icon(Icons.add),
         ),
       ),
-      // Đây chính là phần chịu trách nhiệm lấy và liệt kê danh sách môn học
-      body: StreamBuilder<List<CourseModel>>(
-        // 1. Dùng stream này để LẤY danh sách môn học từ Firebase
-        stream: adminService.getAllCoursesStream(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Đã xảy ra lỗi: ${snapshot.error}'));
-          }
+      body: Column(
+        children: [
+          Expanded(
+            child: StreamBuilder<List<CourseModel>>(
+              stream: adminService.getAllCoursesStream(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Đã xảy ra lỗi: ${snapshot.error}'),
+                  );
+                }
 
-          final allCourses = snapshot.data ?? [];
-          final filteredCourses = allCourses.where((course) {
-            final query = _searchQuery.toLowerCase();
-            return course.courseName.toLowerCase().contains(query) ||
-                course.courseCode.toLowerCase().contains(query);
-          }).toList();
+                final allcourses = snapshot.data ?? [];
+                // CẬP NHẬT LOGIC TÌM KIẾM
+                final filteredcourses = allcourses.where((c) {
+                  final query = _searchQuery.toLowerCase();
+                  return c.courseName.toLowerCase().contains(query) ||
+                      c.courseCode.toLowerCase().contains(query) ||
+                      (c.lecturerId?.toLowerCase() ?? '').contains(query) ||
+                      (c.semester ?? '').toLowerCase().contains(query);
+                }).toList();
 
-          // === PHẦN BỊ THIẾU ĐÃ ĐƯỢC HOÀN THIỆN ===
-          if (filteredCourses.isEmpty) {
-            // Hiển thị thông báo tùy theo việc có đang tìm kiếm hay không
-            return Center(
-              child: Text(
-                _searchQuery.isNotEmpty
-                    ? 'Không tìm thấy môn học nào.'
-                    : 'Chưa có môn học nào.\nNhấn nút + để thêm mới.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-            );
-          }
+                if (filteredcourses.isEmpty) {
+                  return Center(
+                    child: Text(
+                      _searchQuery.isNotEmpty
+                          ? 'Không tìm thấy môn học nào.'
+                          : 'Chưa có môn học nào.\nNhấn nút + để thêm mới.',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 80),
+                  itemCount: filteredcourses.length,
+                  itemBuilder: (context, index) {
+                    final courseInfo = filteredcourses[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          child: Icon(Icons.class_outlined),
+                        ),
 
-          // 2. Dùng ListView.builder để HIỂN THỊ (liệt kê) danh sách đã lấy được
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 80),
-            itemCount: filteredCourses.length,
-            itemBuilder: (context, index) {
-              final course = filteredCourses[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                elevation: 2,
-                child: ListTile(
-                  leading: const CircleAvatar(
-                    child: Icon(Icons.school_outlined),
-                  ),
-                  title: Text(
-                    course.courseName,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    '${course.courseCode} - ${course.credits} tín chỉ',
-                  ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            AdminCourseDetailPage(courseId: course.id),
-                      ),
-                    );
-                  },
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        onPressed: () {
+                        // === THAY ĐỔI HIỂN THỊ CHÍNH ===
+                        title: Text(
+                          '${courseInfo.courseCode} - ${courseInfo.courseName}',
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Dùng widget helper để hiển thị danh sách môn học
+                            Text(
+                              'GV: ${courseInfo.lecturerId ?? '...'} | HK: ${courseInfo.semester}',
+                            ),
+                          ],
+                        ),
+                        isThreeLine: true, // Cho phép subtitle có 3 dòng
+
+                        onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  CourseFormPage(course: course),
+                              builder: (_) => AdminCourseDetailPage(
+                                courseCode: courseInfo.id,
+                              ),
                             ),
                           );
                         },
-                        tooltip: 'Chỉnh sửa',
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.archive_outlined,
-                          color: Colors.orange,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      CourseFormPage(courseModel: courseInfo),
+                                ),
+                              ),
+                              tooltip: 'Chỉnh sửa',
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.archive_outlined,
+                                color: Colors.orange,
+                              ),
+                              onPressed: () => _archiveCourse(
+                                context,
+                                adminService,
+                                courseInfo,
+                              ),
+                              tooltip: 'Lưu trữ',
+                            ),
+                          ],
                         ),
-                        onPressed: () =>
-                            _archiveCourse(context, adminService, course),
-                        tooltip: 'Lưu trữ',
                       ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // Hàm xử lý việc lưu trữ môn học
   void _archiveCourse(
     BuildContext context,
-    AdminService adminService,
-    CourseModel course,
+    AdminService service,
+    CourseModel courseInfo,
   ) async {
-    // ... (logic của hàm này đã đúng, không cần thay đổi)
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Xác nhận lưu trữ'),
+        // Cập nhật lại nội dung dialog
         content: Text(
-          'Môn học "${course.courseName}" sẽ được ẩn đi. Bạn có chắc chắn?',
+          'môn học "${courseInfo.courseName}" sẽ bị ẩn đi. Bạn có chắc chắn?',
         ),
         actions: [
           TextButton(
@@ -223,22 +250,70 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
       ),
     );
 
-    if (confirm == true) {
+    if (confirm == true && mounted) {
       try {
-        await adminService.archiveCourse(course.id);
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đã lưu trữ môn học thành công.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        await service.archiveCourse(courseInfo.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã lưu trữ môn học thành công.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } catch (e) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
     }
+  }
+}
+
+// === WIDGET HELPER ĐẶT TẠI ĐÂY CHO TIỆN LỢI ===
+class _CourseCourseInfo extends StatelessWidget {
+  final List<String> courseCodes;
+  const _CourseCourseInfo({required this.courseCodes});
+
+  @override
+  Widget build(BuildContext context) {
+    if (courseCodes.isEmpty) {
+      return const Text(
+        'Chưa có môn học',
+        style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+      );
+    }
+
+    // Sử dụng FutureBuilder để lấy thông tin chi tiết của các môn học từ ID
+    return FutureBuilder<List<CourseModel>>(
+      // Gọi hàm mới trong service mà chúng ta sẽ thêm vào
+      future: context.read<AdminService>().getCoursesByIds(courseCodes),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 16,
+            width: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          );
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Text(
+            'Lỗi tải môn học',
+            style: TextStyle(color: Colors.red),
+          );
+        }
+
+        // Ghép mã các môn học lại thành một chuỗi để hiển thị
+        final courseText = snapshot.data!.map((c) => c.courseCode).join(' | ');
+        return Text(
+          courseText,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: Theme.of(context).colorScheme.primary),
+        );
+      },
+    );
   }
 }

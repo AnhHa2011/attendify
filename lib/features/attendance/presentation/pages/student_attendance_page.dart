@@ -4,11 +4,11 @@ import 'package:attendify/features/attendance/domain/attendance_stats.dart';
 import '../../domain/attendance_stats.dart';
 
 class StudentAttendancePage extends StatefulWidget {
-  final String classId;
+  final String classCode;
   final String className;
   const StudentAttendancePage({
     super.key,
-    required this.classId,
+    required this.classCode,
     required this.className,
   });
 
@@ -36,7 +36,7 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
     });
     try {
       final data = await _ds.historyForStudent(
-        classId: widget.classId,
+        classCode: widget.classCode,
         studentId: _ds.currentUid, // dùng uid hiện tại từ DS
       );
       setState(() => _history = data);

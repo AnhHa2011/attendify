@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../app/providers/auth_provider.dart';
-import '../../../common/presentation/layouts/role_layout.dart';
+import '../../../../core/presentation/layouts/role_layout.dart';
 import 'admin_dashboard.dart';
 import 'user_management/user_management_page.dart';
-import 'course_management/course_management_page.dart';
 import 'class_management/class_management_page.dart';
+import 'course_management/course_management_page.dart';
 import 'admin_profile.dart';
 import '../../presentation/pages/leave_request_management_page.dart';
 

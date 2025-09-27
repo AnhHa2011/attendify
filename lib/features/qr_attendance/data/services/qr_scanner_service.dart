@@ -1,10 +1,6 @@
 import 'dart:convert';
 
-enum QRType {
-  attendance,
-  joinClass,
-  unknown,
-}
+enum QRType { attendance, joinClass, unknown }
 
 class QRScanResult {
   final bool isValid;
@@ -20,10 +16,10 @@ class QRScanResult {
   });
 
   QRScanResult.error(String errorMessage)
-      : isValid = false,
-        type = QRType.unknown,
-        data = {},
-        error = errorMessage;
+    : isValid = false,
+      type = QRType.unknown,
+      data = {},
+      error = errorMessage;
 }
 
 class QRScannerService {
@@ -75,8 +71,8 @@ class QRScannerService {
 
   /// Validate attendance QR code
   static QRScanResult _validateAttendanceQR(Map<String, String> params) {
-    final requiredFields = ['classId', 'sessionId', 'timestamp', 'signature'];
-    
+    final requiredFields = ['classCode', 'sessionId', 'timestamp', 'signature'];
+
     for (final field in requiredFields) {
       if (!params.containsKey(field) || params[field]!.isEmpty) {
         return QRScanResult.error('Missing required field: $field');
@@ -98,12 +94,12 @@ class QRScannerService {
     }
 
     // TODO: Validate signature in production
-    
+
     return QRScanResult(
       isValid: true,
       type: QRType.attendance,
       data: {
-        'classId': params['classId']!,
+        'classCode': params['classCode']!,
         'sessionId': params['sessionId']!,
         'timestamp': timestamp,
         'signature': params['signature']!,
@@ -113,8 +109,13 @@ class QRScannerService {
 
   /// Validate join class QR code
   static QRScanResult _validateJoinClassQR(Map<String, String> params) {
-    final requiredFields = ['classId', 'courseCode', 'validUntil', 'signature'];
-    
+    final requiredFields = [
+      'classCode',
+      'courseCode',
+      'validUntil',
+      'signature',
+    ];
+
     for (final field in requiredFields) {
       if (!params.containsKey(field) || params[field]!.isEmpty) {
         return QRScanResult.error('Missing required field: $field');
@@ -134,12 +135,12 @@ class QRScannerService {
     }
 
     // TODO: Validate signature in production
-    
+
     return QRScanResult(
       isValid: true,
       type: QRType.joinClass,
       data: {
-        'classId': params['classId']!,
+        'classCode': params['classCode']!,
         'courseCode': params['courseCode']!,
         'validUntil': validUntil,
         'signature': params['signature']!,
@@ -152,8 +153,8 @@ class QRScannerService {
     try {
       if (!qrData.startsWith('attendify://')) return false;
       final uri = Uri.parse(qrData);
-      return uri.host == 'attendance' || 
-             uri.queryParameters['type'] == 'attendance';
+      return uri.host == 'attendance' ||
+          uri.queryParameters['type'] == 'attendance';
     } catch (e) {
       return false;
     }
@@ -164,8 +165,7 @@ class QRScannerService {
     try {
       if (!qrData.startsWith('attendify://')) return false;
       final uri = Uri.parse(qrData);
-      return uri.host == 'join' || 
-             uri.queryParameters['type'] == 'join_class';
+      return uri.host == 'join' || uri.queryParameters['type'] == 'join_class';
     } catch (e) {
       return false;
     }

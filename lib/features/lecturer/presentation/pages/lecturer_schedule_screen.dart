@@ -146,6 +146,7 @@ class _LecturerScheduleScreenState extends State<LecturerScheduleScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Thời khóa biểu'),
+        automaticallyImplyLeading: false,
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         actions: [
           IconButton(
@@ -191,22 +192,6 @@ class _LecturerScheduleScreenState extends State<LecturerScheduleScreen>
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SessionCreate(selectedDate: _selectedDate),
-            ),
-          );
-
-          if (result == true) {
-            _loadSessions();
-          }
-        },
-        child: const Icon(Icons.add),
-        tooltip: 'Tạo buổi học mới',
-      ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : error != null
@@ -216,15 +201,15 @@ class _LecturerScheduleScreenState extends State<LecturerScheduleScreen>
               children: [
                 _buildSessionsList(
                   _todaySessions,
-                  'Không có lớp học nào hôm nay',
+                  'Không có môn học nào hôm nay',
                 ),
                 _buildSessionsList(
                   _thisWeekSessions,
-                  'Không có lớp học nào trong tuần',
+                  'Không có môn học nào trong tuần',
                 ),
                 _buildSessionsList(
                   _upcomingSessions,
-                  'Không có lớp học nào sắp tới',
+                  'Không có môn học nào sắp tới',
                 ),
               ],
             ),
@@ -275,13 +260,6 @@ class _LecturerScheduleScreenState extends State<LecturerScheduleScreen>
             ),
             const SizedBox(height: 16),
             Text(emptyMessage, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              'Nhấn nút + để tạo buổi học mới',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
-              ),
-            ),
           ],
         ),
       );

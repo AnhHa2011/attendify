@@ -2,9 +2,8 @@
 
 class StudentSessionDetail {
   final String sessionId;
-  final String classId;
-  final String className;
   final String classCode;
+  final String className;
   final String courseNames;
   final String lecturerName;
   final DateTime startTime;
@@ -16,9 +15,8 @@ class StudentSessionDetail {
 
   const StudentSessionDetail({
     required this.sessionId,
-    required this.classId,
-    required this.className,
     required this.classCode,
+    required this.className,
     required this.courseNames,
     required this.lecturerName,
     required this.startTime,
@@ -32,7 +30,7 @@ class StudentSessionDetail {
   bool get isPresent => attendanceStatus == 'present';
   bool get isAbsent => attendanceStatus == 'absent';
   bool get hasLeaveApproved => attendanceStatus == 'leave_approved';
-  
+
   String get statusText {
     switch (attendanceStatus) {
       case 'present':
@@ -49,9 +47,8 @@ class StudentSessionDetail {
   factory StudentSessionDetail.fromMap(Map<String, dynamic> map) {
     return StudentSessionDetail(
       sessionId: map['sessionId'] ?? '',
-      classId: map['classId'] ?? '',
-      className: map['className'] ?? '',
       classCode: map['classCode'] ?? '',
+      className: map['className'] ?? '',
       courseNames: map['courseNames'] ?? '',
       lecturerName: map['lecturerName'] ?? '',
       startTime: (map['startTime'] as DateTime?) ?? DateTime.now(),
@@ -66,9 +63,8 @@ class StudentSessionDetail {
   Map<String, dynamic> toMap() {
     return {
       'sessionId': sessionId,
-      'classId': classId,
-      'className': className,
       'classCode': classCode,
+      'className': className,
       'courseNames': courseNames,
       'lecturerName': lecturerName,
       'startTime': startTime,

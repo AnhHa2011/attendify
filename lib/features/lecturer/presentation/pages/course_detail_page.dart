@@ -7,9 +7,9 @@ import 'session_create_screen.dart';
 import 'attendance_detail_screen.dart';
 
 class CourseDetail extends StatefulWidget {
-  final String courseId;
+  final String courseCode;
 
-  const CourseDetail({Key? key, required this.courseId}) : super(key: key);
+  const CourseDetail({Key? key, required this.courseCode}) : super(key: key);
 
   @override
   State<CourseDetail> createState() => _CourseDetailState();
@@ -53,7 +53,7 @@ class _CourseDetailState extends State<CourseDetail>
 
       setState(() {
         courseDetails = {
-          'id': widget.courseId,
+          'id': widget.courseCode,
           'name': 'Lập trình Flutter',
           'code': 'CS101',
           'description':
@@ -95,7 +95,9 @@ class _CourseDetailState extends State<CourseDetail>
       });
 
       // Load real sessions
-      _lecturerService.getCourseSessions(widget.courseId).listen((sessionList) {
+      _lecturerService.getCourseSessions(widget.courseCode).listen((
+        sessionList,
+      ) {
         if (mounted) {
           setState(() {
             sessions = sessionList;
@@ -145,7 +147,8 @@ class _CourseDetailState extends State<CourseDetail>
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => SessionCreate(courseId: widget.courseId),
+              builder: (context) =>
+                  SessionCreate(courseCode: widget.courseCode),
             ),
           );
         },

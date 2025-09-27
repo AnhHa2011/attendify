@@ -5,14 +5,14 @@ import 'dart:async';
 import '../../data/services/qr_generator_service.dart';
 
 class QRGeneratorPage extends StatefulWidget {
-  final String classId;
+  final String classCode;
   final String sessionId;
   final String className;
   final VoidCallback? onClose;
 
   const QRGeneratorPage({
     super.key,
-    required this.classId,
+    required this.classCode,
     required this.sessionId,
     required this.className,
     this.onClose,
@@ -43,7 +43,7 @@ class _QRGeneratorPageState extends State<QRGeneratorPage> {
   void _generateInitialQR() {
     setState(() {
       _qrData = QRGeneratorService.generateDynamicAttendanceQR(
-        classId: widget.classId,
+        classCode: widget.classCode,
         sessionId: widget.sessionId,
       );
       _lastUpdate = DateTime.now();
@@ -60,7 +60,7 @@ class _QRGeneratorPageState extends State<QRGeneratorPage> {
       if (mounted) {
         setState(() {
           _qrData = QRGeneratorService.generateDynamicAttendanceQR(
-            classId: widget.classId,
+            classCode: widget.classCode,
             sessionId: widget.sessionId,
           );
           _lastUpdate = DateTime.now();

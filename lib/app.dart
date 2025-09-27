@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'app/providers/auth_provider.dart';
+import 'core/data/models/user_model.dart';
 import 'routing/route_generator.dart';
 import 'routing/app_routes.dart';
-import 'features/common/data/models/user_model.dart';
 
 class AttendifyApp extends StatelessWidget {
   const AttendifyApp({super.key});

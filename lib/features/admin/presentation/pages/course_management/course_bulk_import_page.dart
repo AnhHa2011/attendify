@@ -5,30 +5,40 @@ import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../common/data/models/course_model.dart';
-import '../../../../common/utils/template_downloader.dart';
+import '../../../../../core/data/models/course_model.dart';
+import '../../../../../core/data/models/user_model.dart';
+import '../../../../../core/utils/template_downloader.dart';
 import '../../../data/services/admin_service.dart';
-// NOTE: Sửa đường dẫn import dưới đây cho đúng với project bạn:
-// - Nếu CourseModel nằm ở lib/common/models: dùng dòng đầu, còn nếu ở lib/data/models: dùng dòng thứ hai
-// import '../../../data/models/course_model.dart';
 
-const _expectedHeaders = ['courseCode', 'courseName', 'credits'];
+const _expectedHeaders = [
+  'courseCode',
+  'lecturerEmail',
+  'semester',
+  'courseName',
+];
 
-class _RowState {
+class _CourseRow {
   final int rowIndex;
   String courseCode;
+  String lecturerEmail;
+  String semester;
   String courseName;
-  int credits;
-  String? matchedCourseId; // nếu đã khớp course hiện có
-  bool createNew; // nếu không khớp và muốn tạo mới
+
+  String? lecturerId; // user đã chọn trong dropdown
+
+  bool createCourse = false; // nếu chưa có course → tạo mới
+  bool createLecturer = false; // nếu chưa có giảng viên → tạo mới
+
   String? error;
 
-  _RowState({
+  _CourseRow({
     required this.rowIndex,
     required this.courseCode,
+    required this.lecturerEmail,
+    required this.semester,
     required this.courseName,
-    required this.credits,
-    this.createNew = false,
+    this.createCourse = false,
+    this.createLecturer = false,
   });
 }
 
@@ -40,10 +50,46 @@ class CourseBulkImportPage extends StatefulWidget {
 }
 
 class _CourseBulkImportPageState extends State<CourseBulkImportPage> {
-  List<_RowState> _rows = [];
+  List<_CourseRow> _rows = [];
   String? _fileName;
   bool _submitting = false;
   String? _message;
+  bool _allValid = false;
+
+  bool _rowValid(_CourseRow r) {
+    // yêu cầu: course đã chọn hoặc chọn "tạo mới", lecturer đã chọn hoặc tạo mới,
+    // semester & courseName không rỗng
+    final okCourse = (r.courseCode != null) || r.createCourse;
+    final okLecturer = (r.lecturerId != null) || r.createLecturer;
+    final okSemester = r.semester.trim().isNotEmpty;
+    final okName = r.courseName.trim().isNotEmpty;
+
+    r.error = null;
+    if (!okCourse) r.error = 'Chưa chọn Course (hoặc tạo mới).';
+    if (!okLecturer) {
+      r.error = (r.error == null)
+          ? 'Chưa chọn Giảng viên (hoặc tạo mới).'
+          : '${r.error} Chưa chọn Giảng viên (hoặc tạo mới).';
+    }
+    if (!okSemester) {
+      r.error = (r.error == null)
+          ? 'Thiếu Semester.'
+          : '${r.error} Thiếu Semester.';
+    }
+    if (!okName) {
+      r.error = (r.error == null)
+          ? 'Thiếu tên môn.'
+          : '${r.error} Thiếu tên môn.';
+    }
+    return r.error == null;
+  }
+
+  void _recomputeValidity() {
+    for (final r in _rows) {
+      _rowValid(r); // set r.error
+    }
+    _allValid = _rows.isNotEmpty && _rows.every(_rowValid);
+  }
 
   Future<void> _pickFile() async {
     setState(() {
@@ -63,7 +109,7 @@ class _CourseBulkImportPageState extends State<CourseBulkImportPage> {
     final name = res.files.single.name;
 
     try {
-      final rows = await _parseCoursesXlsx(bytes);
+      final rows = await _parsecoursesXlsx(bytes);
       setState(() {
         _rows = rows;
         _fileName = name;
@@ -75,12 +121,11 @@ class _CourseBulkImportPageState extends State<CourseBulkImportPage> {
     }
   }
 
-  Future<List<_RowState>> _parseCoursesXlsx(Uint8List bytes) async {
+  Future<List<_CourseRow>> _parsecoursesXlsx(Uint8List bytes) async {
     final excel = Excel.decodeBytes(bytes);
-    if (excel.tables.isEmpty) {
-      throw Exception('File không có sheet nào.');
-    }
-    // Ưu tiên sheet tên Courses/Course, nếu không có dùng sheet đầu
+    if (excel.tables.isEmpty) throw Exception('File không có sheet nào.');
+
+    // Ưu tiên sheet courses/Course
     Sheet? tb = excel.tables.values.first;
     for (final key in excel.tables.keys) {
       final lk = key.toLowerCase().trim();
@@ -101,7 +146,7 @@ class _CourseBulkImportPageState extends State<CourseBulkImportPage> {
       }
     }
 
-    final out = <_RowState>[];
+    final out = <_CourseRow>[];
     for (var i = 1; i < tb.rows.length; i++) {
       final row = tb.rows[i];
       if (row.every((c) => (c?.value?.toString().trim() ?? '').isEmpty)) {
@@ -115,66 +160,233 @@ class _CourseBulkImportPageState extends State<CourseBulkImportPage> {
         if (key.isNotEmpty) map[key] = val;
       }
 
-      final code = (map['courseCode'] ?? '').toString().trim();
-      final name = (map['courseName'] ?? '').toString().trim();
-      final creditsStr = (map['credits'] ?? '').toString().trim();
-      final credits = int.tryParse(creditsStr);
+      final courseCode = (map['courseCode'] ?? '').toString().trim();
+      final lecturerEmail = (map['lecturerEmail'] ?? '').toString().trim();
+      final semester = (map['semester'] ?? '').toString().trim();
+      final courseName = (map['courseName'] ?? '').toString().trim();
 
-      if (code.isEmpty || name.isEmpty || credits == null) continue;
+      if (courseCode.isEmpty || lecturerEmail.isEmpty || semester.isEmpty) {
+        continue;
+      }
 
       out.add(
-        _RowState(
+        _CourseRow(
           rowIndex: i,
-          courseCode: code,
-          courseName: name,
-          credits: credits,
+          courseCode: courseCode,
+          lecturerEmail: lecturerEmail,
+          semester: semester,
+          courseName: courseName,
         ),
       );
     }
     return out;
   }
 
-  Future<void> _submit(List<CourseModel> allCourses) async {
+  Future<void> _createCourseDialog(_CourseRow r) async {
+    final codeCtrl = TextEditingController(text: r.courseCode);
+    final nameCtrl = TextEditingController();
+    final creditsCtrl = TextEditingController(text: '3');
+    final formKey = GlobalKey<FormState>();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Tạo môn học mới'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: codeCtrl,
+                decoration: const InputDecoration(labelText: 'courseCode'),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Bắt buộc' : null,
+              ),
+              TextFormField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'courseName'),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Bắt buộc' : null,
+              ),
+              TextFormField(
+                controller: creditsCtrl,
+                decoration: const InputDecoration(labelText: 'credits'),
+                keyboardType: TextInputType.number,
+                validator: (v) =>
+                    int.tryParse(v ?? '') == null ? 'Nhập số' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(context, true);
+              }
+            },
+            child: const Text('Tạo'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      final admin = context.read<AdminService>();
+      await admin.createCourse(
+        courseCode: codeCtrl.text.trim(),
+        courseName: nameCtrl.text.trim(),
+        lecturerId: '',
+        semester: '',
+        joinCode: '',
+        credits: null,
+        description: '',
+        totalStudents: null,
+        minStudents: null,
+        maxStudents: null,
+        startDate: null,
+        endDate: null,
+      );
+      setState(() {
+        r.courseCode = codeCtrl.text.trim();
+        r.createCourse = false;
+      });
+    }
+  }
+
+  Future<void> _createLecturerDialog(_CourseRow r) async {
+    final emailCtrl = TextEditingController(text: r.lecturerEmail);
+    final nameCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Tạo giảng viên mới'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: emailCtrl,
+                decoration: const InputDecoration(labelText: 'email'),
+                validator: (v) => (v == null || !v.contains('@'))
+                    ? 'Email không hợp lệ'
+                    : null,
+              ),
+              TextFormField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'displayName'),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Bắt buộc' : null,
+              ),
+              TextFormField(
+                controller: passCtrl,
+                decoration: const InputDecoration(labelText: 'mật khẩu tạm'),
+                obscureText: true,
+                validator: (v) =>
+                    (v == null || v.length < 6) ? '≥ 6 ký tự' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(context, true);
+              }
+            },
+            child: const Text('Tạo'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      final admin = context.read<AdminService>();
+      await admin.createNewUser(
+        email: emailCtrl.text.trim(),
+        password: passCtrl.text.trim(),
+        displayName: nameCtrl.text.trim(),
+        role: UserRole.lecture, // theo code hiện có: 'lecture'
+      );
+      setState(() {
+        r.lecturerEmail = emailCtrl.text.trim();
+        r.createLecturer = false;
+      });
+    }
+  }
+
+  Future<void> _submit(
+    List<CourseModel> allCourses,
+    List<UserModel> lecturers,
+  ) async {
     if (_rows.isEmpty) return;
 
-    // Kiểm tra: mỗi dòng phải chọn khớp hoặc bật Tạo mới
     for (final r in _rows) {
       r.error = null;
-      final ok = (r.matchedCourseId != null) || r.createNew;
-      if (!ok) r.error = 'Chưa chọn course hoặc đánh dấu "Tạo mới".';
+      final okCourse = (r.courseCode != null) || (!r.createCourse);
+      final okLecturer = (r.lecturerId != null) || (!r.createLecturer);
+      if (!okCourse || !okLecturer) {
+        r.error = 'Chưa chọn Course/User hoặc tạo mới.';
+      }
     }
     setState(() {});
     if (_rows.any((e) => e.error != null)) return;
+
+    // Chuẩn hóa lại courseCode / lecturerEmail theo lựa chọn dropdown (để backend map chính xác)
+    for (final r in _rows) {
+      if (r.courseCode != null) {
+        final ci = allCourses.indexWhere(
+          (e) => e.id == r.courseCode,
+        ); // nếu model của bạn dùng field khác, đổi 'id' cho đúng
+        if (ci != -1) {
+          r.courseCode = allCourses[ci].courseCode;
+        }
+      }
+      if (r.lecturerId != null) {
+        final ui = lecturers.indexWhere(
+          (e) => e.uid == r.lecturerId,
+        ); // nếu model của bạn dùng field khác, đổi 'uid' cho đúng
+        if (ui != -1) {
+          r.lecturerEmail = lecturers[ui].email;
+        }
+      }
+    }
 
     setState(() {
       _submitting = true;
       _message = null;
     });
-    final admin = context.read<AdminService>();
-
     try {
-      int created = 0, updated = 0;
+      final admin = context.read<AdminService>();
+      // Tận dụng createcoursesFromList có sẵn trong AdminService
+      final payload = _rows
+          .map(
+            (r) => {
+              'courseCode': r.courseCode,
+              'lecturerEmail': r.lecturerEmail,
+              'semester': r.semester,
+              'courseName': r.courseName,
+            },
+          )
+          .toList();
 
-      for (final r in _rows) {
-        if (r.createNew) {
-          await admin.createCourse(
-            courseCode: r.courseCode,
-            courseName: r.courseName,
-            credits: r.credits,
-          );
-          created++;
-        } else if (r.matchedCourseId != null) {
-          await admin.updateCourse(
-            courseId: r.matchedCourseId!,
-            courseCode: r.courseCode,
-            courseName: r.courseName,
-            credits: r.credits,
-          );
-          updated++;
-        }
-      }
+      await admin.createcoursesFromList(payload);
       setState(() {
-        _message = 'Tạo mới: $created • Cập nhật: $updated';
+        _message = 'Tạo môn học thành công.';
       });
     } catch (e) {
       setState(() {
@@ -189,146 +401,190 @@ class _CourseBulkImportPageState extends State<CourseBulkImportPage> {
 
   @override
   Widget build(BuildContext context) {
+    final admin = context.read<AdminService>();
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Nhập môn học từ Excel')),
+      appBar: AppBar(title: const Text('Thêm môn học từ Excel')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: StreamBuilder<List<CourseModel>>(
-          stream: context.read<AdminService>().getAllCoursesStream(),
-          builder: (context, snapshot) {
-            final all = snapshot.data ?? [];
+          stream: admin.getAllCoursesStream(),
+          builder: (_, courseSnap) {
+            final courses = courseSnap.data ?? [];
 
-            // Auto-match theo courseCode
+            // Auto-match course theo courseCode
             for (final r in _rows) {
-              if (r.matchedCourseId == null) {
-                final idx = all.indexWhere(
+              if (r.courseCode == null) {
+                final i = courses.indexWhere(
                   (c) =>
                       c.courseCode.toUpperCase().trim() ==
                       r.courseCode.toUpperCase().trim(),
                 );
-                if (idx >= 0) r.matchedCourseId = all[idx].id;
+                if (i >= 0) r.courseCode = courses[i].id;
               }
             }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.download_outlined),
-                  label: const Text('Tải template môn học (.xlsx)'),
-                  onPressed: () => TemplateDownloader.download('class_enroll'),
-                ),
-                const SizedBox(height: 8),
-                Row(
+
+            return StreamBuilder<List<UserModel>>(
+              stream: admin.getAllLecturersStream(),
+              builder: (_, lecSnap) {
+                final lecturers = lecSnap.data ?? [];
+
+                // Auto-match giảng viên theo email
+                for (final r in _rows) {
+                  if (r.lecturerId == null) {
+                    final i = lecturers.indexWhere(
+                      (u) =>
+                          u.email.toLowerCase().trim() ==
+                          r.lecturerEmail.toLowerCase().trim(),
+                    );
+                    if (i >= 0) r.lecturerId = lecturers[i].uid;
+                  }
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ElevatedButton.icon(
-                      onPressed: _pickFile,
-                      icon: const Icon(Icons.upload_file),
-                      label: const Text('Chọn file .xlsx'),
+                    // ⬇️ Thay vì Text 'Yêu cầu header', đưa 2 nút tải template
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.download_outlined),
+                          label: const Text('Tải template môn (.xlsx)'),
+                          onPressed: () =>
+                              TemplateDownloader.download('course'),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    ElevatedButton.icon(
-                      onPressed: (_rows.isNotEmpty && !_submitting)
-                          ? () => _submit(all)
-                          : null,
-                      icon: const Icon(Icons.cloud_upload_outlined),
-                      label: _submitting
-                          ? const Text('Đang nhập...')
-                          : const Text('Thực hiện'),
+                    const SizedBox(height: 8),
+
+                    Row(
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: _pickFile,
+                          icon: const Icon(Icons.upload_file),
+                          label: const Text('Chọn file .xlsx'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed:
+                              (_rows.isNotEmpty && _allValid && !_submitting)
+                              ? () => _submit(courses, lecturers)
+                              : null,
+                          icon: const Icon(Icons.cloud_upload_outlined),
+                          label: _submitting
+                              ? const Text('Đang nhập...')
+                              : const Text('Thực hiện'),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (_fileName != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'File: $_fileName',
-                    style: const TextStyle(fontStyle: FontStyle.italic),
-                  ),
-                ],
-                if (_message != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _message!,
-                    style: TextStyle(
-                      color: _message!.startsWith('Lỗi')
-                          ? Colors.red
-                          : Colors.green,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Expanded(
-                  child: _rows.isEmpty
-                      ? const Center(child: Text('Chưa có dữ liệu xem trước'))
-                      : ListView.separated(
-                          itemCount: _rows.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (_, i) {
-                            final r = _rows[i];
-                            return ListTile(
-                              leading: const Icon(Icons.menu_book_outlined),
-                              title: Text(
-                                '${r.rowIndex}. ${r.courseCode} — ${r.courseName}',
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
+                    if (_fileName != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'File: $_fileName',
+                        style: const TextStyle(fontStyle: FontStyle.italic),
+                      ),
+                    ],
+                    if (_message != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _message!,
+                        style: TextStyle(
+                          color: _message!.startsWith('Lỗi')
+                              ? Colors.red
+                              : Colors.green,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: _rows.isEmpty
+                          ? const Center(
+                              child: Text('Chưa có dữ liệu xem trước'),
+                            )
+                          : ListView.separated(
+                              itemCount: _rows.length,
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (_, i) {
+                                final r = _rows[i];
+                                return ListTile(
+                                  leading: const Icon(Icons.school_outlined),
+                                  title: Text(
+                                    '${r.rowIndex}. ${r.courseName} — ${r.semester}',
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      const Text('Khớp với: '),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: DropdownButtonFormField<String?>(
-                                          initialValue: r.matchedCourseId,
-                                          isExpanded: true,
-                                          items: <DropdownMenuItem<String?>>[
-                                            const DropdownMenuItem<String?>(
-                                              value: null,
-                                              child: Text('— Chưa chọn —'),
-                                            ),
-                                            ...all.map(
-                                              (c) => DropdownMenuItem<String?>(
-                                                value: c.id,
-                                                child: Text(
-                                                  '${c.courseCode} — ${c.courseName}',
+                                      // Resolver: LECTURER
+                                      Row(
+                                        children: [
+                                          const Text('Giảng viên: '),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: DropdownButtonFormField<String?>(
+                                              initialValue: r.lecturerId,
+                                              isExpanded: true,
+                                              items: <DropdownMenuItem<String?>>[
+                                                const DropdownMenuItem<String?>(
+                                                  value: null,
+                                                  child: Text('— Chưa chọn —'),
                                                 ),
-                                              ),
+                                                ...lecturers.map(
+                                                  (
+                                                    u,
+                                                  ) => DropdownMenuItem<String?>(
+                                                    value: u.uid,
+                                                    child: Text(
+                                                      '${u.displayName} — ${u.email}',
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                              onChanged: (val) {
+                                                setState(() {
+                                                  r.lecturerId = val;
+                                                  r.createLecturer = false;
+                                                });
+                                              },
                                             ),
-                                          ],
-                                          onChanged: (val) {
-                                            setState(() {
-                                              r.matchedCourseId = val;
-                                              r.createNew = false;
-                                            });
-                                          },
+                                          ),
+                                          const SizedBox(width: 8),
+                                          FilterChip(
+                                            selected: r.createLecturer,
+                                            label: const Text(
+                                              'Tạo giảng viên mới',
+                                            ),
+                                            onSelected: (v) async {
+                                              if (v) {
+                                                await _createLecturerDialog(r);
+                                              } else {
+                                                setState(
+                                                  () =>
+                                                      r.createLecturer = false,
+                                                );
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                      if (r.error != null)
+                                        Text(
+                                          r.error!,
+                                          style: const TextStyle(
+                                            color: Colors.red,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      FilterChip(
-                                        selected: r.createNew,
-                                        label: const Text('Tạo mới'),
-                                        onSelected: (v) {
-                                          setState(() {
-                                            r.createNew = v;
-                                            if (v) r.matchedCourseId = null;
-                                          });
-                                        },
-                                      ),
                                     ],
                                   ),
-                                  Text('credits: ${r.credits}'),
-                                  if (r.error != null)
-                                    Text(
-                                      r.error!,
-                                      style: const TextStyle(color: Colors.red),
-                                    ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
             );
           },
         ),

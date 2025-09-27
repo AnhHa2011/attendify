@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../common/data/models/user_model.dart';
+import '../../../../../core/data/models/user_model.dart';
 import '../../../data/services/admin_service.dart';
 import 'user_bulk_import_page.dart';
 import 'user_form_page.dart';
@@ -14,7 +14,7 @@ class UserManagementPage extends StatefulWidget {
 class _UserManagementPageState extends State<UserManagementPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  late AdminService adminService;
+  final adminService = AdminService();
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -22,26 +22,16 @@ class _UserManagementPageState extends State<UserManagementPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    adminService = AdminService(); // hoặc từ Provider
-    _searchController.addListener(_onSearchChanged);
-  }
-
-  void _onSearchChanged() {
-    setState(() {
-      _searchQuery = _searchController.text;
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+      });
     });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _searchController.removeListener(_onSearchChanged);
-    _searchController.dispose();
-
-    // Clear cache nếu cần
-    imageCache.clear();
-    imageCache.clearLiveImages();
-
     super.dispose();
   }
 
@@ -132,50 +122,14 @@ class _UserManagementPageState extends State<UserManagementPage>
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-
-        final allUsers = snapshot.data!;
-
-        // ✅ THÊM FILTER LOGIC
-        final filteredUsers = _searchQuery.isEmpty
-            ? allUsers
-            : allUsers.where((user) {
-                final query = _searchQuery.toLowerCase();
-                return user.displayName.toLowerCase().contains(query) ||
-                    user.email.toLowerCase().contains(query) ||
-                    user.role.name.toLowerCase().contains(query);
-              }).toList();
-
-        if (filteredUsers.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
-                const SizedBox(height: 16),
-                Text(
-                  _searchQuery.isEmpty
-                      ? 'Chưa có người dùng'
-                      : 'Không tìm thấy kết quả',
-                  style: TextStyle(color: Colors.grey.shade600),
-                ),
-                if (_searchQuery.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () {
-                      _searchController.clear();
-                    },
-                    child: const Text('Xóa bộ lọc'),
-                  ),
-                ],
-              ],
-            ),
-          );
+        final users = snapshot.data!;
+        if (users.isEmpty) {
+          return const Center(child: Text('Chưa có người dùng'));
         }
-
         return ListView.builder(
-          itemCount: filteredUsers.length, // ✅ Sử dụng filteredUsers
+          itemCount: users.length,
           itemBuilder: (context, index) {
-            final user = filteredUsers[index]; // ✅ Sử dụng filteredUsers
+            final user = users[index];
             return ListTile(
               leading: CircleAvatar(
                 child: Text(

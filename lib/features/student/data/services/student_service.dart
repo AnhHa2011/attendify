@@ -56,15 +56,15 @@ class StudentService {
   }
 
   /// Lấy thống kê điểm danh cho một lớp cụ thể
-  Future<StudentAttendanceStats> getClassAttendanceStats(
+  Future<StudentAttendanceStats> getCourseAttendanceStats(
     String studentId,
-    String classId,
+    String classCode,
   ) async {
     try {
       // Lấy tất cả sessions của lớp
       final sessionsQuery = await _firestore
           .collection('sessions')
-          .where('classId', isEqualTo: classId)
+          .where('classCode', isEqualTo: classCode)
           .get();
 
       final sessionIds = sessionsQuery.docs.map((doc) => doc.id).toList();
@@ -151,14 +151,14 @@ class StudentService {
               if (!sessionDoc.exists) continue;
 
               final sessionData = sessionDoc.data()!;
-              final classId = sessionData['classId'] as String? ?? '';
+              final classCode = sessionData['classCode'] as String? ?? '';
 
-              if (classId.isEmpty) continue;
+              if (classCode.isEmpty) continue;
 
               // Lấy thông tin lớp học
               final classDoc = await _firestore
                   .collection('classes')
-                  .doc(classId)
+                  .doc(classCode)
                   .get();
 
               if (!classDoc.exists) continue;
@@ -180,13 +180,15 @@ class StudentService {
               }
 
               // Lấy tên môn học
-              final courseIds = List<String>.from(classData['courseIds'] ?? []);
+              final courseCodes = List<String>.from(
+                classData['courseCodes'] ?? [],
+              );
               final List<String> courseNames = [];
 
-              for (String courseId in courseIds) {
+              for (String courseCode in courseCodes) {
                 final courseDoc = await _firestore
                     .collection('courses')
-                    .doc(courseId)
+                    .doc(courseCode)
                     .get();
                 if (courseDoc.exists) {
                   courseNames.add(courseDoc.data()?['courseName'] ?? '');
@@ -195,9 +197,8 @@ class StudentService {
 
               final detail = StudentSessionDetail(
                 sessionId: sessionId,
-                classId: classId,
+                classCode: classCode,
                 className: classData['className'] ?? '',
-                classCode: classData['classCode'] ?? '',
                 courseNames: courseNames.join(', '),
                 lecturerName: lecturerName,
                 startTime:
@@ -225,13 +226,13 @@ class StudentService {
   }
 
   /// Lấy chi tiết lịch sử điểm danh cho một lớp cụ thể
-  Stream<List<StudentSessionDetail>> getClassAttendanceHistory(
+  Stream<List<StudentSessionDetail>> getCourseAttendanceHistory(
     String studentId,
-    String classId,
+    String classCode,
   ) {
     return _firestore
         .collection('sessions')
-        .where('classId', isEqualTo: classId)
+        .where('classCode', isEqualTo: classCode)
         .orderBy('startTime', descending: true)
         .snapshots()
         .asyncMap((snapshot) async {
@@ -265,7 +266,7 @@ class StudentService {
               // Lấy thông tin lớp học
               final classDoc = await _firestore
                   .collection('classes')
-                  .doc(classId)
+                  .doc(classCode)
                   .get();
 
               if (!classDoc.exists) continue;
@@ -287,13 +288,15 @@ class StudentService {
               }
 
               // Lấy tên môn học
-              final courseIds = List<String>.from(classData['courseIds'] ?? []);
+              final courseCodes = List<String>.from(
+                classData['courseCodes'] ?? [],
+              );
               final List<String> courseNames = [];
 
-              for (String courseId in courseIds) {
+              for (String courseCode in courseCodes) {
                 final courseDoc = await _firestore
                     .collection('courses')
-                    .doc(courseId)
+                    .doc(courseCode)
                     .get();
                 if (courseDoc.exists) {
                   courseNames.add(courseDoc.data()?['courseName'] ?? '');
@@ -302,9 +305,8 @@ class StudentService {
 
               final detail = StudentSessionDetail(
                 sessionId: sessionId,
-                classId: classId,
+                classCode: classCode,
                 className: classData['className'] ?? '',
-                classCode: classData['classCode'] ?? '',
                 courseNames: courseNames.join(', '),
                 lecturerName: lecturerName,
                 startTime:
@@ -343,14 +345,14 @@ class StudentService {
 
       final sessionData = sessionDoc.data()!;
       final isOpen = sessionData['isOpen'] ?? false;
-      final classId = sessionData['classId'] as String? ?? '';
+      final classCode = sessionData['classCode'] as String? ?? '';
 
       if (!isOpen) return false;
 
       // Kiểm tra sinh viên có trong lớp không
       final enrollmentQuery = await _firestore
           .collection('enrollments')
-          .where('classId', isEqualTo: classId)
+          .where('classCode', isEqualTo: classCode)
           .where('studentId', isEqualTo: studentId)
           .limit(1)
           .get();
@@ -385,23 +387,23 @@ class StudentService {
         throw Exception('Không có lớp học nào để xuất lịch');
       }
 
-      final classIds = enrollmentsQuery.docs
-          .map((doc) => doc.data()['classId'] as String)
+      final classCodes = enrollmentsQuery.docs
+          .map((doc) => doc.data()['classCode'] as String)
           .toList();
 
       // Lấy tất cả sessions của các lớp này
       final List<Map<String, dynamic>> allSessions = [];
 
-      for (String classId in classIds) {
+      for (String classCode in classCodes) {
         final sessionsQuery = await _firestore
             .collection('sessions')
-            .where('classId', isEqualTo: classId)
+            .where('classCode', isEqualTo: classCode)
             .get();
 
         for (var sessionDoc in sessionsQuery.docs) {
           final sessionData = sessionDoc.data();
           sessionData['sessionId'] = sessionDoc.id;
-          sessionData['classId'] = classId;
+          sessionData['classCode'] = classCode;
           allSessions.add(sessionData);
         }
       }
@@ -416,21 +418,20 @@ class StudentService {
       for (var session in allSessions) {
         final startTime = (session['startTime'] as Timestamp?)?.toDate();
         final endTime = (session['endTime'] as Timestamp?)?.toDate();
-        final classId = session['classId'] as String;
+        final classCode = session['classCode'] as String;
 
         if (startTime == null || endTime == null) continue;
 
         // Lấy thông tin lớp học
         final classDoc = await _firestore
             .collection('classes')
-            .doc(classId)
+            .doc(classCode)
             .get();
 
         if (!classDoc.exists) continue;
 
         final classData = classDoc.data()!;
         final className = classData['className'] ?? '';
-        final classCode = classData['classCode'] ?? '';
         final room = session['room'] ?? '';
 
         // Format datetime for ICS

@@ -1,15 +1,12 @@
 // lib/features/admin/presentation/pages/admin_menu_new.dart
 import 'package:attendify/features/admin/presentation/pages/leave_request_management_page.dart';
-import 'package:attendify/features/lecturer/presentation/pages/course_detail_page.dart';
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../../../../app/providers/navigation_provider.dart';
 import '../../../../app/providers/auth_provider.dart';
 import '../../../../app_imports.dart' hide AuthProvider;
-import '../../../common/data/models/user_model.dart';
-import '../../../common/data/models/class_model.dart';
-import '../../../common/widgets/role_drawer_scaffold.dart';
+import '../../../../core/data/models/course_model.dart';
+import '../../../../core/data/models/user_model.dart';
+import '../../../../core/presentation/widgets/role_drawer_scaffold.dart';
 import '../../../auth/presentation/pages/edit_account_page.dart';
 import 'course_page.dart';
 import 'leave_requests_page.dart';
@@ -24,10 +21,10 @@ class AdminMenuPage extends StatelessWidget {
         switch (navProvider.currentLevel) {
           case NavigationLevel.main:
             return const MainMenuScaffold();
-          case NavigationLevel.classContext:
-            return ClassContextMenuScaffold(
-              classId: navProvider.selectedClassId!,
-              className: navProvider.selectedClassName!,
+          case NavigationLevel.courseContext:
+            return CourseContextMenuScaffold(
+              courseCode: navProvider.selectedcourseCode!,
+              courseName: navProvider.selectedCourseName!,
             );
         }
       },
@@ -55,7 +52,7 @@ class MainMenuScaffold extends StatelessWidget {
       ),
       const DrawerDestination(
         icon: Icons.school_outlined,
-        label: 'Quản lý lớp học',
+        label: 'Quản lý môn học',
       ),
       const DrawerDestination(
         icon: Icons.person_outline,
@@ -84,15 +81,15 @@ class MainMenuScaffold extends StatelessWidget {
   }
 }
 
-//  Class Context Menu Scaffold
-class ClassContextMenuScaffold extends StatelessWidget {
-  final String classId;
-  final String className;
+//  Course Context Menu Scaffold
+class CourseContextMenuScaffold extends StatelessWidget {
+  final String courseCode;
+  final String courseName;
 
-  const ClassContextMenuScaffold({
+  const CourseContextMenuScaffold({
     super.key,
-    required this.classId,
-    required this.className,
+    required this.courseCode,
+    required this.courseName,
   });
 
   @override
@@ -112,21 +109,21 @@ class ClassContextMenuScaffold extends StatelessWidget {
     ];
 
     final pages = <Widget>[
-      SessionListPage(classId: classId),
-      QRAttendancePage(classId: classId),
+      SessionListPage(courseCode: courseCode),
+      QRAttendancePage(courseCode: courseCode),
       LeaveRequestsPage(),
     ];
 
     return DrawerScaffold(
-      title: className,
+      title: courseName,
       destinations: destinations,
       pages: pages,
       currentIndex: navProvider.currentIndex,
       onDestinationSelected: (index) {
         navProvider.setCurrentIndex(index);
       },
-      drawerHeader: ClassContextHeader(
-        className: className,
+      drawerHeader: CourseContextHeader(
+        courseName: courseName,
         onBackToMain: () {
           navProvider.navigateToMainLevel(index: 3);
         },
@@ -398,13 +395,13 @@ class DrawerHeader extends StatelessWidget {
   }
 }
 
-class ClassContextHeader extends StatelessWidget {
-  final String className;
+class CourseContextHeader extends StatelessWidget {
+  final String courseName;
   final VoidCallback onBackToMain;
 
-  const ClassContextHeader({
+  const CourseContextHeader({
     super.key,
-    required this.className,
+    required this.courseName,
     required this.onBackToMain,
   });
 
@@ -431,7 +428,7 @@ class ClassContextHeader extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Lớp học',
+                      'Môn học',
                       style: TextStyle(
                         fontSize: 12,
                         color: theme.colorScheme.onPrimaryContainer.withOpacity(
@@ -440,7 +437,7 @@ class ClassContextHeader extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      className,
+                      courseName,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -514,7 +511,7 @@ class DashboardPage extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Giảng viên Dashboard',
+                          'Admin Dashboard',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onPrimaryContainer
                                 .withOpacity(0.8),
@@ -538,14 +535,14 @@ class DashboardPage extends StatelessWidget {
                   return StreamBuilder<List<UserModel>>(
                     stream: context.read<AdminService>().getAllStudentsStream(),
                     builder: (context, studentSnapshot) {
-                      return StreamBuilder<List<ClassModel>>(
+                      return StreamBuilder<List<CourseModel>>(
                         stream: context
                             .read<AdminService>()
-                            .getAllClassesStream(),
-                        builder: (context, classSnapshot) {
+                            .getAllCoursesStream(),
+                        builder: (context, courseSnapshot) {
                           final lecturers = lecturerSnapshot.data ?? [];
                           final students = studentSnapshot.data ?? [];
-                          final classes = classSnapshot.data ?? [];
+                          final coursees = courseSnapshot.data ?? [];
 
                           return GridView.count(
                             shrinkWrap: true,
@@ -569,7 +566,7 @@ class DashboardPage extends StatelessWidget {
                               ),
                               StatCard(
                                 title: 'Lớp học',
-                                value: '${classes.length}',
+                                value: '${coursees.length}',
                                 icon: Icons.school,
                                 color: Colors.orange,
                               ),
@@ -713,7 +710,7 @@ class ProfilePage extends StatelessWidget {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 title: const Text('Vai trò'),
-                subtitle: const Text('Giảng viên'),
+                subtitle: const Text('Quản trị viên hệ thống'),
               ),
             ),
           ],
@@ -723,10 +720,10 @@ class ProfilePage extends StatelessWidget {
   }
 }
 
-// Simplified Class Context Pages
+// Simplified Course Context Pages
 class SessionListPage extends StatelessWidget {
-  final String classId;
-  const SessionListPage({super.key, required this.classId});
+  final String courseCode;
+  const SessionListPage({super.key, required this.courseCode});
 
   @override
   Widget build(BuildContext context) {
@@ -754,8 +751,8 @@ class SessionListPage extends StatelessWidget {
 }
 
 class QRAttendancePage extends StatelessWidget {
-  final String classId;
-  const QRAttendancePage({super.key, required this.classId});
+  final String courseCode;
+  const QRAttendancePage({super.key, required this.courseCode});
 
   @override
   Widget build(BuildContext context) {

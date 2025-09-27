@@ -1,7 +1,10 @@
 import '../../../../app_imports.dart';
-import '../../../common/data/models/course_enrollment_model.dart';
-import '../../../common/data/models/enrollment_model.dart';
-import '../models/course_import_model.dart';
+import '../../../../core/data/models/class_model.dart';
+import '../../../../core/data/models/course_model.dart';
+import '../../../../core/data/models/course_schedule_model.dart';
+import '../../../../core/data/models/lecturer_lite.dart';
+import '../../../../core/data/models/session_model.dart';
+import '../../../../core/data/models/user_model.dart';
 
 class AdminService {
   final _db = FirebaseFirestore.instance;
@@ -53,7 +56,7 @@ class AdminService {
         .map(
           (snapshot) =>
               // Chuyển đổi mỗi document thành một đối tượng UserModel
-              snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList(),
+              snapshot.docs.map((doc) => UserModel.fromDoc(doc)).toList(),
         );
   }
 
@@ -69,17 +72,12 @@ class AdminService {
         .snapshots()
         .map(
           (snapshot) =>
-              snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList(),
+              snapshot.docs.map((doc) => UserModel.fromDoc(doc)).toList(),
         );
   }
 
   /// Lấy danh sách tất cả sinh viên (sử dụng hàm trên)
   Stream<List<UserModel>> getAllStudentsStream() {
-    return getUsersStreamByRole(UserRole.student);
-  }
-
-  /// Lấy danh sách tất cả sinh viên (sử dụng hàm trên)
-  Stream<List<UserModel>> getAllStudentsByCourseStream() {
     return getUsersStreamByRole(UserRole.student);
   }
 
@@ -106,7 +104,7 @@ class AdminService {
         'displayName': displayName,
         'email': email,
         'role': role.toKey(),
-        'createdAt': FieldValue.serverTimestamp(),
+        'createdAt': Timestamp.now().toDate(),
       });
     } on FirebaseAuthException catch (e) {
       // Bắt các lỗi cụ thể từ Firebase Auth để thông báo dễ hiểu hơn
@@ -140,17 +138,15 @@ class AdminService {
   Future<void> deleteUser(String uid) {
     return _db.collection('users').doc(uid).delete();
   }
-  // === QUẢN LÝ LỚP HỌC (CLASSES) ===
+  // === QUẢN LÝ lớp HỌC (COURSES) ===
 
   /// Tạo lịch học hàng loạt cho nhiều tuần liên tiếp
   Future<void> createRecurringSessions({
-    required String classId,
-    required String courseId,
-    required String baseTitle,
+    required String courseCode,
     required String location,
     required int durationInMinutes,
     required int numberOfWeeks,
-    required List<ClassSchedule> weeklySchedules,
+    required List<CourseSchedule> weeklySchedules,
     required DateTime semesterStartDate,
   }) async {
     final batch = _db.batch();
@@ -172,10 +168,9 @@ class AdminService {
 
         final docRef = _db.collection('sessions').doc();
         batch.set(docRef, {
-          'classId': classId,
-          'courseId': courseId,
+          'courseCode': courseCode,
           'title':
-              '$baseTitle - Buổi ${(week * weeklySchedules.length) + weeklySchedules.indexOf(schedule) + 1}',
+              'Buổi ${(week * weeklySchedules.length) + weeklySchedules.indexOf(schedule) + 1}',
           'startTime': Timestamp.fromDate(startTime),
           'endTime': Timestamp.fromDate(
             startTime.add(Duration(minutes: durationInMinutes)),
@@ -207,24 +202,22 @@ class AdminService {
     return snapshot.docs.map((doc) => CourseModel.fromDoc(doc)).toList();
   }
 
-  // === QUẢN LÝ MÔN HỌC (COURSES) ===
+  // === QUẢN LÝ lớp HỌC (COURSES) ===
 
-  /// Tạo một môn học mới
-  Future<void> createCourse({
-    required String courseCode,
-    required String courseName,
-    required int credits,
+  /// Tạo một lớp học mới
+  Future<void> createClass({
+    required String classCode,
+    required String className,
     String? lecturerId, // NEW (optional)
     int? minStudents, // NEW (optional)
     int? maxStudents, // NEW (optional)
     List<Map<String, dynamic>>? weeklySchedule, // NEW (optional)
   }) {
     final data = <String, dynamic>{
-      'courseCode': courseCode.trim().toUpperCase(),
-      'courseName': courseName.trim(),
-      'credits': credits,
+      'classCode': classCode.trim().toUpperCase(),
+      'className': className.trim(),
       'isArchived': false,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': Timestamp.now().toDate(),
     };
 
     if (lecturerId != null) data['lecturerId'] = lecturerId;
@@ -232,25 +225,23 @@ class AdminService {
     if (maxStudents != null) data['maxStudents'] = maxStudents;
     if (weeklySchedule != null) data['weeklySchedule'] = weeklySchedule;
 
-    return _db.collection(FirestoreCollections.courses).add(data);
+    return _db.collection(FirestoreCollections.classes).add(data);
   }
 
-  /// ===  Cập nhật thông tin một môn học ===
-  Future<void> updateCourse({
-    required String courseId,
-    required String courseCode,
-    required String courseName,
-    required int credits,
+  /// ===  Cập nhật thông tin một lớp học ===
+  Future<void> updateClass({
+    required String id,
+    required String classCode,
+    required String className,
     String? lecturerId, // NEW (optional)
     int? minStudents, // NEW (optional)
     int? maxStudents, // NEW (optional)
     List<Map<String, dynamic>>? weeklySchedule, // NEW (optional)
   }) {
     final data = <String, dynamic>{
-      'courseCode': courseCode.trim().toUpperCase(),
-      'courseName': courseName.trim(),
-      'credits': credits,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'classCode': classCode.trim().toUpperCase(),
+      'className': className.trim(),
+      'updatedAt': Timestamp.now().toDate(),
     };
 
     // Chỉ update các trường nếu có truyền vào (tránh xóa dữ liệu cũ)
@@ -260,45 +251,75 @@ class AdminService {
     if (weeklySchedule != null) data['weeklySchedule'] = weeklySchedule;
 
     return _db
-        .collection(FirestoreCollections.courses)
-        .doc(courseId)
+        .collection(FirestoreCollections.classes)
+        .doc(classCode)
         .update(data);
   }
 
-  /// ===  Xoá một môn học ===
-  Future<void> deleteCourse(String courseId) {
-    return _db.collection('courses').doc(courseId).delete();
+  /// ===  Xoá một lớp học ===
+  Future<void> deleteClass(String classCode) {
+    return _db.collection('classes').doc(classCode).delete();
   }
 
   /// === THAY ĐỔI: Chuyển từ Xoá cứng sang Xoá mềm (Lưu trữ) ===
-  /// Đánh dấu một môn học là đã được lưu trữ.
-  Future<void> archiveCourse(String courseId) {
-    return _db.collection('courses').doc(courseId).update({
+  /// Đánh dấu một lớp học là đã được lưu trữ.
+  Future<void> archiveClass(String classCode) {
+    return _db.collection('classes').doc(classCode).update({
       'isArchived': true, // Thêm một trường để đánh dấu
     });
   }
 
-  /// === THAY ĐỔI: Lọc ra các môn học đã bị lưu trữ ===
-  /// Lấy danh sách các môn học CHƯA bị lưu trữ.
-  Stream<List<CourseModel>> getAllCoursesStream() {
+  /// === THAY ĐỔI: Lọc ra các lớp học đã bị lưu trữ ===
+  /// Lấy danh sách các lớp học CHƯA bị lưu trữ.
+  Stream<List<ClassModel>> getAllClassStream() {
     return _db
-        .collection('courses')
+        .collection('classes')
         // Query này sẽ chỉ lấy các document có isArchived != true
         // (bao gồm cả các document chưa có trường isArchived)
         .where('isArchived', isNotEqualTo: true)
-        .orderBy('courseCode')
+        .orderBy('classCode')
         .snapshots()
         .map(
           (snapshot) =>
-              snapshot.docs.map((doc) => CourseModel.fromDoc(doc)).toList(),
+              snapshot.docs.map((doc) => ClassModel.fromDoc(doc)).toList(),
         );
   }
 
-  // === THÊM MỚI: Hàm kiểm tra mã môn học đã tồn tại hay chưa ===
-  /// Trả về `true` nếu mã môn học đã được sử dụng bởi một môn học khác.
-  /// `currentCourseId` được dùng trong trường hợp Chỉnh sửa, để loại trừ chính môn học đang sửa ra khỏi
+  // === THÊM MỚI: Hàm kiểm tra mã lớp học đã tồn tại hay chưa ===
+  /// Trả về `true` nếu mã lớp học đã được sử dụng bởi một lớp học khác.
+  /// `currentclassCode` được dùng trong trường hợp Chỉnh sửa, để loại trừ chính lớp học đang sửa ra khỏi
   /// việc kiểm tra.
-  Future<bool> isCourseCodeTaken(String code, {String? currentCourseId}) async {
+  Future<bool> isClassCodeTaken(String code, {String? currentclassCode}) async {
+    // Luôn chuẩn hoá code trước khi query
+    final normalizedCode = code.trim().toUpperCase();
+
+    Query query = _db
+        .collection('classes')
+        .where('classCode', isEqualTo: normalizedCode)
+        .limit(1);
+
+    final querySnapshot = await query.get();
+
+    // Nếu không tìm thấy document nào, mã chắc chắn chưa tồn tại
+    if (querySnapshot.docs.isEmpty) {
+      return false;
+    }
+
+    // Nếu đang ở chế độ chỉnh sửa, kiểm tra xem document tìm thấy có phải là document
+    // đang sửa hay không
+    if (currentclassCode != null) {
+      // Nếu ID của doc tìm thấy khác với ID đang sửa -> mã đã bị lấy
+      return querySnapshot.docs.first.id != currentclassCode;
+    }
+
+    // Nếu đang ở chế độ tạo mới và tìm thấy document -> mã đã bị lấy
+    return true;
+  }
+
+  Future<bool> isCourseCodeTaken(
+    String code, {
+    String? currentcourseCode,
+  }) async {
     // Luôn chuẩn hoá code trước khi query
     final normalizedCode = code.trim().toUpperCase();
 
@@ -316,66 +337,155 @@ class AdminService {
 
     // Nếu đang ở chế độ chỉnh sửa, kiểm tra xem document tìm thấy có phải là document
     // đang sửa hay không
-    if (currentCourseId != null) {
+    if (currentcourseCode != null) {
       // Nếu ID của doc tìm thấy khác với ID đang sửa -> mã đã bị lấy
-      return querySnapshot.docs.first.id != currentCourseId;
+      return querySnapshot.docs.first.id != currentcourseCode;
     }
 
     // Nếu đang ở chế độ tạo mới và tìm thấy document -> mã đã bị lấy
     return true;
   }
 
-  Future<void> createClass({
-    required String classCode,
-    required String className,
-    required int academicYearStart,
-    required int academicYearEnd,
+  /// Lấy danh sách tất cả môn học cho Admin, đã được "làm giàu" thông tin
+  Stream<List<CourseModel>> getAllCoursesStream() {
+    return _db
+        .collection('courses')
+        .where('isArchived', isEqualTo: false) // Giữ lại logic lọc
+        .snapshots()
+        .asyncMap((snapshot) async {
+          // Chuyển đổi DocumentSnapshot thành List<CourseModel>
+          final courseFutures = snapshot.docs.map((doc) async {
+            final courseModel = CourseModel.fromDoc(doc);
+
+            // Chỉ làm giàu thông tin giảng viên
+            try {
+              final lecturerDoc = await _db
+                  .collection('users')
+                  .doc(courseModel.lecturerId)
+                  .get();
+
+              // Sử dụng copyWith để thêm thông tin giảng viên
+              // return courseModel.copyWith(
+              //   lecturerName: lecturerDoc.data()?['displayName'],
+              // );
+              return courseModel;
+            } catch (e) {
+              // Nếu có lỗi khi lấy thông tin GV, vẫn trả về thông tin môn học gốc
+              return courseModel;
+            }
+          }).toList();
+
+          // Đợi tất cả các future hoàn thành và trả về kết quả
+          return Future.wait(courseFutures);
+        });
+  }
+
+  /// Lấy danh sách tất cả môn học cho Admin, đã được "làm giàu" thông tin
+  Stream<List<ClassModel>> getAllClassesStream() {
+    return _db
+        .collection('classes')
+        .where('isArchived', isEqualTo: false) // Giữ lại logic lọc
+        .orderBy('createdAt', descending: true) // Giữ lại logic sắp xếp
+        .snapshots()
+        .asyncMap((snapshot) async {
+          // Chuyển đổi DocumentSnapshot thành List<ClassModel>
+          final classFutures = snapshot.docs.map((doc) async {
+            return ClassModel.fromDoc(doc);
+          }).toList();
+
+          // Đợi tất cả các future hoàn thành và trả về kết quả
+          return Future.wait(classFutures);
+        });
+  }
+
+  Future<void> createCourse({
+    required String? lecturerId,
+    required String courseName, // Tên môn học, ví dụ: "môn Tín chỉ IT - K15"
+    required String courseCode, // Mã môn học, ví dụ: "LTC_IT_K15_01"
+    required String joinCode,
+    required int? credits,
+    required String? semester,
+    required String? description,
+    required int? totalStudents,
+    required int? minStudents,
+    required int? maxStudents,
+    required DateTime? startDate,
+    required DateTime? endDate,
   }) async {
     final joinCode =
         _generateRandomCode(); // Giả sử bạn có hàm tạo mã ngẫu nhiên
 
-    await _db.collection('classes').add({
-      'classCode': classCode,
-      'className': className,
+    await _db.collection('courses').add({
+      'lecturerId': lecturerId,
+      'courseName': courseName,
+      'courseCode': courseCode,
       'joinCode': joinCode,
-      'createdAt': FieldValue.serverTimestamp(),
+      'credits': credits,
+      'semester': semester,
+      'description': description,
+      'totalStudents': totalStudents,
+      'minStudents': minStudents,
+      'maxStudents': maxStudents,
+      'startDate': startDate,
+      'endDate': endDate,
+      'createdAt': Timestamp.now().toDate(),
+      'updatedAt': Timestamp.now().toDate(),
       'isArchived': false,
-      'academicYearStart': academicYearStart,
-      'academicYearEnd': academicYearEnd,
     });
   }
 
-  Future<void> updateClass({
-    required String classId,
-    required String classCode,
-    required String className,
-    required int academicYearStart,
-    required int academicYearEnd,
+  Future<void> updateCourse({
+    required String id,
+    required String? lecturerId,
+    required String courseName, // Tên môn học, ví dụ: "môn Tín chỉ IT - K15"
+    required String courseCode, // Mã môn học, ví dụ: "LTC_IT_K15_01"
+    required String joinCode,
+    required int? credits,
+    required String? semester,
+    required String? description,
+    required int? minStudents,
+    required int? maxStudents,
+    required DateTime? startDate,
+    required DateTime? endDate, // <<<--- Bổ sung
   }) async {
-    await _db.collection('classes').doc(classId).update({
-      'classCode': classCode,
-      'className': className,
-      'academicYearStart': academicYearStart,
-      'academicYearEnd': academicYearEnd,
+    await _db.collection('courses').doc(id).update({
+      'lecturerId': lecturerId,
+      'courseName': courseName,
+      'courseCode': courseCode,
+      'joinCode': joinCode,
+      'credits': credits,
+      'semester': semester,
+      'description': description,
+      'minStudents': minStudents,
+      'maxStudents': maxStudents,
+      'startDate': startDate,
+      'endDate': endDate,
+      'updatedAt': Timestamp.now().toDate(),
     });
   }
 
-  /// Lưu trữ một lớp học (xoá mềm)
-  Future<void> archiveClass(String classId) {
-    return _db.collection('classes').doc(classId).update({'isArchived': true});
+  /// Lưu trữ một môn học (xoá mềm)
+  Future<void> archiveCourse(String courseCode) {
+    return _db.collection('courses').doc(courseCode).update({
+      'isArchived': true,
+      'updatedAt': Timestamp.now().toDate(),
+    });
   }
 
-  Future<bool> isClassDuplicate({
-    required String classCode,
-    String? currentClassId,
+  Future<bool> isCourseDuplicate({
+    required String courseCode,
+    String? currentcourseCode,
   }) async {
     Query query = _db
-        .collection('classes')
-        .where('classCode', isEqualTo: classCode);
+        .collection('courses')
+        .where('courseCode', isEqualTo: courseCode);
 
-    // Nếu đang ở chế độ sửa, loại trừ chính lớp hiện tại ra khỏi kiểm tra
-    if (currentClassId != null) {
-      query = query.where(FieldPath.documentId, isNotEqualTo: currentClassId);
+    // Nếu đang ở chế độ sửa, loại trừ chính môn hiện tại ra khỏi kiểm tra
+    if (currentcourseCode != null) {
+      query = query.where(
+        FieldPath.documentId,
+        isNotEqualTo: currentcourseCode,
+      );
     }
 
     final snapshot = await query.limit(1).get();
@@ -389,9 +499,9 @@ class AdminService {
     return List.generate(len, (_) => chars[rnd.nextInt(chars.length)]).join();
   }
 
-  /// Tạo nhiều lớp học từ một danh sách (dùng cho import file)
-  Future<void> createClassesFromList(
-    List<Map<String, dynamic>> classDataList,
+  /// Tạo nhiều môn học từ một danh sách (dùng cho import file)
+  Future<void> createcoursesFromList(
+    List<Map<String, dynamic>> courseDataList,
   ) async {
     final batch = _db.batch();
 
@@ -409,22 +519,21 @@ class AdminService {
       for (var doc in lecturersSnapshot.docs) doc.data()['email']: doc.id,
     };
 
-    for (final classData in classDataList) {
-      final courseCode = classData['courseCode'];
-      final lecturerEmail = classData['lecturerEmail'];
+    for (final courseData in courseDataList) {
+      final courseCode = courseData['courseCode'];
+      final lecturerEmail = courseData['lecturerEmail'];
 
-      final courseId = courseMap[courseCode];
       final lecturerId = lecturerMap[lecturerEmail];
 
-      if (courseId != null && lecturerId != null) {
-        final docRef = _db.collection('classes').doc();
+      if (courseCode != null && lecturerId != null) {
+        final docRef = _db.collection('courses').doc();
         batch.set(docRef, {
-          'courseId': courseId,
+          'courseCode': courseCode,
           'lecturerId': lecturerId,
-          'semester': classData['semester'],
-          'className': classData['className'],
+          'semester': courseData['semester'],
+          'courseName': courseData['courseName'],
           'isArchived': false,
-          'createdAt': FieldValue.serverTimestamp(),
+          'createdAt': Timestamp.now().toDate(),
           'joinCode': '',
         });
       }
@@ -434,19 +543,15 @@ class AdminService {
 
   // === THÊM MỚI: CÁC HÀM QUẢN LÝ BUỔI HỌC (SESSIONS) ===
 
-  /// Tạo một buổi học đơn lẻ cho một lớp học
+  /// Tạo một buổi học đơn lẻ cho một môn học
   Future<void> createSingleSession({
-    required String classId,
-    required String title,
-    required String courseId,
+    required String courseCode,
     required DateTime startTime,
     required int durationInMinutes,
     required String location,
   }) async {
     await _db.collection('sessions').add({
-      'classId': classId,
-      'title': title,
-      'courseId': courseId,
+      'courseCode': courseCode,
       'startTime': Timestamp.fromDate(startTime),
       'endTime': Timestamp.fromDate(
         startTime.add(Duration(minutes: durationInMinutes)),
@@ -458,61 +563,27 @@ class AdminService {
     });
   }
 
-  Stream<List<SessionModel>> getSessionsForClassStream(String classId) {
+  Stream<List<SessionModel>> getSessionsForCourseStream(String courseCode) {
     return _db
         .collection('sessions')
-        .where('classId', isEqualTo: classId)
+        .where('courseCode', isEqualTo: courseCode)
         .orderBy(
           'startTime',
           descending: false,
         ) // Sắp xếp buổi học sớm nhất lên đầu
         .snapshots()
         .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => SessionModel.fromFirestore(doc))
-              .toList(),
+          (snapshot) =>
+              snapshot.docs.map((doc) => SessionModel.fromDoc(doc)).toList(),
         );
   }
 
   // === THÊM MỚI: CÁC HÀM QUẢN LÝ VIỆC GHI DANH (ENROLLMENT) ===
 
-  /// Lấy danh sách sinh viên ĐÃ CÓ trong một lớp học
-  Stream<List<EnrollmentModel>> getAllEnrolledStudentsStream() {
+  /// Lấy danh sách sinh viên ĐÃ CÓ trong một môn học
+  Stream<List<UserModel>> getEnrolledStudentsStream(String courseCode) {
     return _db
         .collection('enrollments')
-        .snapshots()
-        .map(
-          (snapshot) =>
-              snapshot.docs.map((doc) => EnrollmentModel.fromDoc(doc)).toList(),
-        );
-  }
-
-  /// Lấy danh sách sinh viên ĐÃ CÓ trong một lớp học
-  Stream<List<UserModel>> getEnrolledStudentsStream(String classId) {
-    return _db
-        .collection('enrollments')
-        .where('classId', isEqualTo: classId)
-        .snapshots()
-        .asyncMap((snapshot) async {
-          if (snapshot.docs.isEmpty) return [];
-          final studentIds = snapshot.docs
-              .map((doc) => doc['studentUid'] as String)
-              .toList();
-          final studentsSnapshot = await _db
-              .collection('users')
-              .where(FieldPath.documentId, whereIn: studentIds)
-              .get();
-          return studentsSnapshot.docs
-              .map((doc) => UserModel.fromFirestore(doc))
-              .toList();
-        });
-  }
-
-  Stream<List<CourseEnrollmentModel>> getCourseEnrolledStudentsStream(
-    String courseCode,
-  ) {
-    return _db
-        .collection('course_enrollments')
         .where('courseCode', isEqualTo: courseCode)
         .snapshots()
         .asyncMap((snapshot) async {
@@ -525,37 +596,37 @@ class AdminService {
               .where(FieldPath.documentId, whereIn: studentIds)
               .get();
           return studentsSnapshot.docs
-              .map((doc) => CourseEnrollmentModel.fromDoc(doc))
+              .map((doc) => UserModel.fromDoc(doc))
               .toList();
         });
   }
 
-  /// Ghi danh MỘT sinh viên vào lớp học
-  Future<void> enrollSingleStudent(String classId, String studentUid) async {
-    // Kiểm tra xem sinh viên đã có trong lớp chưa để tránh trùng lặp
+  /// Ghi danh MỘT sinh viên vào môn học
+  Future<void> enrollSingleStudent(String courseCode, String studentUid) async {
+    // Kiểm tra xem sinh viên đã có trong môn chưa để tránh trùng lặp
     final existing = await _db
         .collection('enrollments')
-        .where('classId', isEqualTo: classId)
+        .where('courseCode', isEqualTo: courseCode)
         .where('studentUid', isEqualTo: studentUid)
         .limit(1)
         .get();
 
     if (existing.docs.isNotEmpty) {
-      throw Exception('Sinh viên này đã có trong lớp học.');
+      throw Exception('Sinh viên này đã có trong môn học.');
     }
 
     await _db.collection('enrollments').add({
-      'classId': classId,
+      'courseCode': courseCode,
       'studentUid': studentUid,
-      'joinDate': FieldValue.serverTimestamp(),
+      'joinDate': Timestamp.now().toDate(),
     });
   }
 
-  /// Hủy ghi danh MỘT sinh viên khỏi lớp học
-  Future<void> unenrollStudent(String classId, String studentUid) async {
+  /// Hủy ghi danh MỘT sinh viên khỏi môn học
+  Future<void> unenrollStudent(String courseCode, String studentUid) async {
     final snapshot = await _db
         .collection('enrollments')
-        .where('classId', isEqualTo: classId)
+        .where('courseCode', isEqualTo: courseCode)
         .where('studentUid', isEqualTo: studentUid)
         .limit(1)
         .get();
@@ -567,7 +638,7 @@ class AdminService {
 
   /// Ghi danh HÀNG LOẠT sinh viên từ một danh sách email (dùng cho import file)
   Future<Map<String, String>> enrollStudentsFromEmails(
-    String classId,
+    String courseCode,
     List<String> emails,
   ) async {
     final batch = _db.batch();
@@ -590,9 +661,9 @@ class AdminService {
         // Tạo một document mới trong collection 'enrollments'
         final docRef = _db.collection('enrollments').doc();
         batch.set(docRef, {
-          'classId': classId,
+          'courseCode': courseCode,
           'studentUid': studentUid,
-          'joinDate': FieldValue.serverTimestamp(),
+          'joinDate': Timestamp.now().toDate(),
         });
         successEmails.add(email);
       } else {
@@ -653,8 +724,57 @@ class AdminService {
     return {'created': created, 'updated': updated, 'skipped': skipped};
   }
 
+  /// Import courses từ danh sách: {courseCode, lecturerEmail, semester, courseName}
+  /// Trả về: {created, skipped}
+  Future<Map<String, int>> importcoursesFromList(
+    List<Map<String, dynamic>> courseRows,
+  ) async {
+    int created = 0, skipped = 0;
+
+    final coursesSnapshot = await _db.collection('courses').get();
+    final lecturersSnapshot = await _db
+        .collection('users')
+        .where('role', isEqualTo: 'lecture')
+        .get();
+
+    final courseMap = {
+      for (var doc in coursesSnapshot.docs) doc.data()['courseCode']: doc.id,
+    };
+    final lecturerMap = {
+      for (var doc in lecturersSnapshot.docs) doc.data()['email']: doc.id,
+    };
+
+    final batch = _db.batch();
+    for (final r in courseRows) {
+      final courseCode = (r['courseCode'] ?? '').toString().trim();
+      final lecturerEmail = (r['lecturerEmail'] ?? '').toString().trim();
+      final semester = (r['semester'] ?? '').toString().trim();
+      final courseName = (r['courseName'] ?? '').toString().trim();
+
+      final lecturerId = lecturerMap[lecturerEmail];
+      if (courseCode == null || lecturerId == null || semester.isEmpty) {
+        skipped++;
+        continue;
+      }
+
+      final docRef = _db.collection('courses').doc();
+      batch.set(docRef, {
+        'courseCode': courseCode,
+        'lecturerId': lecturerId,
+        'semester': semester,
+        'courseName': courseName,
+        'isArchived': false,
+        'createdAt': Timestamp.now().toDate(),
+        'joinCode': '',
+      });
+      created++;
+    }
+    await batch.commit();
+    return {'created': created, 'skipped': skipped};
+  }
+
   // === Helpers: tra id theo code/email ===
-  Future<String?> getCourseIdByCode(String courseCode) async {
+  Future<String?> getcourseCodeByCode(String courseCode) async {
     final snap = await _db
         .collection('courses')
         .where('courseCode', isEqualTo: courseCode)
@@ -662,45 +782,6 @@ class AdminService {
         .get();
     if (snap.docs.isEmpty) return null;
     return snap.docs.first.id;
-  }
-
-  Stream<CourseModel> getRichCourseByIdStream(String courseId) {
-    return _db.collection('courses').doc(courseId).snapshots().asyncMap((
-      courseDoc,
-    ) async {
-      if (!courseDoc.exists) {
-        throw Exception('Môn học không tồn tại!');
-      }
-      // Parse course
-      final course = CourseModel.fromDoc(courseDoc);
-      final lecturerSnap = await _db
-          .collection('users')
-          .doc(course.lecturerId)
-          .get();
-
-      if (!lecturerSnap.exists) {
-        // Nếu không có lecturer thì vẫn trả course nhưng lecturer = null
-        return course.copyWith(lecturerName: '', lecturerEmail: '');
-      }
-
-      final lecturer = UserModel.fromFirestore(lecturerSnap);
-      // Gắn lecturer vào course (copyWith)
-      return course.copyWith(
-        lecturerName: lecturer.displayName,
-        lecturerEmail: lecturer.email,
-      );
-    });
-  }
-
-  Stream<CourseModel> getCourseByIdStream(String courseId) {
-    return _db.collection('courses').doc(courseId).snapshots().asyncMap((
-      classDoc,
-    ) async {
-      if (!classDoc.exists) {
-        throw Exception('Môn học không tồn tại!');
-      }
-      return CourseModel.fromDoc(classDoc);
-    });
   }
 
   Future<String?> getUserIdByEmail(String email) async {
@@ -713,22 +794,42 @@ class AdminService {
     return snap.docs.first.id; // hoặc 'uid' tuỳ schema; nếu docId==uid thì OK
   }
 
-  /// Lấy danh sách tất cả lớp học cho Admin
-  Stream<List<ClassModel>> getAllClassesStream() {
-    return _db
-        .collection('classes')
-        .where('isArchived', isEqualTo: false) // Giữ lại logic lọc
-        .orderBy('createdAt', descending: true) // Giữ lại logic sắp xếp
-        .snapshots()
-        .asyncMap((snapshot) async {
-          // Chuyển đổi DocumentSnapshot thành List<ClassModel>
-          final classFutures = snapshot.docs.map((doc) {
-            return ClassModel.fromDoc(doc);
-          }).toList();
+  // === Tạo course và trả về id ===
+  Future<String> createCourseRaw({
+    required String courseName,
+    required String courseCode,
+    required String lecturerId,
+    required String semester,
+  }) async {
+    final ref = await _db.collection('courses').add({
+      'courseName': courseName,
+      'courseCode': courseCode,
+      'lecturerId': lecturerId,
+      'semester': semester,
+      'createdAt': Timestamp.now().toDate(),
+      'isArchived': false,
+      'joinCode': '',
+    });
+    return ref.id;
+  }
 
-          // Đợi tất cả các future hoàn thành và trả về kết quả
-          return classFutures;
-        });
+  // === Thêm enrollment (bỏ qua nếu đã tồn tại) ===
+  Future<void> addEnrollment({
+    required String courseCode,
+    required String studentUid,
+  }) async {
+    final q = await _db
+        .collection('enrollments')
+        .where('courseCode', isEqualTo: courseCode)
+        .where('studentUid', isEqualTo: studentUid)
+        .limit(1)
+        .get();
+    if (q.docs.isNotEmpty) return;
+    await _db.collection('enrollments').add({
+      'courseCode': courseCode,
+      'studentUid': studentUid,
+      'joinDate': Timestamp.now().toDate(),
+    });
   }
 
   /// Lấy danh sách giảng viên (một lần) cho dropdown
@@ -745,117 +846,5 @@ class AdminService {
       final email = (data['email'] ?? '').toString();
       return LecturerLite(uid: d.id, displayName: displayName, email: email);
     }).toList();
-  }
-}
-
-extension ClassManagementService on AdminService {
-  // === Tạo class và trả về id ===
-  Future<String> createClassRaw({
-    required String className,
-    required String courseId,
-    required String lecturerId,
-    required String semester,
-  }) async {
-    final ref = await _db.collection('classes').add({
-      'className': className,
-      'createdAt': FieldValue.serverTimestamp(),
-      'isArchived': false,
-      'joinCode': '',
-    });
-    return ref.id;
-  }
-
-  // === Thêm enrollment (bỏ qua nếu đã tồn tại) ===
-  Future<void> addEnrollment({
-    required String classId,
-    required String studentUid,
-  }) async {
-    final q = await _db
-        .collection('enrollments')
-        .where('classId', isEqualTo: classId)
-        .where('studentUid', isEqualTo: studentUid)
-        .limit(1)
-        .get();
-    if (q.docs.isNotEmpty) return;
-    await _db.collection('enrollments').add({
-      'classId': classId,
-      'studentUid': studentUid,
-      'joinDate': FieldValue.serverTimestamp(),
-    });
-  }
-
-  /// Import classes từ danh sách: {courseCode, lecturerEmail, semester, className}
-  /// Trả về: {created, skipped}
-  Future<Map<String, int>> importClassesFromList(
-    List<Map<String, dynamic>> classRows,
-  ) async {
-    int created = 0, skipped = 0;
-    final batch = _db.batch();
-    for (final r in classRows) {
-      final classId = (r['classId'] ?? '').toString().trim();
-      final className = (r['className'] ?? '').toString().trim();
-
-      final docRef = _db.collection('classes').doc();
-      batch.set(docRef, {
-        'classId': classId,
-        'className': className,
-        'isArchived': false,
-        'createdAt': FieldValue.serverTimestamp(),
-        'joinCode': '',
-      });
-      created++;
-    }
-    await batch.commit();
-    return {'created': created, 'skipped': skipped};
-  }
-}
-
-extension CourseImportWrite on AdminService {
-  Future<void> bulkImportCoursesFromImportModels(
-    List<CourseImportModel> rows,
-  ) async {
-    final batch = _db.batch();
-    final now = FieldValue.serverTimestamp();
-
-    // Cache email -> uid
-    final Map<String, String> cacheEmailToUid = {};
-
-    Future<String?> resolveLecturerId(String? email) async {
-      if (email == null || email.trim().isEmpty) return null;
-      final norm = email.trim().toLowerCase();
-      if (cacheEmailToUid.containsKey(norm)) return cacheEmailToUid[norm]!;
-      final q = await _db
-          .collection('users')
-          .where('email', isEqualTo: norm)
-          .limit(1)
-          .get();
-      if (q.docs.isEmpty) return null;
-      final uid = q.docs.first.id;
-      cacheEmailToUid[norm] = uid;
-      return uid;
-    }
-
-    for (final c in rows) {
-      final lecturerId = await resolveLecturerId(c.lecturerEmail);
-      final docRef = _db.collection('courses').doc();
-      batch.set(docRef, {
-        'courseCode': c.courseCode,
-        'courseName': c.courseName,
-        'credits': c.credits,
-        'minStudents': c.minStudents,
-        'maxStudents': c.maxStudents,
-        'lecturerId': lecturerId,
-        'isArchived': false,
-        'createdAt': now,
-        'updatedAt': now,
-        'weeklySchedule': c.weeklySchedule.map((e) => e.toJson()).toList(),
-        if (c.description != null) 'description': c.description,
-        if (c.notes != null) 'note': c.notes,
-        'startDate': Timestamp.fromDate(c.startDate),
-        'endDate': Timestamp.fromDate(c.endDate),
-      });
-    }
-
-    await batch.commit();
   }
 }

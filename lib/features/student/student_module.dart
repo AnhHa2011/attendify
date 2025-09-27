@@ -8,9 +8,9 @@ export 'data/models/student_session_detail.dart';
 export 'data/services/student_service.dart';
 
 // Export student presentation pages
-export 'presentation/pages/student_class_list_page.dart';
+export 'presentation/pages/student_course_list_page.dart';
 export 'presentation/pages/qr_scanner_page.dart';
-export 'presentation/pages/join_class_scanner_page.dart';
+export 'presentation/pages/join_course_scanner_page.dart';
 
 // Export student attendance pages
 export 'presentation/attendance/student_attendance_history_page.dart';
@@ -19,7 +19,7 @@ export 'presentation/attendance/student_attendance_history_page.dart';
 export 'presentation/schedule/student_schedule_page.dart';
 
 // Export student class detail pages
-export 'presentation/classes/student_class_detail_page.dart';
+export 'presentation/courses/student_course_detail_page.dart';
 
 // Export student notification pages
 export 'presentation/notifications/notification_settings_page.dart';

@@ -73,7 +73,7 @@ class _LecturerCoursesScreenState extends State<LecturerCoursesScreen> {
     });
   }
 
-  Future<void> _regenerateJoinCode(String courseId, String courseName) async {
+  Future<void> _regenerateJoinCode(String courseCode, String courseName) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -112,7 +112,7 @@ class _LecturerCoursesScreenState extends State<LecturerCoursesScreen> {
         );
 
         final newJoinCode = await _lecturerService.generateNewJoinCode(
-          courseId,
+          courseCode,
         );
 
         if (mounted) {
@@ -312,9 +312,9 @@ class _LecturerCoursesScreenState extends State<LecturerCoursesScreen> {
   }
 
   Widget _buildCourseCard(Map<String, dynamic> course) {
-    final courseId = course['id'] as String;
-    final courseName = course['name'] as String;
-    final courseCode = course['code'] as String;
+    final id = course['id'] as String;
+    final courseName = course['courseName'] as String;
+    final courseCode = course['courseCode'] as String;
     final credits = course['credits'] as int;
     final joinCode = course['joinCode'] as String?;
     final description = course['description'] as String? ?? '';
@@ -326,7 +326,7 @@ class _LecturerCoursesScreenState extends State<LecturerCoursesScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => CourseDetail(courseId: courseId),
+              builder: (context) => CourseDetail(courseCode: courseCode),
             ),
           );
         },
@@ -377,14 +377,14 @@ class _LecturerCoursesScreenState extends State<LecturerCoursesScreen> {
                     onSelected: (value) {
                       switch (value) {
                         case 'regenerate_code':
-                          _regenerateJoinCode(courseId, courseName);
+                          _regenerateJoinCode(courseCode, courseName);
                           break;
                         case 'create_session':
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) =>
-                                  SessionManagement(courseId: courseId),
+                                  SessionManagement(courseCode: courseCode),
                             ),
                           );
                           break;
@@ -494,7 +494,7 @@ class _LecturerCoursesScreenState extends State<LecturerCoursesScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) =>
-                                SessionManagement(courseId: courseId),
+                                SessionManagement(courseCode: courseCode),
                           ),
                         );
                       },
@@ -510,7 +510,7 @@ class _LecturerCoursesScreenState extends State<LecturerCoursesScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) =>
-                                CourseDetail(courseId: courseId),
+                                CourseDetail(courseCode: courseCode),
                           ),
                         );
                       },

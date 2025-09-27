@@ -1,11 +1,9 @@
 // lib/features/admin/presentation/pages/admin_profile.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:math' as math;
 
 import '../../../../app/providers/auth_provider.dart';
 import '../../../auth/presentation/pages/edit_account_page.dart';
-import '../../../auth/presentation/pages/update_my_password.dart';
 
 class AdminProfile extends StatefulWidget {
   const AdminProfile({super.key});
@@ -44,8 +42,7 @@ class _AdminProfileState extends State<AdminProfile>
           curve: Interval(
             index * 0.2,
             0.6 + (index * 0.1),
-            curve: Curves
-                .fastOutSlowIn, // Thay đổi từ Curves.easeOutBack để tránh vượt 1.0
+            curve: Curves.easeOutBack,
           ),
         ),
       );
@@ -102,12 +99,12 @@ class _AdminProfileState extends State<AdminProfile>
                   animation: _cardAnimations[0],
                   builder: (context, child) {
                     return Transform.translate(
-                      offset: Offset(0, 30 * (1 - _cardAnimations[0].value)),
+                      offset: Offset(
+                        0,
+                        30 * (1 - _cardAnimations[0].value).clamp(0.0, 1.0),
+                      ),
                       child: Opacity(
-                        opacity: math.min(
-                          1.0,
-                          math.max(0.0, _cardAnimations[0].value),
-                        ),
+                        opacity: _cardAnimations[0].value.clamp(0.0, 1.0),
                         child: _buildProfileHeader(theme, user),
                       ),
                     );
@@ -127,13 +124,10 @@ class _AdminProfileState extends State<AdminProfile>
                         return Transform.translate(
                           offset: Offset(
                             0,
-                            30 * (1 - _cardAnimations[1].value),
+                            30 * (1 - _cardAnimations[1].value).clamp(0.0, 1.0),
                           ),
                           child: Opacity(
-                            opacity: math.min(
-                              1.0,
-                              math.max(0.0, _cardAnimations[1].value),
-                            ),
+                            opacity: _cardAnimations[1].value.clamp(0.0, 1.0),
                             child: _buildPersonalInfoSection(theme, user),
                           ),
                         );
@@ -149,13 +143,10 @@ class _AdminProfileState extends State<AdminProfile>
                         return Transform.translate(
                           offset: Offset(
                             0,
-                            30 * (1 - _cardAnimations[2].value),
+                            30 * (1 - _cardAnimations[2].value).clamp(0.0, 1.0),
                           ),
                           child: Opacity(
-                            opacity: math.min(
-                              1.0,
-                              math.max(0.0, _cardAnimations[2].value),
-                            ),
+                            opacity: _cardAnimations[2].value.clamp(0.0, 1.0),
                             child: _buildSystemSection(theme),
                           ),
                         );
@@ -372,25 +363,18 @@ class _AdminProfileState extends State<AdminProfile>
           theme: theme,
           icon: Icons.security_rounded,
           title: 'Bảo mật',
-          subtitle: 'Thay đổi mật khẩu',
+          subtitle: 'Quản lý mật khẩu và xác thực',
           trailing: Icons.chevron_right_rounded,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const UpdateMyPassWordPage(),
-              ),
-            );
-          },
+          onTap: () => _showSecurityDialog(),
         ),
-        // _buildInfoTile(
-        //   theme: theme,
-        //   icon: Icons.backup_rounded,
-        //   title: 'Sao lưu dữ liệu',
-        //   subtitle: 'Export toàn bộ dữ liệu hệ thống',
-        //   trailing: Icons.chevron_right_rounded,
-        //   onTap: () => _showBackupDialog(),
-        // ),
+        _buildInfoTile(
+          theme: theme,
+          icon: Icons.backup_rounded,
+          title: 'Sao lưu dữ liệu',
+          subtitle: 'Export toàn bộ dữ liệu hệ thống',
+          trailing: Icons.chevron_right_rounded,
+          onTap: () => _showBackupDialog(),
+        ),
         _buildInfoTile(
           theme: theme,
           icon: Icons.notifications_rounded,

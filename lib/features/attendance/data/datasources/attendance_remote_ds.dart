@@ -11,12 +11,12 @@ class AttendanceRemoteDS {
     List<({String sessionId, DateTime start, String name, AttendanceModel att})>
   >
   historyForStudentInClass({
-    required String classId,
+    required String classCode,
     required String studentId,
   }) async {
     final sSnap = await _fs
         .collection('sessions')
-        .where('classId', isEqualTo: classId)
+        .where('classCode', isEqualTo: classCode)
         .get();
 
     final items =
@@ -30,7 +30,7 @@ class AttendanceRemoteDS {
       final name = (m['name'] ?? 'Buổi ${m['order'] ?? ''}').toString();
       final attSnap = await _fs
           .collection('classes')
-          .doc(classId)
+          .doc(classCode)
           .collection('sessions')
           .doc(s.id)
           .collection('attendances')
@@ -46,7 +46,7 @@ class AttendanceRemoteDS {
   }
 
   Future<List<Map<String, dynamic>>> historyForStudent({
-    required String classId,
+    required String classCode,
     required String studentId,
   }) async {
     final now = DateTime.now();
@@ -54,7 +54,7 @@ class AttendanceRemoteDS {
     // 1) Lấy tất cả sessions của lớp
     final sSnap = await _fs
         .collection('sessions')
-        .where('classId', isEqualTo: classId)
+        .where('classCode', isEqualTo: classCode)
         .orderBy('startTime')
         .get();
 
@@ -62,7 +62,7 @@ class AttendanceRemoteDS {
     final leaveSnap = await _fs
         .collection('leave_requests')
         .where('studentId', isEqualTo: studentId)
-        .where('classId', isEqualTo: classId)
+        .where('classCode', isEqualTo: classCode)
         .get();
 
     final leaveSessionIds = leaveSnap.docs
@@ -81,7 +81,7 @@ class AttendanceRemoteDS {
       if (isPast || hasLeave) {
         final attSnap = await _fs
             .collection('classes')
-            .doc(classId)
+            .doc(classCode)
             .collection('sessions')
             .doc(s.id)
             .collection('attendances')

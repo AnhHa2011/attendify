@@ -1,10 +1,9 @@
-import 'package:attendify/features/leave/data/services/leave_request_service.dart';
+import 'package:attendify/features/student/data/services/student_leave_request_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:attendify/features/leave/data/models/leave_request_model.dart';
-import 'package:attendify/features/leave/presentation/widgets/leave_request_tile.dart';
-
-import '../../../leave/presentation/pages/create_leave_request_page.dart';
+import 'package:attendify/core/presentation/widgets/leave_request_tile.dart';
+import '../../../../core/data/models/leave_request_model.dart';
+import 'create_leave_request_page.dart';
 
 class LeaveRequestStatusPage extends StatefulWidget {
   const LeaveRequestStatusPage({super.key});
@@ -13,7 +12,7 @@ class LeaveRequestStatusPage extends StatefulWidget {
 }
 
 class _LeaveRequestStatusPageState extends State<LeaveRequestStatusPage> {
-  final _ds = LeaveRequestService();
+  final _ds = StudentLeaveRequestService();
   String? _statusFilter; // null = all; 'pending' | 'approved' | 'rejected'
 
   @override

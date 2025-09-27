@@ -1,14 +1,10 @@
 // lib/features/Student/presentation/pages/Student_layout.dart
 
 import 'package:attendify/app_imports.dart' hide AuthProvider;
-import 'package:attendify/features/schedule/presentation/pages/schedule_page.dart';
 
 import '../../../../app/providers/auth_provider.dart';
-import '../../../classes/data/services/class_service.dart';
+import '../../../../core/data/services/courses_service.dart';
 import '../../student_module.dart';
-import '../schedule/student_schedule_page.dart';
-import 'join_class_scanner_page.dart';
-import 'qr_scanner_page.dart';
 
 class StudentLayout extends StatelessWidget {
   const StudentLayout({super.key});
@@ -35,7 +31,7 @@ class StudentLayout extends StatelessWidget {
       RoleNavigationItem(
         icon: Icons.class_outlined,
         activeIcon: Icons.class_outlined,
-        label: 'Tham gia lớp học',
+        label: 'Tham gia môn học',
         gradient: LinearGradient(
           colors: [Colors.orange.shade400, Colors.orange.shade600],
         ),
@@ -43,7 +39,7 @@ class StudentLayout extends StatelessWidget {
       RoleNavigationItem(
         icon: Icons.class_outlined,
         activeIcon: Icons.class_outlined,
-        label: 'Lớp học',
+        label: 'Môn học',
         gradient: LinearGradient(
           colors: [Colors.orange.shade400, Colors.orange.shade600],
         ),
@@ -85,8 +81,8 @@ class StudentLayout extends StatelessWidget {
     final pages = const [
       StudentSchedulePage(),
       QrScannerPage(),
-      _JoinClassPage(),
-      StudentClassListPage(),
+      _JoinCoursePage(),
+      StudentCourseListPage(),
       StudentAttendanceHistoryPage(),
       LeaveRequestStatusPage(),
       _StudentProfilePage(),
@@ -102,27 +98,27 @@ class StudentLayout extends StatelessWidget {
   }
 }
 
-// WIDGET CHO CHỨC NĂNG THAM GIA LỚP - Tối ưu cho mobile
-class _JoinClassPage extends StatefulWidget {
-  const _JoinClassPage();
+// WIDGET CHO CHỨC NĂNG THAM GIA môn - Tối ưu cho mobile
+class _JoinCoursePage extends StatefulWidget {
+  const _JoinCoursePage();
 
   @override
-  State<_JoinClassPage> createState() => _JoinClassPageState();
+  State<_JoinCoursePage> createState() => _JoinCoursePageState();
 }
 
-class _JoinClassPageState extends State<_JoinClassPage> {
+class _JoinCoursePageState extends State<_JoinCoursePage> {
   final _formKey = GlobalKey<FormState>();
   final _codeController = TextEditingController();
   bool _isLoading = false;
 
-  Future<void> _submitJoinClass({required String joinCode}) async {
+  Future<void> _submitJoinCourse({required String joinCode}) async {
     setState(() => _isLoading = true);
     try {
-      final classService = context.read<ClassService>();
+      final courseService = context.read<CourseService>();
       final auth = context.read<AuthProvider>();
       final user = auth.user!;
 
-      await classService.enrollStudent(
+      await courseService.enrollStudent(
         joinCode: joinCode,
         studentUid: user.uid,
         studentName: user.displayName ?? 'N/A',
@@ -132,7 +128,7 @@ class _JoinClassPageState extends State<_JoinClassPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Tham gia lớp học thành công!'),
+          content: Text('Tham gia môn học thành công!'),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
         ),
@@ -155,11 +151,11 @@ class _JoinClassPageState extends State<_JoinClassPage> {
   Future<void> _scanAndJoin() async {
     final scannedCode = await Navigator.push<String>(
       context,
-      MaterialPageRoute(builder: (context) => const JoinClassScannerPage()),
+      MaterialPageRoute(builder: (context) => const JoinCourseScannerPage()),
     );
     if (scannedCode != null && scannedCode.isNotEmpty) {
       _codeController.text = scannedCode;
-      await _submitJoinClass(joinCode: scannedCode);
+      await _submitJoinCourse(joinCode: scannedCode);
     }
   }
 
@@ -219,7 +215,7 @@ class _JoinClassPageState extends State<_JoinClassPage> {
                         ),
                         SizedBox(height: screenSize.width < 360 ? 12 : 16),
                         Text(
-                          'Tham gia lớp học',
+                          'Tham gia môn học',
                           style:
                               (screenSize.width < 360
                                       ? theme.textTheme.titleLarge
@@ -260,7 +256,7 @@ class _JoinClassPageState extends State<_JoinClassPage> {
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) {
                       if (_formKey.currentState!.validate()) {
-                        _submitJoinClass(joinCode: _codeController.text);
+                        _submitJoinCourse(joinCode: _codeController.text);
                       }
                     },
                     validator: (value) {
@@ -279,7 +275,7 @@ class _JoinClassPageState extends State<_JoinClassPage> {
                         ? null
                         : () {
                             if (_formKey.currentState!.validate()) {
-                              _submitJoinClass(joinCode: _codeController.text);
+                              _submitJoinCourse(joinCode: _codeController.text);
                             }
                           },
                     icon: _isLoading

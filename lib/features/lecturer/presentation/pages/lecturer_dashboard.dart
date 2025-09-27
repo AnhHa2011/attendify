@@ -55,8 +55,7 @@ class _LecturerDashboardState extends State<LecturerDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
-      body: SafeArea(
-        child: RefreshIndicator(
+      body: RefreshIndicator(
         onRefresh: _loadDashboardData,
         child: CustomScrollView(
           slivers: [
@@ -112,7 +111,6 @@ class _LecturerDashboardState extends State<LecturerDashboard> {
               ),
             ),
           ],
-        ),
         ),
       ),
     );
@@ -191,7 +189,7 @@ class _LecturerDashboardState extends State<LecturerDashboard> {
           children: [
             Expanded(
               child: _buildStatCard(
-                title: 'Số lớp giảng dạy',
+                title: 'Số môn giảng dạy',
                 value: data['totalCourses'].toString(),
                 icon: Icons.school,
                 color: Colors.blue,
@@ -311,7 +309,7 @@ class _LecturerDashboardState extends State<LecturerDashboard> {
               ),
             ),
             _buildActionCard(
-              title: 'Quản lý lớp học',
+              title: 'Quản lý môn học',
               icon: Icons.class_,
               color: Colors.green,
               onTap: () => Navigator.push(
@@ -554,7 +552,7 @@ class _LecturerDashboardState extends State<LecturerDashboard> {
                       Icons.school,
                     ),
                     _buildTodayStatItem(
-                      'Lớp học',
+                      'môn học',
                       data['totalCourses'].toString(),
                       Icons.class_,
                     ),

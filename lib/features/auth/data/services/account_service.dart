@@ -28,7 +28,7 @@ class AccountService {
     await _db.collection('users').doc(u.uid).set({
       'displayName': trimmed,
       'email': u.email,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAt': Timestamp.now().toDate(),
     }, SetOptions(merge: true));
     await u.reload();
   }
@@ -42,7 +42,7 @@ class AccountService {
     await u.updatePhotoURL(url);
     await _db.collection('users').doc(u.uid).set({
       'photoURL': url,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAt': Timestamp.now().toDate(),
     }, SetOptions(merge: true));
     await u.reload();
   }
@@ -69,7 +69,7 @@ class AccountService {
     await u.updatePhotoURL(url);
     await _db.collection('users').doc(u.uid).set({
       'photoURL': url,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAt': Timestamp.now().toDate(),
     }, SetOptions(merge: true));
     await u.reload();
 

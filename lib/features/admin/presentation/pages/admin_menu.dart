@@ -1,16 +1,16 @@
 // lib/features/admin/presentation/pages/admin_menu_new.dart
 import 'package:attendify/features/admin/presentation/pages/leave_request_management_page.dart';
-import 'package:attendify/features/common/presentation/widgets/profile_widget.dart';
+import 'package:attendify/core/presentation/widgets/profile_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/providers/navigation_provider.dart';
-import '../../../common/presentation/pages/dashboard_page.dart';
-import '../../../common/presentation/widgets/drawer_scaffold.dart';
-import '../../../common/widgets/role_drawer_scaffold.dart';
+import '../../../../core/presentation/pages/dashboard_page.dart';
+import '../../../../core/presentation/widgets/drawer_scaffold.dart';
+import 'admin_ui_components.dart';
 import 'user_management/user_management_page.dart';
-import 'course_management/course_management_page.dart';
 import 'class_management/class_management_page.dart';
+import 'course_management/course_management_page.dart';
 
 class AdminMenuPage extends StatelessWidget {
   const AdminMenuPage({super.key});

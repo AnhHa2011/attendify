@@ -1,7 +1,8 @@
-// lib/features/student/presentation/pages/student_profile.dart
+// lib/features/admin/presentation/pages/admin_profile.dart
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:math' as math;
 
 import '../../../../app/providers/auth_provider.dart';
 import '../../../auth/presentation/pages/edit_account_page.dart';

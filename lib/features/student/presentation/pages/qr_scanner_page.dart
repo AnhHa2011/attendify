@@ -14,15 +14,80 @@ class QrScannerPage extends StatefulWidget {
   State<QrScannerPage> createState() => _QrScannerPageState();
 }
 
-class _QrScannerPageState extends State<QrScannerPage> {
+class _QrScannerPageState extends State<QrScannerPage>
+    with WidgetsBindingObserver {
   final MobileScannerController controller = MobileScannerController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isProcessing = false;
+  bool _isCameraActive = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        if (_isCameraActive && !_isProcessing) {
+          controller.start();
+        }
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+        controller.stop();
+        break;
+      case AppLifecycleState.hidden:
+        controller.stop();
+        break;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pauseCamera();
+    controller.dispose();
+    super.dispose();
+  }
+
+  void _pauseCamera() {
+    try {
+      controller.stop();
+      setState(() => _isCameraActive = false);
+    } catch (e) {
+      // Handle error silently
+    }
+  }
+
+  void _resumeCamera() {
+    if (!_isProcessing && mounted) {
+      try {
+        controller.start();
+        setState(() => _isCameraActive = true);
+      } catch (e) {
+        // Handle error silently
+      }
+    }
+  }
+
+  void _toggleCamera() {
+    if (_isCameraActive) {
+      _pauseCamera();
+    } else {
+      _resumeCamera();
+    }
+  }
 
   Future<void> _handleScannedData(String qrData) async {
     if (_isProcessing) return;
+
     setState(() => _isProcessing = true);
-    controller.stop();
+    _pauseCamera();
 
     try {
       final parts = qrData.split('|');
@@ -45,7 +110,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
 
       final sessionData = sessionDoc.data()!;
       final isOpen = sessionData['isOpen'] ?? false;
-      final classId = sessionData['classId'] as String;
+      final courseCode = sessionData['courseCode'] ?? '' as String;
 
       if (!isOpen) {
         throw Exception("Session đã đóng. Không thể điểm danh.");
@@ -54,13 +119,13 @@ class _QrScannerPageState extends State<QrScannerPage> {
       // Kiểm tra sinh viên có trong lớp không
       final enrollmentQuery = await _firestore
           .collection('enrollments')
-          .where('classId', isEqualTo: classId)
-          .where('studentId', isEqualTo: studentId)
+          .where('courseCode', isEqualTo: courseCode)
+          .where('studentUid', isEqualTo: studentId)
           .limit(1)
           .get();
 
       if (enrollmentQuery.docs.isEmpty) {
-        throw Exception("Bạn không thuộc lớp học này.");
+        throw Exception("Bạn không thuộc môn học này.");
       }
 
       // Kiểm tra đã điểm danh chưa
@@ -80,7 +145,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
         'sessionId': sessionId,
         'studentId': studentId,
         'status': 'present',
-        'timestamp': FieldValue.serverTimestamp(),
+        'timestamp': Timestamp.now().toDate(),
         'method': 'qr_code',
       });
 
@@ -106,16 +171,10 @@ class _QrScannerPageState extends State<QrScannerPage> {
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {
           setState(() => _isProcessing = false);
-          controller.start();
+          _resumeCamera();
         }
       });
     }
-  }
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
   }
 
   @override
@@ -131,6 +190,14 @@ class _QrScannerPageState extends State<QrScannerPage> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         elevation: 0,
+        leading: IconButton(
+          onPressed: () {
+            _pauseCamera();
+            Navigator.of(context).pop();
+          },
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Quay lại',
+        ),
         actions: [
           IconButton(
             onPressed: () {
@@ -144,15 +211,37 @@ class _QrScannerPageState extends State<QrScannerPage> {
       body: Stack(
         children: [
           // Camera Scanner
-          MobileScanner(
-            controller: controller,
-            onDetect: (capture) {
-              final List<Barcode> barcodes = capture.barcodes;
-              if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
-                _handleScannedData(barcodes.first.rawValue!);
-              }
-            },
-          ),
+          _isCameraActive
+              ? MobileScanner(
+                  controller: controller,
+                  onDetect: (capture) {
+                    final List<Barcode> barcodes = capture.barcodes;
+                    if (barcodes.isNotEmpty &&
+                        barcodes.first.rawValue != null) {
+                      _handleScannedData(barcodes.first.rawValue!);
+                    }
+                  },
+                )
+              : Container(
+                  color: Colors.black,
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.videocam_off, color: Colors.white, size: 64),
+                        SizedBox(height: 16),
+                        Text(
+                          'Camera đã tạm dừng',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
           // Overlay UI
           Center(
@@ -165,7 +254,11 @@ class _QrScannerPageState extends State<QrScannerPage> {
                   height: 280,
                   decoration: BoxDecoration(
                     border: Border.all(
-                      color: _isProcessing ? Colors.orange : Colors.white,
+                      color: _isProcessing
+                          ? Colors.orange
+                          : _isCameraActive
+                          ? Colors.white
+                          : Colors.grey,
                       width: 3,
                     ),
                     borderRadius: BorderRadius.circular(16),
@@ -201,7 +294,9 @@ class _QrScannerPageState extends State<QrScannerPage> {
                       Icon(
                         _isProcessing
                             ? Icons.hourglass_empty
-                            : Icons.qr_code_scanner,
+                            : _isCameraActive
+                            ? Icons.qr_code_scanner
+                            : Icons.videocam_off,
                         color: Colors.white,
                         size: 32,
                       ),
@@ -209,7 +304,9 @@ class _QrScannerPageState extends State<QrScannerPage> {
                       Text(
                         _isProcessing
                             ? 'Đang xử lý điểm danh...'
-                            : 'Đưa camera đến mã QR để điểm danh',
+                            : _isCameraActive
+                            ? 'Đưa camera đến mã QR để điểm danh'
+                            : 'Camera đã tạm dừng',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -217,7 +314,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      if (!_isProcessing) ...[
+                      if (!_isProcessing && _isCameraActive) ...[
                         const SizedBox(height: 4),
                         const Text(
                           'Đảm bảo mã QR nằm trong khung trên',
@@ -232,27 +329,29 @@ class _QrScannerPageState extends State<QrScannerPage> {
             ),
           ),
 
-          // Corner decorations
-          Positioned(
-            top: MediaQuery.of(context).size.height / 2 - 140,
-            left: MediaQuery.of(context).size.width / 2 - 140,
-            child: _buildCorner(isTopLeft: true),
-          ),
-          Positioned(
-            top: MediaQuery.of(context).size.height / 2 - 140,
-            right: MediaQuery.of(context).size.width / 2 - 140,
-            child: _buildCorner(isTopRight: true),
-          ),
-          Positioned(
-            bottom: MediaQuery.of(context).size.height / 2 - 140,
-            left: MediaQuery.of(context).size.width / 2 - 140,
-            child: _buildCorner(isBottomLeft: true),
-          ),
-          Positioned(
-            bottom: MediaQuery.of(context).size.height / 2 - 140,
-            right: MediaQuery.of(context).size.width / 2 - 140,
-            child: _buildCorner(isBottomRight: true),
-          ),
+          // Corner decorations - chỉ hiện khi camera active
+          if (_isCameraActive) ...[
+            Positioned(
+              top: MediaQuery.of(context).size.height / 2 - 140,
+              left: MediaQuery.of(context).size.width / 2 - 140,
+              child: _buildCorner(isTopLeft: true),
+            ),
+            Positioned(
+              top: MediaQuery.of(context).size.height / 2 - 140,
+              right: MediaQuery.of(context).size.width / 2 - 140,
+              child: _buildCorner(isTopRight: true),
+            ),
+            Positioned(
+              bottom: MediaQuery.of(context).size.height / 2 - 140,
+              left: MediaQuery.of(context).size.width / 2 - 140,
+              child: _buildCorner(isBottomLeft: true),
+            ),
+            Positioned(
+              bottom: MediaQuery.of(context).size.height / 2 - 140,
+              right: MediaQuery.of(context).size.width / 2 - 140,
+              child: _buildCorner(isBottomRight: true),
+            ),
+          ],
         ],
       ),
       bottomNavigationBar: Container(
@@ -268,12 +367,21 @@ class _QrScannerPageState extends State<QrScannerPage> {
                   _buildActionButton(
                     icon: Icons.flash_on,
                     label: 'Đèn flash',
-                    onTap: () => controller.toggleTorch(),
+                    onTap: _isCameraActive
+                        ? () => controller.toggleTorch()
+                        : null,
+                  ),
+                  _buildActionButton(
+                    icon: _isCameraActive ? Icons.videocam : Icons.videocam_off,
+                    label: _isCameraActive ? 'Tạm dừng' : 'Bật camera',
+                    onTap: _isProcessing ? null : _toggleCamera,
                   ),
                   _buildActionButton(
                     icon: Icons.cameraswitch,
                     label: 'Đổi camera',
-                    onTap: () => controller.switchCamera(),
+                    onTap: _isCameraActive
+                        ? () => controller.switchCamera()
+                        : null,
                   ),
                   _buildActionButton(
                     icon: Icons.help_outline,
@@ -320,23 +428,29 @@ class _QrScannerPageState extends State<QrScannerPage> {
   Widget _buildActionButton({
     required IconData icon,
     required String label,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
   }) {
+    final isEnabled = onTap != null;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.white, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
-          ],
+      child: Opacity(
+        opacity: isEnabled ? 1.0 : 0.5,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 24),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -393,7 +507,8 @@ class _QrScannerPageState extends State<QrScannerPage> {
                 '2. Đảm bảo mã QR nằm trong khung quét\n'
                 '3. Giữ máy ổn định và đợi quét tự động\n'
                 '4. Khi thành công, bạn sẽ thấy thông báo xanh\n'
-                '5. Mỗi session chỉ có thể điểm danh một lần',
+                '5. Mỗi session chỉ có thể điểm danh một lần\n'
+                '6. Có thể tạm dừng camera để tiết kiệm pin',
                 style: TextStyle(fontSize: 16, height: 1.5),
               ),
               const SizedBox(height: 24),

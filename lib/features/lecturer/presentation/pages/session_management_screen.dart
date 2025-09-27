@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 class SessionManagement extends StatelessWidget {
-  final String? courseId;
+  final String? courseCode;
 
-  const SessionManagement({Key? key, this.courseId}) : super(key: key);
+  const SessionManagement({Key? key, this.courseCode}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../app/providers/auth_provider.dart';
 import '../../data/services/student_service.dart';
-import '../../../schedule/presentation/pages/schedule_page.dart';
+import '../../../../core/presentation/pages/schedule_page.dart';
 
 class StudentSchedulePage extends StatefulWidget {
   const StudentSchedulePage({super.key});

@@ -2,6 +2,7 @@ import 'package:attendify/app_imports.dart' hide LeaveRequestStatus;
 import 'package:attendify/features/lecturer/models/leave_request.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../core/data/models/course_model.dart';
 import '../models/class_session.dart';
 import '../models/attendance_record.dart';
 import 'notification_service.dart';
@@ -33,14 +34,14 @@ class LecturerService {
           .where('lecturerId', isEqualTo: currentLecturerId)
           .get();
 
-      final courseIds = coursesSnapshot.docs.map((doc) => doc.id).toList();
+      final courseCodes = coursesSnapshot.docs.map((doc) => doc.id).toList();
 
       // Get total students across all courses
       int totalStudents = 0;
-      for (String courseId in courseIds) {
+      for (String courseCode in courseCodes) {
         final enrollmentsSnapshot = await _firestore
             .collection('enrollments')
-            .where('courseId', isEqualTo: courseId)
+            .where('courseCode', isEqualTo: courseCode)
             .get();
         totalStudents += enrollmentsSnapshot.docs.length;
       }
@@ -102,13 +103,13 @@ class LecturerService {
   }
 
   // Generate new join code for course
-  Future<String> generateNewJoinCode(String courseId) async {
+  Future<String> generateNewJoinCode(String courseCode) async {
     try {
       final newJoinCode = _generateJoinCode();
 
-      await _firestore.collection('courses').doc(courseId).update({
+      await _firestore.collection('courses').doc(courseCode).update({
         'joinCode': newJoinCode,
-        'updatedAt': FieldValue.serverTimestamp(),
+        'updatedAt': Timestamp.now().toDate(),
       });
 
       return newJoinCode;
@@ -144,7 +145,7 @@ class LecturerService {
         'qrCode': qrCode,
         'qrCodeExpiry': expiry,
         'isAttendanceOpen': true,
-        'updatedAt': FieldValue.serverTimestamp(),
+        'updatedAt': Timestamp.now().toDate(),
       });
 
       return qrCode;
@@ -160,7 +161,7 @@ class LecturerService {
         'isAttendanceOpen': false,
         'qrCode': null,
         'qrCodeExpiry': null,
-        'updatedAt': FieldValue.serverTimestamp(),
+        'updatedAt': Timestamp.now().toDate(),
       });
     } catch (e) {
       throw Exception('Error closing attendance: $e');
@@ -215,8 +216,8 @@ class LecturerService {
       await _firestore.collection('leaveRequests').doc(requestId).update({
         'status': status.name,
         'lecturerResponse': response,
-        'responseDate': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
+        'responseDate': Timestamp.now().toDate(),
+        'updatedAt': Timestamp.now().toDate(),
       });
     } catch (e) {
       throw Exception('Error responding to leave request: $e');
@@ -240,10 +241,10 @@ class LecturerService {
   }
 
   // Get course sessions
-  Stream<List<ClassSession>> getCourseSessions(String courseId) {
+  Stream<List<ClassSession>> getCourseSessions(String courseCode) {
     return _firestore
         .collection('sessions')
-        .where('courseId', isEqualTo: courseId)
+        .where('courseCode', isEqualTo: courseCode)
         .orderBy('startTime', descending: true)
         .snapshots()
         .map(

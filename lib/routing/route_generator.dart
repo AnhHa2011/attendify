@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/data/models/user_model.dart';
 import '../features/student/presentation/pages/student_main.dart';
 import 'app_routes.dart';
 import '../features/auth/presentation/pages/login_page.dart';
@@ -8,7 +9,6 @@ import '../features/auth/presentation/pages/reset_password_page.dart';
 import '../features/admin/presentation/pages/admin_main.dart';
 import '../features/lecturer/presentation/pages/lecturer_main.dart';
 import '../app/providers/auth_provider.dart';
-import '../features/common/data/models/user_model.dart';
 
 class RouteGenerator {
   static Route<dynamic> generateRoute(RouteSettings settings) {

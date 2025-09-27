@@ -84,10 +84,10 @@ class _QRScannerPageState extends State<QRScannerPage> {
               Text('Loại: ${_getTypeText(result.type)}'),
               const SizedBox(height: 8),
               if (result.type == QRType.attendance) ...[
-                Text('Lớp: ${result.data['classId'] ?? 'N/A'}'),
+                Text('Lớp: ${result.data['classCode'] ?? 'N/A'}'),
                 Text('Phiên: ${result.data['sessionId'] ?? 'N/A'}'),
               ] else if (result.type == QRType.joinClass) ...[
-                Text('Lớp: ${result.data['classId'] ?? 'N/A'}'),
+                Text('Lớp: ${result.data['classCode'] ?? 'N/A'}'),
                 Text('Môn học: ${result.data['courseCode'] ?? 'N/A'}'),
               ],
             ] else ...[

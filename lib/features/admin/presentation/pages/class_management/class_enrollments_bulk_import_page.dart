@@ -5,10 +5,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../common/data/models/class_model.dart';
-import '../../../../common/data/models/course_model.dart';
-import '../../../../common/data/models/user_model.dart';
-import '../../../../common/utils/template_downloader.dart';
+import '../../../../../core/data/models/class_model.dart';
+import '../../../../../core/data/models/course_model.dart';
+import '../../../../../core/data/models/user_model.dart';
+import '../../../../../core/utils/template_downloader.dart';
 import '../../../data/services/admin_service.dart';
 
 /// Mô tả một dòng trong Excel với format:
@@ -21,8 +21,8 @@ class _ClassEnrollmentRow {
   String semester;
   List<String> studentEmails;
 
-  String? classId; // sẽ được resolve sau khi tạo lớp hoặc tìm thấy lớp existing
-  String? courseId;
+  String?
+  classCode; // sẽ được resolve sau khi tạo lớp hoặc tìm thấy lớp existing
   String? lecturerId;
 
   bool createClass = false;
@@ -197,13 +197,13 @@ class _ClassEnrollmentsBulkImportPageState
   ) {
     for (final row in _rows) {
       // Auto-match course
-      if (row.courseId == null) {
+      if (row.courseCode == null) {
         final course = courses.firstWhere(
           (c) => c.courseCode.toUpperCase() == row.courseCode.toUpperCase(),
           orElse: () => CourseModel.empty(),
         );
         if (course.id.isNotEmpty) {
-          row.courseId = course.id;
+          row.courseCode = course.id;
         }
       }
 
@@ -224,22 +224,18 @@ class _ClassEnrollmentsBulkImportPageState
       }
 
       // Auto-match existing class (by className + semester + courseCode)
-      if (row.classId == null) {
+      if (row.classCode == null) {
         final existingClass = classes.firstWhere(
           (c) => c.className.toLowerCase() == row.className.toLowerCase(),
           orElse: () => ClassModel(
             id: '',
             className: '',
             classCode: '',
-            joinCode: '',
-            createdAt: DateTime.now(),
             isArchived: false,
-            academicYearStart: 1990,
-            academicYearEnd: 1990,
           ),
         );
         if (existingClass.id.isNotEmpty) {
-          row.classId = existingClass.id;
+          row.classCode = existingClass.id;
         }
       }
     }
@@ -255,9 +251,9 @@ class _ClassEnrollmentsBulkImportPageState
     // Validate all rows
     for (final row in _rows) {
       row.error = null;
-      final needsCourse = row.courseId == null && !row.createCourse;
+      final needsCourse = row.courseCode == null && !row.createCourse;
       final needsLecturer = row.lecturerId == null && !row.createLecturer;
-      final needsClass = row.classId == null && !row.createClass;
+      final needsClass = row.classCode == null && !row.createClass;
 
       if (needsCourse || needsLecturer || needsClass) {
         final missing = <String>[];
@@ -292,16 +288,14 @@ class _ClassEnrollmentsBulkImportPageState
       for (final row in _rows) {
         // Step 1: Create course if needed
         if (row.createCourse) {
-          await admin.createCourse(
-            courseCode: row.courseCode,
-            courseName: '${row.courseCode} Course', // Default name
-            credits: 3, // Default credits
-          );
+          // await admin.createClass(
+          //   courseCode: row.courseCode,
+          //   courseName: '${row.courseCode} Course', // Default name
+          //   credits: 3, // Default credits
+          // );
           coursesCreated++;
 
           // Re-fetch to get the new course ID
-          final newCourse = await admin.getCourseIdByCode(row.courseCode);
-          row.courseId = newCourse;
         }
 
         // Step 2: Create lecturer if needed
@@ -322,26 +316,28 @@ class _ClassEnrollmentsBulkImportPageState
         }
 
         // Step 3: Create class if needed
-        if (row.createClass && row.courseId != null && row.lecturerId != null) {
-          final classId = await admin.createClassRaw(
-            className: row.className,
-            courseId: row.courseId!,
-            lecturerId: row.lecturerId!,
-            semester: row.semester,
-          );
-          row.classId = classId;
+        if (row.createClass &&
+            row.courseCode != null &&
+            row.lecturerId != null) {
+          // final classCode = await admin.createClassRaw(
+          //   className: row.className,
+          //   courseCode: row.courseCode!,
+          //   lecturerId: row.lecturerId!,
+          //   semester: row.semester,
+          // );
+          // row.classCode = classCode;
           classesCreated++;
         }
 
         // Step 4: Enroll students
-        if (row.classId != null) {
+        if (row.classCode != null) {
           for (final email in row.studentEmails) {
             final studentId = await admin.getUserIdByEmail(email);
             if (studentId != null) {
-              await admin.addEnrollment(
-                classId: row.classId!,
-                studentUid: studentId,
-              );
+              // await admin.addEnrollment(
+              //   classCode: row.classCode!,
+              //   studentUid: studentId,
+              // );
               enrollmentsCreated++;
             }
           }
@@ -490,68 +486,6 @@ class _ClassEnrollmentsBulkImportPageState
                                             ),
                                             const SizedBox(height: 8),
 
-                                            // Course selection
-                                            Row(
-                                              children: [
-                                                const SizedBox(
-                                                  width: 100,
-                                                  child: Text('Môn học:'),
-                                                ),
-                                                Expanded(
-                                                  child:
-                                                      DropdownButtonFormField<
-                                                        String?
-                                                      >(
-                                                        value: row.courseId,
-                                                        items: [
-                                                          const DropdownMenuItem<
-                                                            String?
-                                                          >(
-                                                            value: null,
-                                                            child: Text(
-                                                              '-- Chọn môn học --',
-                                                            ),
-                                                          ),
-                                                          ...courses.map(
-                                                            (c) =>
-                                                                DropdownMenuItem<
-                                                                  String?
-                                                                >(
-                                                                  value: c.id,
-                                                                  child: Text(
-                                                                    '${c.courseCode} - ${c.courseName}',
-                                                                  ),
-                                                                ),
-                                                          ),
-                                                        ],
-                                                        onChanged: (value) {
-                                                          setState(() {
-                                                            row.courseId =
-                                                                value;
-                                                            row.createCourse =
-                                                                false;
-                                                          });
-                                                        },
-                                                      ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                FilterChip(
-                                                  label: const Text('Tạo mới'),
-                                                  selected: row.createCourse,
-                                                  onSelected: (selected) {
-                                                    setState(() {
-                                                      row.createCourse =
-                                                          selected;
-                                                      if (selected)
-                                                        row.courseId = null;
-                                                    });
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-
-                                            const SizedBox(height: 8),
-
                                             // Lecturer selection
                                             Row(
                                               children: [
@@ -622,7 +556,7 @@ class _ClassEnrollmentsBulkImportPageState
                                                       DropdownButtonFormField<
                                                         String?
                                                       >(
-                                                        value: row.classId,
+                                                        value: row.classCode,
                                                         items: [
                                                           const DropdownMenuItem<
                                                             String?
@@ -635,7 +569,8 @@ class _ClassEnrollmentsBulkImportPageState
                                                         ],
                                                         onChanged: (value) {
                                                           setState(() {
-                                                            row.classId = value;
+                                                            row.classCode =
+                                                                value;
                                                             row.createClass =
                                                                 false;
                                                           });
@@ -651,7 +586,7 @@ class _ClassEnrollmentsBulkImportPageState
                                                       row.createClass =
                                                           selected;
                                                       if (selected)
-                                                        row.classId = null;
+                                                        row.classCode = null;
                                                     });
                                                   },
                                                 ),

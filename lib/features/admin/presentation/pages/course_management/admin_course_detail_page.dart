@@ -4,20 +4,24 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../common/data/models/course_model.dart';
-import '../../../../common/data/models/user_model.dart';
+import '../../../../../core/data/models/rich_course_model.dart';
+import '../../../../../core/data/models/session_model.dart';
+import '../../../../../core/data/models/user_model.dart';
+import '../../../../../core/data/services/courses_service.dart';
+import '../../../../../core/data/services/session_service.dart';
 import '../../../data/services/admin_service.dart';
 
 class AdminCourseDetailPage extends StatelessWidget {
-  final String courseId;
-  const AdminCourseDetailPage({super.key, required this.courseId});
+  final String courseCode;
+  const AdminCourseDetailPage({super.key, required this.courseCode});
 
   @override
   Widget build(BuildContext context) {
-    final courseService = context.read<AdminService>();
+    final courseService = context.read<CourseService>();
+    final sessionService = context.read<SessionService>();
 
-    return StreamBuilder<CourseModel>(
-      stream: courseService.getRichCourseByIdStream(courseId),
+    return StreamBuilder<RichCourseModel>(
+      stream: courseService.getRichCourseStream(courseCode),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -35,15 +39,24 @@ class AdminCourseDetailPage extends StatelessWidget {
           );
         }
 
-        final courseInfo = snapshot.data!;
+        final richCourse = snapshot.data!;
+        final courseInfo = richCourse.courseInfo;
+        final lecturer = richCourse.lecturer;
         final adminSvc = context.read<AdminService>();
 
         return Scaffold(
-          appBar: AppBar(title: Text('Thông tin môn học')),
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            title: Text(courseInfo.courseName),
+            leading: IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.arrow_back),
+            ),
+          ),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
             children: [
-              // === PHẦN THÔNG TIN LỚP HỌC ===
+              // === PHẦN THÔNG TIN MÔN HỌC ===
               Card(
                 elevation: 2,
                 child: Padding(
@@ -56,38 +69,197 @@ class AdminCourseDetailPage extends StatelessWidget {
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
+                      const SizedBox(height: 8),
                       _buildInfoRow(
-                        Icons.tag,
-                        'Mã môn:',
-                        courseInfo.courseCode,
-                      ),
-                      _buildInfoRow(
-                        Icons.tag,
-                        'Số tín chỉ:',
-                        courseInfo.credits.toString(),
-                      ),
-                      _buildInfoRow(
-                        Icons.tag,
+                        Icons.person_outline,
                         'Giảng viên:',
-                        courseInfo.lecturerName ??
-                            '${courseInfo.lecturerName} ${courseInfo.lecturerEmail ?? '(${courseInfo.lecturerEmail})'}',
+                        lecturer?.displayName ?? '...',
+                      ),
+                      _buildInfoRow(
+                        Icons.tag,
+                        'Mã lớp:',
+                        courseInfo.courseCode,
                       ),
                     ],
                   ),
                 ),
               ),
               const Divider(height: 32, indent: 16, endIndent: 16),
+
+              // === PHẦN QUẢN LÝ LỊCH HỌC ===
+              _buildSectionHeader(
+                context,
+                title: 'Lịch học',
+                onSelected: (_) => _showCourseSelectorForSessionDialog(
+                  context,
+                  sessionService,
+                  courseInfo.id,
+                  courseInfo.courseName, // Pass course name
+                  lecturer,
+                ),
+              ),
+              const SizedBox(height: 8),
+              StreamBuilder<List<SessionModel>>(
+                stream: sessionService.sessionsOfCourse(courseInfo.id),
+                builder: (context, sessionSnap) {
+                  if (sessionSnap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: LinearProgressIndicator());
+                  }
+                  if (sessionSnap.hasError) {
+                    return Center(
+                      child: Text('Lỗi tải buổi học: ${sessionSnap.error}'),
+                    );
+                  }
+                  final sessions = sessionSnap.data ?? [];
+                  if (sessions.isEmpty) {
+                    return const Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(
+                          child: Text('Chưa có buổi học nào được tạo.'),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: sessions.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final session = sessions[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).primaryColor.withOpacity(0.1),
+                            child: Text(
+                              '${index + 1}',
+                              style: TextStyle(
+                                color: Theme.of(context).primaryColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            session.title,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Thời gian: ${DateFormat('dd/MM/yyyy - HH:mm').format(session.startTime)}',
+                              ),
+                              if (session.location.isNotEmpty)
+                                Text('Địa điểm: ${session.location}'),
+                              Text(
+                                'Thời lượng: ${session.duration.inMinutes} phút',
+                              ),
+                              Text(
+                                'Loại: ${session.typeDisplayName}',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              // Show status
+                              Text(
+                                'Trạng thái: ${session.statusDisplayName}',
+                                style: TextStyle(
+                                  color: _getStatusColor(session.status),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          isThreeLine: true,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Attendance toggle button
+                              IconButton(
+                                icon: Icon(
+                                  session.isOpen
+                                      ? Icons.qr_code
+                                      : Icons.qr_code_outlined,
+                                  color: session.isOpen
+                                      ? Colors.green
+                                      : Colors.grey,
+                                ),
+                                onPressed: () async {
+                                  try {
+                                    await sessionService.toggleAttendance(
+                                      session.id,
+                                      !session.isOpen,
+                                    );
+
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            !session.isOpen
+                                                ? 'Đã mở điểm danh'
+                                                : 'Đã đóng điểm danh',
+                                          ),
+                                          backgroundColor: !session.isOpen
+                                              ? Colors.green
+                                              : Colors.orange,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Lỗi: $e'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                tooltip: session.isOpen
+                                    ? 'Đóng điểm danh'
+                                    : 'Mở điểm danh',
+                              ),
+                              // Delete button
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.redAccent,
+                                ),
+                                onPressed: () => _showDeleteSessionDialog(
+                                  context,
+                                  sessionService,
+                                  session,
+                                ),
+                                tooltip: 'Xóa buổi học',
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 32, indent: 16, endIndent: 16),
+
               // === PHẦN QUẢN LÝ SINH VIÊN ===
               _buildSectionHeader(
                 context,
                 title: 'Sinh viên',
                 onSelected: (value) {
-                  switch (value) {
-                    case 'add_single':
-                      _showAddStudentDialog(context, adminSvc, courseInfo.id);
-
-                    // case 'import_file':
-                    //   _showAddStudentDialog(context, adminSvc, courseInfo.id);
+                  if (value == 'add_single') {
+                    _showAddStudentDialog(context, adminSvc, courseInfo.id);
                   }
                 },
               ),
@@ -104,7 +276,7 @@ class AdminCourseDetailPage extends StatelessWidget {
                       child: Padding(
                         padding: EdgeInsets.all(16),
                         child: Center(
-                          child: Text('Chưa có sinh viên nào trong môn.'),
+                          child: Text('Chưa có sinh viên nào trong lớp.'),
                         ),
                       ),
                     );
@@ -135,7 +307,7 @@ class AdminCourseDetailPage extends StatelessWidget {
                             ),
                             onPressed: () async => await adminSvc
                                 .unenrollStudent(courseInfo.id, student.uid),
-                            tooltip: 'Xoá khỏi môn',
+                            tooltip: 'Xoá khỏi lớp',
                           ),
                         );
                       },
@@ -150,13 +322,24 @@ class AdminCourseDetailPage extends StatelessWidget {
     );
   }
 
-  // Widget helper để tạo tiêu đề và nút bấm cho mỗi khu vực
+  Color _getStatusColor(SessionStatus status) {
+    switch (status) {
+      case SessionStatus.scheduled:
+        return Colors.blue;
+      case SessionStatus.inProgress:
+        return Colors.green;
+      case SessionStatus.completed:
+        return Colors.grey;
+      case SessionStatus.cancelled:
+        return Colors.red;
+    }
+  }
+
   Widget _buildSectionHeader(
     BuildContext context, {
     required String title,
     required Function(String) onSelected,
   }) {
-    // Menu items được định nghĩa cứng ở đây để gọn gàng
     final Map<String, List<PopupMenuEntry<String>>> menuItems = {
       'Lịch học': [
         const PopupMenuItem(
@@ -190,7 +373,6 @@ class AdminCourseDetailPage extends StatelessWidget {
       children: [
         Text(title, style: Theme.of(context).textTheme.titleLarge),
         PopupMenuButton<String>(
-          // Sửa lỗi cú pháp tại đây
           onSelected: (value) => onSelected(value),
           itemBuilder: (context) => menuItems[title]!,
           child: const Chip(
@@ -203,7 +385,6 @@ class AdminCourseDetailPage extends StatelessWidget {
     );
   }
 
-  // Widget helper để hiển thị thông tin
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -218,10 +399,304 @@ class AdminCourseDetailPage extends StatelessWidget {
     );
   }
 
+  void _showCourseSelectorForSessionDialog(
+    BuildContext context,
+    SessionService sessionService,
+    String courseCode,
+    String courseName,
+    UserModel? lecturer,
+  ) {
+    _showSessionTypeSelectorDialog(
+      context,
+      sessionService,
+      courseCode,
+      courseName,
+      lecturer,
+    );
+  }
+
+  void _showSessionTypeSelectorDialog(
+    BuildContext context,
+    SessionService sessionService,
+    String courseCode,
+    String courseName,
+    UserModel? lecturer,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Thêm lịch học:'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _showSingleSessionForm(
+                context,
+                sessionService,
+                courseCode,
+                courseName,
+                lecturer,
+              );
+            },
+            child: const ListTile(
+              leading: Icon(Icons.add),
+              title: Text('Thêm buổi đơn lẻ'),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Tính năng tạo lịch hàng loạt đang được phát triển',
+                  ),
+                ),
+              );
+            },
+            child: const ListTile(
+              leading: Icon(Icons.calendar_month),
+              title: Text('Thêm lịch hàng loạt'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSingleSessionForm(
+    BuildContext context,
+    SessionService sessionService,
+    String courseCode,
+    String courseName,
+    UserModel? lecturer,
+  ) {
+    final formKey = GlobalKey<FormState>();
+    final titleCtrl = TextEditingController();
+    final locationCtrl = TextEditingController();
+    final descriptionCtrl = TextEditingController();
+    final durationCtrl = TextEditingController(text: '90');
+    final classCodeCtrl = TextEditingController();
+
+    DateTime? selectedDate;
+    TimeOfDay? selectedTime;
+    SessionType selectedSessionType = SessionType.lecture;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Thêm buổi học đơn lẻ'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: titleCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Tiêu đề buổi học',
+                          hintText: 'Ví dụ: Buổi 1 - Giới thiệu',
+                        ),
+                        validator: (v) =>
+                            v!.trim().isEmpty ? 'Không được để trống' : null,
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<SessionType>(
+                        value: selectedSessionType,
+                        decoration: const InputDecoration(
+                          labelText: 'Loại buổi học',
+                        ),
+                        items: SessionType.values.map((type) {
+                          return DropdownMenuItem(
+                            value: type,
+                            child: Text(type.typeDisplayName),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setDialogState(() => selectedSessionType = value);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: locationCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Địa điểm',
+                          hintText: 'Số phòng hoặc link online',
+                        ),
+                        validator: (v) =>
+                            v!.trim().isEmpty ? 'Không được để trống' : null,
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: descriptionCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Mô tả (tùy chọn)',
+                          hintText: 'Nội dung buổi học...',
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: durationCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Thời lượng (phút)',
+                          hintText: '90',
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        validator: (v) {
+                          if (v!.trim().isEmpty) return 'Không được để trống';
+                          final duration = int.tryParse(v);
+                          if (duration == null || duration <= 0) {
+                            return 'Thời lượng phải là số dương';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_today),
+                              label: Text(
+                                selectedDate == null
+                                    ? 'Chọn ngày'
+                                    : DateFormat(
+                                        'dd/MM/yyyy',
+                                      ).format(selectedDate!),
+                              ),
+                              onPressed: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: DateTime.now(),
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime(2030),
+                                );
+                                if (date != null) {
+                                  setDialogState(() => selectedDate = date);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.access_time),
+                              label: Text(
+                                selectedTime == null
+                                    ? 'Chọn giờ'
+                                    : selectedTime!.format(context),
+                              ),
+                              onPressed: () async {
+                                final time = await showTimePicker(
+                                  context: context,
+                                  initialTime: TimeOfDay.now(),
+                                );
+                                if (time != null) {
+                                  setDialogState(() => selectedTime = time);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: classCodeCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Mã lớp (tùy chọn)',
+                          hintText: courseCode,
+                          helperText: 'Để trống nếu giống mã môn học',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Huỷ'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  if (formKey.currentState!.validate() &&
+                      selectedDate != null &&
+                      selectedTime != null) {
+                    final duration = int.parse(durationCtrl.text);
+                    final startTime = DateTime(
+                      selectedDate!.year,
+                      selectedDate!.month,
+                      selectedDate!.day,
+                      selectedTime!.hour,
+                      selectedTime!.minute,
+                    );
+                    final endTime = startTime.add(Duration(minutes: duration));
+
+                    try {
+                      await sessionService.createSession(
+                        courseCode: courseCode,
+                        classCode: classCodeCtrl.text.trim().isEmpty
+                            ? null
+                            : classCodeCtrl.text.trim(),
+                        courseName: courseName,
+                        lecturerId: lecturer?.uid,
+                        lecturerName: lecturer?.displayName,
+                        title: titleCtrl.text.trim(),
+                        description: descriptionCtrl.text.trim().isEmpty
+                            ? null
+                            : descriptionCtrl.text.trim(),
+                        startTime: startTime,
+                        endTime: endTime,
+                        location: locationCtrl.text.trim(),
+                        type: selectedSessionType,
+                      );
+
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Đã tạo buổi học thành công'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Lỗi tạo buổi học: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  }
+                },
+                child: const Text('Thêm'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   void _showAddStudentDialog(
     BuildContext context,
     AdminService adminSvc,
-    String courseId,
+    String courseCode,
   ) async {
     showDialog(
       context: context,
@@ -229,247 +704,159 @@ class AdminCourseDetailPage extends StatelessWidget {
       barrierDismissible: false,
     );
 
-    // Load dữ liệu
-    final allStudents = await adminSvc.getAllStudentsStream().first;
-    final classEnrolledStudents = await adminSvc
-        .getAllEnrolledStudentsStream()
-        .first;
-    final courseEnrolledStudents = await adminSvc
-        .getCourseEnrolledStudentsStream(courseId)
-        .first;
-    final allClasses = await adminSvc.getAllClassesStream().first;
+    try {
+      final allStudents = await adminSvc.getAllStudentsStream().first;
+      final enrolledStudents = await adminSvc
+          .getEnrolledStudentsStream(courseCode)
+          .first;
+      final enrolledStudentIds = enrolledStudents.map((s) => s.uid).toSet();
+      final availableStudents = allStudents
+          .where((s) => !enrolledStudentIds.contains(s.uid))
+          .toList();
 
-    final enrolledStudentIds = courseEnrolledStudents
-        .map((s) => s.studentUid)
-        .toSet();
-    final availableStudents = allStudents
-        .where((s) => !enrolledStudentIds.contains(s.uid))
-        .toList();
+      if (context.mounted) Navigator.of(context).pop();
 
-    if (context.mounted) Navigator.of(context).pop();
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        String? selectedStudentId;
-        String? selectedClassId = 'ALL'; // Default là "All"
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            // Filter sinh viên theo class được chọn
-            List<UserModel> filteredStudents;
-            if (selectedClassId == 'ALL') {
-              filteredStudents = availableStudents;
-            } else {
-              // Lấy danh sách student IDs của class được chọn
-              final classStudentIds = classEnrolledStudents
-                  .where((enrollment) => enrollment.classId == selectedClassId)
-                  .map((enrollment) => enrollment.studentUid)
-                  .toSet();
-
-              filteredStudents = availableStudents
-                  .where((student) => classStudentIds.contains(student.uid))
-                  .toList();
-            }
-
-            return AlertDialog(
-              title: const Text('Thêm sinh viên vào môn'),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Dropdown chọn class
-                    const Text(
-                      'Chọn lớp học:',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: selectedClassId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                      items: [
-                        // Option "All" mặc định
-                        const DropdownMenuItem(
-                          value: 'ALL',
-                          child: Text('Tất cả lớp'),
-                        ),
-                        // Các class khác
-                        ...allClasses.map(
-                          (classItem) => DropdownMenuItem(
-                            value: classItem.id,
+      showDialog(
+        context: context,
+        builder: (ctx) {
+          String? selectedStudentId;
+          return AlertDialog(
+            title: const Text('Thêm sinh viên vào môn học'),
+            content: availableStudents.isEmpty
+                ? const Text(
+                    'Tất cả sinh viên đã tham gia môn học hoặc chưa có sinh viên trong hệ thống.',
+                  )
+                : DropdownButtonFormField<String>(
+                    hint: const Text('Chọn sinh viên'),
+                    isExpanded: true,
+                    items: availableStudents
+                        .map(
+                          (student) => DropdownMenuItem(
+                            value: student.uid,
                             child: Text(
-                              '${classItem.className} (${classItem.classCode})',
+                              '${student.displayName} (${student.email})',
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          selectedClassId = value;
-                          selectedStudentId = null; // Reset student selection
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Dropdown chọn sinh viên
-                    const Text(
-                      'Chọn sinh viên:',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-
-                    if (filteredStudents.isEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Text(
-                          selectedClassId == 'ALL'
-                              ? 'Tất cả sinh viên đã có trong môn hoặc chưa có sinh viên nào trong hệ thống.'
-                              : 'Không có sinh viên khả dụng trong lớp này.',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontStyle: FontStyle.italic,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    else
-                      DropdownButtonFormField<String>(
-                        value: selectedStudentId,
-                        hint: Text(
-                          'Chọn sinh viên (${filteredStudents.length} khả dụng)',
-                        ),
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                        items: filteredStudents
-                            .map(
-                              (student) => DropdownMenuItem(
-                                value: student.uid,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '${student.displayName} (${student.email})',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedStudentId = value;
-                          });
-                        },
-                        validator: (v) =>
-                            v == null ? 'Vui lòng chọn một sinh viên' : null,
-                      ),
-
-                    const SizedBox(height: 8),
-
-                    // Hiển thị thông tin thống kê
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.blue.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            size: 16,
-                            color: Colors.blue.shade700,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              selectedClassId == 'ALL'
-                                  ? 'Hiển thị ${filteredStudents.length} sinh viên từ tất cả lớp'
-                                  : 'Hiển thị ${filteredStudents.length} sinh viên từ lớp đã chọn',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue.shade700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                        )
+                        .toList(),
+                    onChanged: (value) => selectedStudentId = value,
+                  ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Huỷ'),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Huỷ'),
-                ),
-                FilledButton(
-                  onPressed:
-                      (filteredStudents.isEmpty || selectedStudentId == null)
-                      ? null
-                      : () async {
+              FilledButton(
+                onPressed: availableStudents.isEmpty
+                    ? null
+                    : () async {
+                        if (selectedStudentId != null) {
                           try {
                             await adminSvc.enrollSingleStudent(
-                              courseId,
+                              courseCode,
                               selectedStudentId!,
                             );
-                            if (ctx.mounted) {
-                              Navigator.of(ctx).pop();
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Thêm sinh viên thành công!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            }
+                            if (ctx.mounted) Navigator.of(ctx).pop();
                           } catch (e) {
                             if (ctx.mounted) {
                               ScaffoldMessenger.of(ctx).showSnackBar(
                                 SnackBar(
-                                  content: Text('Lỗi: ${e.toString()}'),
+                                  content: Text(e.toString()),
                                   backgroundColor: Colors.red,
                                 ),
                               );
                             }
                           }
-                        },
-                  child: const Text('Thêm'),
-                ),
-              ],
-            );
-          },
+                        }
+                      },
+                child: const Text('Thêm'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi tải dữ liệu: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
-      },
+      }
+    }
+  }
+
+  void _showDeleteSessionDialog(
+    BuildContext context,
+    SessionService sessionService,
+    SessionModel session,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận xóa'),
+        content: Text(
+          'Bạn có chắc chắn muốn xóa buổi học "${session.title}"?\n\n'
+          'Thời gian: ${DateFormat('dd/MM/yyyy - HH:mm').format(session.startTime)}\n'
+          'Hành động này không thể hoàn tác.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              try {
+                await sessionService.deleteSession(session.id);
+                if (ctx.mounted) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Đã xóa buổi học thành công'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (ctx.mounted) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Lỗi xóa buổi học: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
     );
+  }
+}
+
+// Extension for SessionType display
+extension SessionTypeExtension on SessionType {
+  String get typeDisplayName {
+    switch (this) {
+      case SessionType.lecture:
+        return 'Lý thuyết';
+      case SessionType.practice:
+        return 'Thực hành';
+      case SessionType.exam:
+        return 'Kiểm tra';
+      case SessionType.review:
+        return 'Ôn tập';
+    }
   }
 }

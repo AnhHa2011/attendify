@@ -1,24 +1,21 @@
 // lib/features/admin/presentation/pages/admin_dashboard.dart
-import 'package:attendify/features/admin/presentation/pages/class_management/class_form_page.dart';
-import 'package:attendify/features/admin/presentation/pages/class_management/class_management_page.dart';
-import 'package:attendify/features/admin/presentation/pages/course_management/course_form_page.dart';
 import 'package:attendify/features/admin/presentation/pages/course_management/course_management_page.dart';
 import 'package:attendify/features/admin/presentation/pages/user_management/user_management_page.dart';
-import 'package:attendify/features/classes/presentation/pages/class_list_page.dart';
-import 'package:attendify/features/common/widgets/large_screen_quick_action.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../app/providers/auth_provider.dart';
-import '../../../../app/providers/navigation_provider.dart';
-import '../../../common/data/models/user_model.dart';
-import '../../../common/data/models/class_model.dart';
-import '../../../common/widgets/large_screen_content.dart';
-import '../../../common/widgets/small_screen_content.dart';
-import '../../../common/widgets/small_screen_quick_action.dart';
+import '../../../../core/data/models/course_model.dart';
+import '../../../../core/data/models/user_model.dart';
+import '../../../../core/presentation/widgets/large_screen_content.dart';
+import '../../../../core/presentation/widgets/large_screen_quick_action.dart';
+import '../../../../core/presentation/widgets/small_screen_content.dart';
+import '../../../../core/presentation/widgets/small_screen_quick_action.dart';
 import '../../data/services/admin_service.dart';
-import 'admin_ui_components.dart';
+import 'class_management/class_form_page.dart';
+import 'class_management/class_management_page.dart';
+import 'course_management/course_form_page.dart';
 import 'course_management/course_import_page.dart';
 import 'user_management/user_form_page.dart';
 
@@ -107,8 +104,8 @@ class _AdminDashboardState extends State<AdminDashboard>
           children: [
             _buildOverviewTab(),
             _buildUsersTab(),
-            _buildAcademicTab(),
-            _buildAnalyticsTab(),
+            _buildClassesTab(),
+            _buildCoursesTab(),
           ],
         ),
       ),
@@ -274,12 +271,12 @@ class _AdminDashboardState extends State<AdminDashboard>
         return StreamBuilder<List<UserModel>>(
           stream: context.read<AdminService>().getAllStudentsStream(),
           builder: (context, studentSnapshot) {
-            return StreamBuilder<List<ClassModel>>(
-              stream: context.read<AdminService>().getAllClassesStream(),
-              builder: (context, classSnapshot) {
+            return StreamBuilder<List<CourseModel>>(
+              stream: context.read<AdminService>().getAllCoursesStream(),
+              builder: (context, courseSnapshot) {
                 final lecturers = lecturerSnapshot.data ?? [];
                 final students = studentSnapshot.data ?? [];
-                final classes = classSnapshot.data ?? [];
+                final courses = courseSnapshot.data ?? [];
 
                 // Responsive layout
                 return LayoutBuilder(
@@ -342,8 +339,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                               isSmallScreen: isSmallScreen,
                             ),
                             _buildGlassCard(
-                              title: 'Lớp học',
-                              value: '${classes.length}',
+                              title: 'Môn học',
+                              value: '${courses.length}',
                               icon: Icons.school_rounded,
                               gradient: LinearGradient(
                                 colors: [
@@ -356,7 +353,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                             ),
                             _buildGlassCard(
                               title: 'Hoạt động',
-                              value: '${(classes.length * 0.85).round()}%',
+                              value: '${(courses.length * 0.85).round()}%',
                               icon: Icons.trending_up_rounded,
                               gradient: LinearGradient(
                                 colors: [
@@ -726,11 +723,11 @@ class _AdminDashboardState extends State<AdminDashboard>
     return const UserManagementPage();
   }
 
-  Widget _buildAcademicTab() {
+  Widget _buildClassesTab() {
     return const ClassManagementPage();
   }
 
-  Widget _buildAnalyticsTab() {
+  Widget _buildCoursesTab() {
     return const CourseManagementPage();
   }
 }

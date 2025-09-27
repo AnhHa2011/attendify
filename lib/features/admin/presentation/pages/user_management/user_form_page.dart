@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../../common/data/models/user_model.dart';
+import '../../../../../core/data/models/user_model.dart';
 import '../../../data/services/admin_service.dart';
 
 class UserFormPage extends StatefulWidget {

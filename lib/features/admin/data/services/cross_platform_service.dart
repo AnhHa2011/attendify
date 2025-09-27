@@ -8,8 +8,8 @@ class CrossPlatformService {
   /// Returns a JSON string that can be encoded to QR
   static String generateAttendanceQRData({
     required String sessionId,
-    required String classId,
-    required String courseId,
+    required String classCode,
+    required String courseCode,
     required DateTime timestamp,
     int validityMinutes = 10,
   }) {
@@ -18,8 +18,8 @@ class CrossPlatformService {
     final qrData = {
       'type': 'attendance',
       'sessionId': sessionId,
-      'classId': classId,
-      'courseId': courseId,
+      'classCode': classCode,
+      'courseCode': courseCode,
       'timestamp': timestamp.millisecondsSinceEpoch,
       'expiresAt': expiresAt.millisecondsSinceEpoch,
       'nonce': _generateNonce(),
@@ -42,8 +42,8 @@ class CrossPlatformService {
 
       // Kiểm tra required fields
       return data['sessionId'] != null &&
-          data['classId'] != null &&
-          data['courseId'] != null;
+          data['classCode'] != null &&
+          data['courseCode'] != null;
     } catch (e) {
       return false;
     }
@@ -59,7 +59,7 @@ class CrossPlatformService {
     }
   }
 
-  /// Tạo mã tham gia lớp học
+  /// Tạo mã tham gia môn học
   static String generateJoinCode([int length = 8]) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final random = Random.secure();

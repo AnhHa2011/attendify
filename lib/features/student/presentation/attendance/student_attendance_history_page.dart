@@ -223,7 +223,7 @@ class _StatisticsTab extends StatelessWidget {
       cardIcon = Icons.warning;
     } else {
       advice =
-          'Cảnh báo! Tỷ lệ tham dự thấp. Bạn nên tăng cường tham gia lớp học.';
+          'Cảnh báo! Tỷ lệ tham dự thấp. Bạn nên tăng cường tham gia môn học.';
       cardColor = Colors.red;
       cardIcon = Icons.error;
     }

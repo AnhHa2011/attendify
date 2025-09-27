@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../app/providers/auth_provider.dart';
-import '../../../common/data/models/user_model.dart';
+import '../../../../core/data/models/user_model.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});

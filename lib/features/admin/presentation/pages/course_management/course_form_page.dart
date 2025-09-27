@@ -1,15 +1,17 @@
 // lib/presentation/pages/admin/course_form_page.dart
 
-import 'package:attendify/features/common/data/models/lecturer_lite.dart';
+import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:provider/provider.dart';
-import '../../../../common/data/models/course_model.dart';
+import '../../../../../core/data/models/course_model.dart';
+import '../../../../../core/data/models/lecturer_lite.dart';
 import '../../../data/services/admin_service.dart';
 
 class CourseFormPage extends StatefulWidget {
-  final CourseModel? course;
-  const CourseFormPage({super.key, this.course});
+  final CourseModel? courseModel;
+  const CourseFormPage({super.key, this.courseModel});
 
   @override
   State<CourseFormPage> createState() => _CourseFormPageState();
@@ -23,9 +25,14 @@ class _CourseFormPageState extends State<CourseFormPage> {
   late final TextEditingController _creditsCtrl;
   late final TextEditingController _minStudentsCtrl;
   late final TextEditingController _maxStudentsCtrl;
-
+  late final TextEditingController _semesterCtrl;
+  late final TextEditingController _joinCodeCtrl;
+  late final TextEditingController _descriptionCtrl;
+  late final TextEditingController _startDateCtrl;
+  late final TextEditingController _endDateCtrl;
+  final _dateFormat = DateFormat('dd/MM/yyyy');
   bool _isLoading = false;
-  bool get _isEditMode => widget.course != null;
+  bool get _isEditMode => widget.courseModel != null;
 
   // ====== Lecturer dropdown state ======
   List<LecturerLite> _lecturers = [];
@@ -43,32 +50,58 @@ class _CourseFormPageState extends State<CourseFormPage> {
   void initState() {
     super.initState();
 
-    _codeCtrl = TextEditingController(text: widget.course?.courseCode ?? '');
-    _nameCtrl = TextEditingController(text: widget.course?.courseName ?? '');
+    _codeCtrl = TextEditingController(
+      text: widget.courseModel?.courseCode ?? '',
+    );
+    _nameCtrl = TextEditingController(
+      text: widget.courseModel?.courseName ?? '',
+    );
     _creditsCtrl = TextEditingController(
-      text: widget.course?.credits != null
-          ? widget.course!.credits.toString()
+      text: widget.courseModel?.credits != null
+          ? widget.courseModel!.credits.toString()
           : '',
     );
     _minStudentsCtrl = TextEditingController(
-      text: widget.course?.minStudents != null
-          ? widget.course!.minStudents.toString()
+      text: widget.courseModel?.minStudents != null
+          ? widget.courseModel!.minStudents.toString()
           : '',
     );
     _maxStudentsCtrl = TextEditingController(
-      text: widget.course?.maxStudents != null
-          ? widget.course!.maxStudents.toString()
+      text: widget.courseModel?.maxStudents != null
+          ? widget.courseModel!.maxStudents.toString()
+          : '',
+    );
+    _semesterCtrl = TextEditingController(
+      text: widget.courseModel?.semester != null
+          ? widget.courseModel!.semester.toString()
+          : '',
+    );
+    _joinCodeCtrl = TextEditingController(
+      text: widget.courseModel?.joinCode != null
+          ? widget.courseModel!.joinCode.toString()
+          : '',
+    );
+    _descriptionCtrl = TextEditingController(
+      text: widget.courseModel?.description != null
+          ? widget.courseModel!.description.toString()
+          : '',
+    );
+    _startDateCtrl = TextEditingController(
+      text: widget.courseModel?.startDate != null
+          ? widget.courseModel!.startDate.toString()
+          : '',
+    );
+    _endDateCtrl = TextEditingController(
+      text: widget.courseModel?.endDate != null
+          ? widget.courseModel!.endDate.toString()
           : '',
     );
 
     // Lecturer default when edit
-    _selectedLecturerId = widget.course?.lecturerId;
+    _selectedLecturerId = widget.courseModel?.lecturerId;
 
     // Load lecturers
     Future.microtask(_loadLecturers);
-
-    // If editing and course has weekly schedule, you can map it here
-    // TODO: nếu CourseModel đã có dữ liệu lịch tuần, parse và set vào _weekdaySlots
   }
 
   Future<void> _loadLecturers() async {
@@ -110,6 +143,11 @@ class _CourseFormPageState extends State<CourseFormPage> {
     _creditsCtrl.dispose();
     _minStudentsCtrl.dispose();
     _maxStudentsCtrl.dispose();
+    _semesterCtrl.dispose();
+    _joinCodeCtrl.dispose();
+    _descriptionCtrl.dispose();
+    _startDateCtrl.dispose();
+    _endDateCtrl.dispose();
     super.dispose();
   }
 
@@ -226,13 +264,16 @@ class _CourseFormPageState extends State<CourseFormPage> {
     final minStudents = int.parse(_minStudentsCtrl.text);
     final maxStudents = int.parse(_maxStudentsCtrl.text);
     final lecturerId = _selectedLecturerId!;
-    final weeklySchedule = _collectSchedulePayload();
-
+    final semester = _semesterCtrl.text.trim();
+    final joinCode = _joinCodeCtrl.text.trim();
+    final description = _descriptionCtrl.text.trim();
+    final startDate = DateFormat('dd/MM/yyyy').parseStrict(_startDateCtrl.text);
+    final endDate = DateFormat('dd/MM/yyyy').parseStrict(_endDateCtrl.text);
     try {
       // Kiểm tra trùng mã môn học
       final isTaken = await adminService.isCourseCodeTaken(
         courseCode,
-        currentCourseId: widget.course?.id,
+        currentcourseCode: widget.courseModel?.id,
       );
       if (isTaken) {
         if (mounted) {
@@ -247,28 +288,36 @@ class _CourseFormPageState extends State<CourseFormPage> {
       }
 
       // Tạo/Cập nhật
+
       if (_isEditMode) {
-        // TODO: sửa tham số cho khớp với service của bạn (nếu khác tên)
         await adminService.updateCourse(
-          courseId: widget.course!.id,
-          courseCode: courseCode,
+          id: widget.courseModel!.id,
+          lecturerId: lecturerId,
+          semester: semester,
           courseName: courseName,
+          courseCode: courseCode,
+          joinCode: joinCode,
           credits: credits,
+          description: description,
           minStudents: minStudents,
           maxStudents: maxStudents,
-          lecturerId: lecturerId,
-          weeklySchedule: weeklySchedule,
+          startDate: startDate,
+          endDate: endDate,
         );
       } else {
-        // TODO: sửa tham số cho khớp với service của bạn (nếu khác tên)
         await adminService.createCourse(
-          courseCode: courseCode,
+          lecturerId: lecturerId,
+          semester: semester,
           courseName: courseName,
+          courseCode: courseCode,
+          joinCode: joinCode,
           credits: credits,
+          description: description,
           minStudents: minStudents,
           maxStudents: maxStudents,
-          lecturerId: lecturerId,
-          weeklySchedule: weeklySchedule,
+          startDate: startDate,
+          endDate: endDate,
+          totalStudents: 0,
         );
       }
 
@@ -311,7 +360,7 @@ class _CourseFormPageState extends State<CourseFormPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ====== Course Code ======
+              // ====== course Code ======
               TextFormField(
                 controller: _codeCtrl,
                 decoration: const InputDecoration(
@@ -329,7 +378,7 @@ class _CourseFormPageState extends State<CourseFormPage> {
               ),
               const SizedBox(height: 16),
 
-              // ====== Course Name ======
+              // ====== course Name ======
               TextFormField(
                 controller: _nameCtrl,
                 decoration: const InputDecoration(
@@ -395,8 +444,9 @@ class _CourseFormPageState extends State<CourseFormPage> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty)
+                  if (v == null || v.trim().isEmpty) {
                     return 'Không được để trống';
+                  }
                   final n = int.tryParse(v);
                   if (n == null || n <= 0) return 'Số tín chỉ phải là số > 0';
                   return null;
@@ -415,8 +465,9 @@ class _CourseFormPageState extends State<CourseFormPage> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty)
+                  if (v == null || v.trim().isEmpty) {
                     return 'Không được để trống';
+                  }
                   final n = int.tryParse(v);
                   if (n == null || n <= 0) return 'Phải là số > 0';
                   return null;
@@ -448,12 +499,87 @@ class _CourseFormPageState extends State<CourseFormPage> {
               ),
               const SizedBox(height: 24),
 
-              // ====== Weekly schedule selection ======
-              Text(
-                'Lịch học trong tuần',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              // ====== semester ======
+              TextFormField(
+                controller: _semesterCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Học kỳ',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.tag),
+                  helperText: 'HKI 2025-2026',
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                  UpperCaseTextFormatter(),
+                ],
+                validator: (v) =>
+                    v!.trim().isEmpty ? 'Không được để trống' : null,
+              ),
+              const SizedBox(height: 16),
+              // ====== description ======
+              TextFormField(
+                controller: _descriptionCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Ghi chú',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.tag),
+                  helperText: '',
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                  UpperCaseTextFormatter(),
+                ],
+                validator: (v) =>
+                    v!.trim().isEmpty ? 'Không được để trống' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _startDateCtrl,
+                readOnly: true, // để chặn nhập tay
+                decoration: const InputDecoration(
+                  labelText: 'Ngày bắt đầu',
+                  border: OutlineInputBorder(),
+                  suffixIcon: Icon(Icons.calendar_today),
+                ),
+                validator: (value) => (value == null || value.isEmpty)
+                    ? 'Vui lòng chọn ngày'
+                    : null,
+                onTap: () async {
+                  final pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (pickedDate != null) {
+                    _startDateCtrl.text = _dateFormat.format(pickedDate);
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+
+              TextFormField(
+                controller: _endDateCtrl,
+                readOnly: true, // để chặn nhập tay
+                decoration: const InputDecoration(
+                  labelText: 'Ngày kết thúc',
+                  border: OutlineInputBorder(),
+                  suffixIcon: Icon(Icons.calendar_today),
+                ),
+                validator: (value) => (value == null || value.isEmpty)
+                    ? 'Vui lòng chọn ngày'
+                    : null,
+                onTap: () async {
+                  final pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (pickedDate != null) {
+                    _endDateCtrl.text = _dateFormat.format(pickedDate);
+                  }
+                },
               ),
               const SizedBox(height: 8),
 

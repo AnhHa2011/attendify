@@ -42,11 +42,11 @@ class StudentAttendanceWrapperPage extends StatelessWidget {
             itemCount: docs.length,
             itemBuilder: (context, i) {
               final d = docs[i];
-              final classId = d['classId'] as String;
+              final classCode = d['classCode'] as String;
               return FutureBuilder<DocumentSnapshot>(
                 future: FirebaseFirestore.instance
                     .collection('classes')
-                    .doc(classId)
+                    .doc(classCode)
                     .get(),
                 builder: (context, classSnap) {
                   if (!classSnap.hasData) {
@@ -55,18 +55,18 @@ class StudentAttendanceWrapperPage extends StatelessWidget {
                   final classData =
                       classSnap.data!.data() as Map<String, dynamic>? ?? {};
                   final className =
-                      (classData['name'] ?? classData['className'] ?? classId)
+                      (classData['name'] ?? classData['className'] ?? classCode)
                           .toString();
                   return ListTile(
                     title: Text(className),
-                    subtitle: Text('Mã lớp: $classId'),
+                    subtitle: Text('Mã lớp: $classCode'),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => StudentAttendancePage(
-                            classId: classId,
+                            classCode: classCode,
                             className: className,
                           ),
                         ),

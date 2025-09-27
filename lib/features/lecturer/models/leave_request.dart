@@ -5,7 +5,7 @@ class LeaveRequest {
   final String studentId;
   final String studentName;
   final String studentEmail;
-  final String courseId;
+  final String courseCode;
   final String courseName;
   final String sessionId;
   final String sessionTitle;
@@ -23,7 +23,7 @@ class LeaveRequest {
     required this.studentId,
     required this.studentName,
     required this.studentEmail,
-    required this.courseId,
+    required this.courseCode,
     required this.courseName,
     required this.sessionId,
     required this.sessionTitle,
@@ -43,7 +43,7 @@ class LeaveRequest {
       studentId: map['studentId'] ?? '',
       studentName: map['studentName'] ?? '',
       studentEmail: map['studentEmail'] ?? '',
-      courseId: map['courseId'] ?? '',
+      courseCode: map['courseCode'] ?? '',
       courseName: map['courseName'] ?? '',
       sessionId: map['sessionId'] ?? '',
       sessionTitle: map['sessionTitle'] ?? '',
@@ -73,7 +73,7 @@ class LeaveRequest {
       'studentId': studentId,
       'studentName': studentName,
       'studentEmail': studentEmail,
-      'courseId': courseId,
+      'courseCode': courseCode,
       'courseName': courseName,
       'sessionId': sessionId,
       'sessionTitle': sessionTitle,
@@ -95,7 +95,7 @@ class LeaveRequest {
     String? studentId,
     String? studentName,
     String? studentEmail,
-    String? courseId,
+    String? courseCode,
     String? courseName,
     String? sessionId,
     String? sessionTitle,
@@ -113,7 +113,7 @@ class LeaveRequest {
       studentId: studentId ?? this.studentId,
       studentName: studentName ?? this.studentName,
       studentEmail: studentEmail ?? this.studentEmail,
-      courseId: courseId ?? this.courseId,
+      courseCode: courseCode ?? this.courseCode,
       courseName: courseName ?? this.courseName,
       sessionId: sessionId ?? this.sessionId,
       sessionTitle: sessionTitle ?? this.sessionTitle,

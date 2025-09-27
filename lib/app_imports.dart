@@ -12,12 +12,5 @@ export 'dart:convert';
 export 'features/admin/data/services/admin_service.dart';
 
 //model
-export 'features/common/data/models/class_model.dart';
-export 'features/common/data/models/class_schedule_model.dart';
-export 'features/common/data/models/course_model.dart';
-export 'features/common/data/models/leave_request_model.dart';
-export 'features/common/data/models/lecturer_lite.dart';
-export 'features/common/data/models/session_model.dart';
-export 'features/common/data/models/user_model.dart';
 //layouts
-export 'features/common/presentation/layouts/role_layout.dart';
+export 'core/presentation/layouts/role_layout.dart';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../features/common/data/models/class_model.dart';
-import '../../features/classes/data/services/class_service.dart';
+
+import '../../core/data/models/class_model.dart';
+import '../../core/data/services/class_service.dart';
 
 class AdminClassProvider extends ChangeNotifier {
   final ClassService _svc;

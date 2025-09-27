@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/providers/auth_provider.dart';
-import '../../../common/presentation/layouts/role_layout.dart';
+import '../../../../core/presentation/layouts/role_layout.dart';
+import '../../../courses/presentation/pages/course_list_page.dart';
 
 class LecturerLayout extends StatelessWidget {
   const LecturerLayout({super.key});
@@ -50,7 +51,7 @@ class LecturerLayout extends StatelessWidget {
 
     final pages = const [
       LecturerDashboard(),
-      CoursePage(),
+      CourseListPage(),
       LeaveRequestsPage(),
       ProfilePage(),
     ];

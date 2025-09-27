@@ -1,11 +1,11 @@
+import 'dart:async';
+import 'package:attendify/core/data/models/course_model.dart';
+import 'package:attendify/core/data/services/courses_service.dart';
+import 'package:attendify/features/lecturer/services/lecturer_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
-import '../../services/lecturer_service.dart';
-import '../../models/class_session.dart';
-import 'session_create_screen.dart';
-import 'attendance_detail_screen.dart';
+import '../../../courses/presentation/pages/course_detail_page.dart';
+import 'course_detail_page.dart'; // màn hình chi tiết
 
 class CoursePage extends StatefulWidget {
   const CoursePage({Key? key}) : super(key: key);
@@ -14,77 +14,90 @@ class CoursePage extends StatefulWidget {
   State<CoursePage> createState() => _CoursePageState();
 }
 
-class _CoursePageState extends State<CoursePage> with TickerProviderStateMixin {
-  final LecturerService _lecturerService = LecturerService();
-  late TabController _tabController;
+class _CoursePageState extends State<CoursePage> {
+  final CourseService _coursesService = CourseService();
+  final LecturerService _lectureService = LecturerService();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  Map<String, dynamic>? courses;
-  List<ClassSession> sessions = [];
-  List<Map<String, dynamic>> students = [];
-  Map<String, dynamic> statistics = {};
+  List<CourseModel> courses = [];
+  StreamSubscription<List<CourseModel>>? _sub;
 
   bool isLoading = true;
   String? error;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _loadCourseData();
+    _loadCourses();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _sub?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadCourseData() async {
-    try {
-      setState(() {
-        isLoading = true;
-        error = null;
-      });
+  Future<void> _loadCourses() async {
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
 
-      // Load real sessions
-      _lecturerService
-          .getCourseByLecturer(_auth.currentUser!.uid.toString())
-          .listen((courses) {
-            if (mounted) {
-              setState(() {
-                courses = courses;
-              });
-            }
-          });
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          error = e.toString();
-          isLoading = false;
-        });
-      }
-    }
+    await _sub?.cancel();
+    _sub = _lectureService
+        .getCourseByLecturer(_auth.currentUser!.uid) // stream từ repo
+        .listen(
+          (courseList) {
+            if (!mounted) return;
+            setState(() {
+              courses = courseList;
+              isLoading = false;
+            });
+          },
+          onError: (e) {
+            if (!mounted) return;
+            setState(() {
+              error = e.toString();
+              isLoading = false;
+            });
+          },
+        );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Text(courses?['courseName'] ?? 'Danh sách môn học'),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => CoursePage()),
-          );
-        },
-        child: const Icon(Icons.add),
-        tooltip: 'Tạo môn học mới',
-      ),
+  Widget _buildCourseList() {
+    if (courses.isEmpty) {
+      return const Center(child: Text("Chưa có môn học nào"));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: courses.length,
+      itemBuilder: (context, index) {
+        final course = courses[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: ListTile(
+            leading: const Icon(Icons.school, size: 32),
+            title: Text(
+              course.courseName,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              "Mã: ${course.courseCode} • Tín chỉ: ${course.credits}",
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              // Chuyển sang màn hình chi tiết/chỉnh sửa
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CourseDetailPage(dataId: course.id),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -93,331 +106,25 @@ class _CoursePageState extends State<CoursePage> with TickerProviderStateMixin {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Theme.of(context).colorScheme.error,
-          ),
+          const Icon(Icons.error_outline, size: 64, color: Colors.red),
           const SizedBox(height: 16),
-          Text(
-            'Không thể tải thông tin môn học',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
+          Text(error ?? 'Có lỗi xảy ra'),
           const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _loadCourseData,
-            child: const Text('Thử lại'),
-          ),
+          ElevatedButton(onPressed: _loadCourses, child: const Text("Thử lại")),
         ],
       ),
     );
   }
 
-  Widget _buildOverviewTab() {
-    if (courses == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Course Info Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.school,
-                          color: Theme.of(context).colorScheme.primary,
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              courses!['courseCode'] ?? '',
-                              style: Theme.of(context).textTheme.labelLarge
-                                  ?.copyWith(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              courses!['courseName'] ?? '',
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Mô tả:',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    courses!['description'] ?? '',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Course Stats
-                  Row(
-                    children: [
-                      _buildStatItem('Tín chỉ', '${courses!['credits']}'),
-                      const SizedBox(width: 24),
-                      _buildStatItem(
-                        'Sinh viên',
-                        '${courses!['enrollmentCount']}',
-                      ),
-                      const SizedBox(width: 24),
-                      _buildStatItem(
-                        'Buổi học',
-                        '${statistics['totalSessions']}',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Join Code
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primaryContainer.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.key,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text('Mã tham gia: '),
-                        Text(
-                          courses!['joinCode'] ?? '',
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.copy, size: 20),
-                          onPressed: () {
-                            Clipboard.setData(
-                              ClipboardData(text: courses!['joinCode'] ?? ''),
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Đã sao chép mã tham gia'),
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Danh sách môn học")),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : error != null
+          ? _buildErrorWidget()
+          : _buildCourseList(),
     );
-  }
-
-  Widget _buildSessionsTab() {
-    return sessions.isEmpty
-        ? const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.event_busy, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text('Chưa có buổi học nào'),
-                SizedBox(height: 8),
-                Text('Nhấn nút + để tạo buổi học mới'),
-              ],
-            ),
-          )
-        : ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: sessions.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final session = sessions[index];
-              return _buildSessionCard(session);
-            },
-          );
-  }
-
-  Widget _buildStudentsTab() {
-    return students.isEmpty
-        ? const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.people_outline, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text('Chưa có sinh viên nào đăng ký'),
-                SizedBox(height: 8),
-                Text('Chia sẻ mã tham gia để sinh viên tham gia lớp'),
-              ],
-            ),
-          )
-        : ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: students.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final student = students[index];
-              return _buildStudentCard(student);
-            },
-          );
-  }
-
-  Widget _buildStatItem(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        ),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
-  }
-
-  Widget _buildSessionCard(ClassSession session) {
-    return Card(
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: _getSessionStatusColor(session).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            _getSessionStatusIcon(session),
-            color: _getSessionStatusColor(session),
-            size: 20,
-          ),
-        ),
-        title: Text(
-          session.title,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(DateFormat('dd/MM/yyyy - HH:mm').format(session.startTime)),
-            Text(session.location),
-          ],
-        ),
-        trailing: Chip(
-          label: Text(session.statusText, style: const TextStyle(fontSize: 12)),
-          backgroundColor: _getSessionStatusColor(session).withOpacity(0.1),
-          labelStyle: TextStyle(
-            color: _getSessionStatusColor(session),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        onTap: () {
-          if (session.isFinished) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AttendanceDetail(session: session),
-              ),
-            );
-          }
-        },
-      ),
-    );
-  }
-
-  Widget _buildStudentCard(Map<String, dynamic> student) {
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(
-            context,
-          ).colorScheme.primary.withOpacity(0.1),
-          child: Text(
-            student['name']?.isNotEmpty == true
-                ? student['name'][0].toUpperCase()
-                : 'S',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        title: Text(
-          student['name'] ?? 'Unknown',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(student['email'] ?? ''),
-            if (student['studentId']?.isNotEmpty == true)
-              Text(
-                'MSSV: ${student['studentId']}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _getSessionStatusColor(ClassSession session) {
-    if (session.isOngoing) return Colors.green;
-    if (session.isUpcoming) return Colors.orange;
-    if (session.isFinished) return Colors.grey;
-    return Colors.blue;
-  }
-
-  IconData _getSessionStatusIcon(ClassSession session) {
-    if (session.isOngoing) return Icons.play_circle;
-    if (session.isUpcoming) return Icons.schedule;
-    if (session.isFinished) return Icons.check_circle;
-    return Icons.event;
   }
 }

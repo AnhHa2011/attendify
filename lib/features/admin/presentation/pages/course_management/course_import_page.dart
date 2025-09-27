@@ -171,10 +171,10 @@ class _CourseImportPageState extends State<CourseImportPage> {
           .read<AdminService>()
           .getAllCoursesStream()
           .first;
-      _existingCodes = courses
-          .map((c) => _norm(c.courseCode ?? ''))
-          .where((s) => s.isNotEmpty)
-          .toSet();
+      // _existingCodes = courses
+      //     .map((c) => _norm(c.courseCode ?? ''))
+      //     .where((s) => s.isNotEmpty)
+      //     .toSet();
     } catch (_) {
       _existingCodes = {};
     } finally {
@@ -310,7 +310,7 @@ class _CourseImportPageState extends State<CourseImportPage> {
     try {
       final admin = context.read<AdminService>();
       final list = _rows.map((e) => e.toModel()).toList();
-      await admin.bulkImportCoursesFromImportModels(list);
+      // await admin.bulkImportCoursesFromImportModels(list);
       if (mounted) {
         ScaffoldMessenger.of(
           context,

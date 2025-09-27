@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:attendify/features/common/utils/template_downloader.dart';
+import 'package:attendify/core/utils/template_downloader.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -179,7 +179,7 @@ class _UserBulkImportPageState extends State<UserBulkImportPage> {
           'email': email,
           'displayName': displayName,
           'role': role,
-          'createdAt': FieldValue.serverTimestamp(),
+          'createdAt': Timestamp.now().toDate(),
         });
 
         // 3) (Tuỳ chọn) Gửi email reset để user tự đặt lại password thật

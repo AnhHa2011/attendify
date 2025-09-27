@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ClassSession {
   final String id;
-  final String courseId;
+  final String courseCode;
   final String lecturerId;
   final String title;
   final String description;
@@ -18,7 +18,7 @@ class ClassSession {
 
   ClassSession({
     required this.id,
-    required this.courseId,
+    required this.courseCode,
     required this.lecturerId,
     required this.title,
     this.description = '',
@@ -36,7 +36,7 @@ class ClassSession {
   factory ClassSession.fromMap(Map<String, dynamic> map) {
     return ClassSession(
       id: map['id'] ?? '',
-      courseId: map['courseId'] ?? '',
+      courseCode: map['courseCode'] ?? '',
       lecturerId: map['lecturerId'] ?? '',
       title: map['title'] ?? '',
       description: map['description'] ?? '',
@@ -61,7 +61,7 @@ class ClassSession {
 
   Map<String, dynamic> toMap() {
     return {
-      'courseId': courseId,
+      'courseCode': courseCode,
       'lecturerId': lecturerId,
       'title': title,
       'description': description,
@@ -81,7 +81,7 @@ class ClassSession {
 
   ClassSession copyWith({
     String? id,
-    String? courseId,
+    String? courseCode,
     String? lecturerId,
     String? title,
     String? description,
@@ -97,7 +97,7 @@ class ClassSession {
   }) {
     return ClassSession(
       id: id ?? this.id,
-      courseId: courseId ?? this.courseId,
+      courseCode: courseCode ?? this.courseCode,
       lecturerId: lecturerId ?? this.lecturerId,
       title: title ?? this.title,
       description: description ?? this.description,

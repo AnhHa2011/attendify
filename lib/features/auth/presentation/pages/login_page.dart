@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../app/providers/auth_provider.dart';
-import '../../../common/widgets/role_picker_dialog.dart';
+import '../../../../core/presentation/widgets/role_picker_dialog.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -79,7 +79,7 @@ class _LoginPageState extends State<LoginPage> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Padding(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(16),
             child: AutofillGroup(
               child: Form(
                 key: _formKey,
