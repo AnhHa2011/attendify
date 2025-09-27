@@ -1,9 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+// lib/features/auth/presentation/pages/login_page.dart (ĐÃ SỬA)
+
+// =================== THAY THẾ TOÀN BỘ PHẦN IMPORT BẰNG ĐOẠN NÀY ===================
+
 import 'package:go_router/go_router.dart';
 
-import '../../../../../app/providers/auth_provider.dart';
+// Import file tổng hợp. Nó đã chứa Material, Provider, FirebaseAuthException, và AuthProvider của bạn.
+import '../../../../app_imports.dart';
 import '../../../../core/presentation/widgets/role_picker_dialog.dart';
+
+// Import các widget/dialog cục bộ nếu cần.
+
+// =================================================================================
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -30,17 +37,50 @@ class _LoginPageState extends State<LoginPage> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _submitting = true);
+    // Provider và AuthProvider đã có sẵn từ app_imports.dart
     final auth = context.read<AuthProvider>();
 
     try {
       await auth.login(_emailCtrl.text.trim(), _passCtrl.text);
       if (!mounted) return;
-      // GoRouter sẽ tự redirect theo role trong app.dart
-    } on Object catch (e) {
+      // GoRouter sẽ tự redirect khi đăng nhập thành công
+    } on FirebaseAuthException catch (e) {
+      // FirebaseAuthException đã có sẵn từ app_imports.dart
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Đăng nhập thất bại: $e')));
+
+      String errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
+
+      switch (e.code) {
+        case 'invalid-credential':
+        case 'user-not-found':
+        case 'wrong-password':
+          errorMessage = 'Email hoặc mật khẩu không chính xác.';
+          break;
+        case 'user-disabled':
+          errorMessage = 'Tài khoản của bạn đã bị vô hiệu hoá.';
+          break;
+        case 'invalid-email':
+          errorMessage = 'Địa chỉ email không hợp lệ.';
+          break;
+        case 'too-many-requests':
+          errorMessage = 'Bạn đã thử quá nhiều lần. Vui lòng thử lại sau.';
+          break;
+        default:
+          print('Firebase Auth Error: ${e.code} - ${e.message}');
+          break;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đăng nhập thất bại: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -67,6 +107,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    // context.watch hoạt động vì Provider được export từ app_imports.dart
     final isLoadingGlobal = context.watch<AuthProvider>().isLoading;
     final isBusy = _submitting || isLoadingGlobal;
 
@@ -75,11 +116,12 @@ class _LoginPageState extends State<LoginPage> {
         automaticallyImplyLeading: false,
         title: const Text('Đăng nhập'),
       ),
+      // ... (TOÀN BỘ PHẦN GIAO DIỆN CÒN LẠI GIỮ NGUYÊN)
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(8),
             child: AutofillGroup(
               child: Form(
                 key: _formKey,
@@ -158,31 +200,6 @@ class _LoginPageState extends State<LoginPage> {
                         child: const Text('Quên mật khẩu?'),
                       ),
                     ),
-                    // const Divider(height: 32),
-                    // OutlinedButton.icon(
-                    //   onPressed: isBusy ? null : _signInGoogle,
-                    //   icon: Image.asset(
-                    //     'assets/icons/google_logo.png',
-                    //     width: 24,
-                    //     height: 24,
-                    //     errorBuilder: (_, __, ___) =>
-                    //         const Icon(Icons.g_mobiledata),
-                    //   ),
-                    //   label: const Text('Đăng nhập/đăng ký với Google'),
-                    // ),
-                    // const SizedBox(height: 12),
-                    // Row(
-                    //   mainAxisAlignment: MainAxisAlignment.center,
-                    //   children: [
-                    //     const Text('Chưa có tài khoản?'),
-                    //     TextButton(
-                    //       onPressed: isBusy
-                    //           ? null
-                    //           : () => context.go('/register'),
-                    //       child: const Text('Đăng ký'),
-                    //     ),
-                    //   ],
-                    // ),
                   ],
                 ),
               ),

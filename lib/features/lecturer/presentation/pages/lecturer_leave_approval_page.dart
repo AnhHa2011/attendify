@@ -49,52 +49,41 @@ class _LecturerLeaveApprovalPageState extends State<LecturerLeaveApprovalPage> {
   final _ds = StudentLeaveRequestService();
 
   String? _statusFilter = 'pending'; // mặc định hiển thị pending
-  String? _classCode, _className; // lớp được chọn
+  String? _courseCode, _courseName; // lớp được chọn
   String? _sessionId; // buổi (tùy chọn)
   DateTime? _sessionStart;
 
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
   // ====== Lấy danh sách lớp của GV (hỗ trợ 2 schema: lecturerId hoặc lecturers[]) ======
-  Stream<QuerySnapshot<Map<String, dynamic>>> _myClasses() {
+  Stream<QuerySnapshot<Map<String, dynamic>>> _myCoursees() {
     final uid = _uid;
     if (uid == null) return const Stream.empty();
 
-    final classes = FirebaseFirestore.instance.collection('classes');
+    final courses = FirebaseFirestore.instance.collection('courses');
 
     // Ưu tiên lecturerId
-    final s1 = classes.where('lecturerId', isEqualTo: uid).snapshots();
-
-    // Fallback nếu DB dùng mảng lecturers
-    final s2 = classes.where('lecturers', arrayContains: uid).snapshots();
-
-    // Gộp 2 stream thành 1 (đơn giản: chạy s1; nếu rỗng → s2)
-    return s1.asyncExpand((snap) async* {
-      if (snap.docs.isNotEmpty) {
-        yield snap;
-      } else {
-        yield* s2;
-      }
-    });
+    final s1 = courses.where('lecturerId', isEqualTo: uid).snapshots();
+    return s1;
   }
 
   // ====== Lấy buổi theo lớp (dùng startTime; không orderBy để giảm yêu cầu index) ======
-  Stream<QuerySnapshot<Map<String, dynamic>>> _sessionsByClass(
-    String classCode,
+  Stream<QuerySnapshot<Map<String, dynamic>>> _sessionsByCourse(
+    String courseCode,
   ) {
     return FirebaseFirestore.instance
         .collection('sessions')
-        .where('classCode', isEqualTo: classCode)
+        .where('courseCode', isEqualTo: courseCode)
         .snapshots();
   }
 
   // ====== Lấy các đơn pending theo lớp (và session nếu có) ======
   Stream<List<LeaveRequestModel>> _pendingRequests() {
-    if (_classCode == null) return const Stream.empty();
+    if (_courseCode == null) return const Stream.empty();
 
     Query col = FirebaseFirestore.instance
         .collection('leave_requests')
-        .where('classCode', isEqualTo: _classCode)
+        .where('courseCode', isEqualTo: _courseCode)
         .where('status', isEqualTo: 'pending'); // không orderBy → bớt index
 
     if (_sessionId != null) {
@@ -119,7 +108,7 @@ class _LecturerLeaveApprovalPageState extends State<LecturerLeaveApprovalPage> {
           children: [
             // ========== Chọn lớp ==========
             StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _myClasses(),
+              stream: _myCoursees(),
               builder: (c, s) {
                 if (s.hasError) {
                   return Text(
@@ -140,17 +129,17 @@ class _LecturerLeaveApprovalPageState extends State<LecturerLeaveApprovalPage> {
                 docs.sort((a, b) {
                   final am = a.data();
                   final bm = b.data();
-                  final an = (am['name'] ?? am['className'] ?? a.id)
+                  final an = (am['courseName'] ?? a.id)
                       .toString()
                       .toLowerCase();
-                  final bn = (bm['name'] ?? bm['className'] ?? b.id)
+                  final bn = (bm['courseName'] ?? b.id)
                       .toString()
                       .toLowerCase();
                   return an.compareTo(bn);
                 });
 
-                final valid = docs.any((d) => d.id == _classCode)
-                    ? _classCode
+                final valid = docs.any((d) => d.id == _courseCode)
+                    ? _courseCode
                     : null;
 
                 return DropdownButtonFormField<String>(
@@ -158,22 +147,21 @@ class _LecturerLeaveApprovalPageState extends State<LecturerLeaveApprovalPage> {
                   value: valid,
                   items: docs.map((d) {
                     final m = d.data();
-                    final name = (m['name'] ?? m['className'] ?? d.id)
-                        .toString();
+                    final name = (m['courseName'] ?? d.id).toString();
                     return DropdownMenuItem(
                       value: d.id,
                       child: Text(name, overflow: TextOverflow.ellipsis),
-                      onTap: () => _className = name,
+                      onTap: () => _courseName = name,
                     );
                   }).toList(),
                   onChanged: (v) {
                     setState(() {
-                      _classCode = v;
+                      _courseCode = v;
                       _sessionId = null;
                       _sessionStart = null;
                     });
                   },
-                  decoration: const InputDecoration(labelText: 'Lớp'),
+                  decoration: const InputDecoration(labelText: 'Môn học'),
                 );
               },
             ),
@@ -181,9 +169,9 @@ class _LecturerLeaveApprovalPageState extends State<LecturerLeaveApprovalPage> {
             const SizedBox(height: 10),
 
             // ========== Chọn buổi (tuỳ chọn) ==========
-            if (_classCode != null)
+            if (_courseCode != null)
               StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: _sessionsByClass(_classCode!),
+                stream: _sessionsByCourse(_courseCode!),
                 builder: (c, s) {
                   if (s.hasError) {
                     return Text(
@@ -244,8 +232,8 @@ class _LecturerLeaveApprovalPageState extends State<LecturerLeaveApprovalPage> {
 
             // ========== Danh sách pending ==========
             Expanded(
-              child: _classCode == null
-                  ? const Center(child: Text('Hãy chọn lớp để xem yêu cầu.'))
+              child: _courseCode == null
+                  ? const Center(child: Text('Hãy chọn môn để xem yêu cầu.'))
                   : Column(
                       children: [
                         _StatusChips(
@@ -254,8 +242,8 @@ class _LecturerLeaveApprovalPageState extends State<LecturerLeaveApprovalPage> {
                         ),
                         Expanded(
                           child: StreamBuilder<List<LeaveRequestModel>>(
-                            stream: _ds.byClassFiltered(
-                              classCode: _classCode!,
+                            stream: _ds.byCourseFiltered(
+                              courseCode: _courseCode!,
                               sessionId: _sessionId,
                               status: _statusFilter,
                             ),
@@ -271,10 +259,11 @@ class _LecturerLeaveApprovalPageState extends State<LecturerLeaveApprovalPage> {
                               if (!s.hasData)
                                 return const LinearProgressIndicator();
                               final items = s.data!;
-                              if (items.isEmpty)
+                              if (items.isEmpty) {
                                 return const Center(
-                                  child: Text('Không có đơn.'),
+                                  child: Text('Không có đơn xin nghỉ.'),
                                 );
+                              }
                               return ListView.separated(
                                 itemCount: items.length,
                                 separatorBuilder: (_, __) =>

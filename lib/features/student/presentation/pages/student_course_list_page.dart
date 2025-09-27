@@ -7,6 +7,7 @@ import '../../../../app/providers/auth_provider.dart';
 import '../../../../core/data/models/rich_course_model.dart';
 import '../../../../core/data/services/courses_service.dart';
 import '../courses/student_course_detail_page.dart';
+import 'join_course_page.dart';
 
 class StudentCourseListPage extends StatelessWidget {
   const StudentCourseListPage({super.key});
@@ -109,10 +110,12 @@ class StudentCourseListPage extends StatelessWidget {
                     const SizedBox(height: 24),
                     FilledButton.icon(
                       onPressed: () {
-                        // Navigate back to join course page
-                        DefaultTabController.of(
+                        Navigator.push(
                           context,
-                        )?.animateTo(2); // Index 2 is join course
+                          MaterialPageRoute(
+                            builder: (context) => const JoinCoursePage(),
+                          ),
+                        );
                       },
                       icon: const Icon(Icons.add),
                       label: const Text('Tham gia môn'),

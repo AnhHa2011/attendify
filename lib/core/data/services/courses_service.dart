@@ -447,7 +447,7 @@ class CourseService {
   Stream<List<RichCourseModel>> getRichEnrolledCoursesStream(String studentId) {
     return _db
         .collection('enrollments')
-        .where('studentId', isEqualTo: studentId)
+        .where('studentUid', isEqualTo: studentId)
         .snapshots()
         .asyncMap((enrollmentSnapshot) async {
           if (enrollmentSnapshot.docs.isEmpty) return [];

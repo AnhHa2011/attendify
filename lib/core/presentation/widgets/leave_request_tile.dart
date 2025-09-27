@@ -18,7 +18,7 @@ class LeaveRequestTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = model.className ?? model.classCode;
+    final title = model.courseName ?? model.courseCode;
     final sessionStr = _sessionText(model);
     final status = _statusMeta(model.status);
 

@@ -27,7 +27,6 @@ export 'services/notification_service.dart';
 // Models
 export 'models/attendance_record.dart';
 export 'models/class_session.dart';
-export 'models/leave_request.dart';
 
 // Widgets
 export 'widgets/session_detail_dialog.dart';

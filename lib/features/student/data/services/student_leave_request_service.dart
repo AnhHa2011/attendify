@@ -8,7 +8,7 @@ class StudentLeaveRequestService {
   );
 
   Future<String> create(LeaveRequestModel m) async {
-    final doc = await _col.add(m.toFirestore());
+    final doc = await _col.add(m.toMap());
     return doc.id;
   }
 
@@ -20,24 +20,24 @@ class StudentLeaveRequestService {
         .map((s) => s.docs.map((d) => LeaveRequestModel.fromDoc(d)).toList());
   }
 
-  Stream<List<LeaveRequestModel>> byClassAndSession(
-    String classCode,
+  Stream<List<LeaveRequestModel>> byCourseAndSession(
+    String courseCode,
     String sessionId,
   ) {
     return _col
-        .where('classCode', isEqualTo: classCode)
+        .where('courseCode', isEqualTo: courseCode)
         .where('sessionId', isEqualTo: sessionId)
         .snapshots()
         .map((s) => s.docs.map((d) => LeaveRequestModel.fromDoc(d)).toList());
   }
 
   // Stream đơn PENDING theo lớp (và buổi nếu chọn)
-  Stream<List<LeaveRequestModel>> pendingByClass({
-    required String classCode,
+  Stream<List<LeaveRequestModel>> pendingByCourse({
+    required String courseCode,
     String? sessionId,
   }) {
     Query q = _col
-        .where('classCode', isEqualTo: classCode)
+        .where('courseCode', isEqualTo: courseCode)
         .where('status', isEqualTo: 'pending');
     if (sessionId != null) q = q.where('sessionId', isEqualTo: sessionId);
     return q.snapshots().map(
@@ -76,13 +76,13 @@ class StudentLeaveRequestService {
     });
   }
 
-  // NEW: lấy theo class + (optional) session + status
-  Stream<List<LeaveRequestModel>> byClassFiltered({
-    required String classCode,
+  // NEW: lấy theo course + (optional) session + status
+  Stream<List<LeaveRequestModel>> byCourseFiltered({
+    required String courseCode,
     String? sessionId,
     String? status, // null = all
   }) {
-    Query q = _col.where('classCode', isEqualTo: classCode);
+    Query q = _col.where('courseCode', isEqualTo: courseCode);
     if (sessionId != null) q = q.where('sessionId', isEqualTo: sessionId);
     if (status != null) q = q.where('status', isEqualTo: status);
 

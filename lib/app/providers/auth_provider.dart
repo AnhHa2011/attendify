@@ -36,31 +36,47 @@ class AuthProvider extends ChangeNotifier {
     required String name,
     required UserRole role,
   }) async {
-    _loading = true;
-    notifyListeners();
-    await _auth.registerWithEmail(
-      email: email,
-      password: password,
-      displayName: name,
-      role: role,
-    );
+    // KHÔNG quản lý loading ở đây. Hãy để UI tự xử lý.
+    try {
+      await _auth.registerWithEmail(
+        email: email,
+        password: password,
+        displayName: name,
+        role: role,
+      );
+    } catch (e) {
+      // Chỉ cần ném lại lỗi, không cần notifyListeners()
+      throw e;
+    }
   }
 
+  // SỬA LẠI PHƯƠNG THỨC LOGIN
   Future<void> login(String email, String password) async {
-    _loading = true;
-    notifyListeners();
-    await _auth.signInWithEmail(email, password);
+    // KHÔNG quản lý loading ở đây. Hãy để UI tự xử lý.
+    try {
+      await _auth.signInWithEmail(email, password);
+    } catch (e) {
+      // Chỉ cần ném lại lỗi, không cần notifyListeners()
+      throw e;
+    }
   }
 
   // Google flow riêng: login xong mới hỏi role nếu cần
   Future<void> loginWithGoogleAndPickRole(
     Future<UserRole?> Function() pickRole,
   ) async {
+    // Có thể giữ lại loading ở đây vì nó phức tạp hơn
     _loading = true;
     notifyListeners();
-    await _auth.googleSignInThenEnsureRole(pickRole);
-    _loading = false;
-    notifyListeners();
+    try {
+      await _auth.googleSignInThenEnsureRole(pickRole);
+    } catch (e) {
+      throw e;
+    } finally {
+      // Đảm bảo loading luôn được tắt
+      _loading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> resetPassword(String email) async {
@@ -72,12 +88,8 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     await _auth.signOut();
 
-    // <<< THAY ĐỔI QUAN TRỌNG >>>
-    // Chủ động dọn dẹp state ngay lập tức sau khi đăng xuất thành công.
-    // Điều này đảm bảo rằng khi listener được thông báo, state đã hoàn toàn sạch.
     _user = null;
     _role = null;
-
     _loading = false;
     notifyListeners();
   }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../models/leave_request.dart';
+import '../../../../core/data/models/leave_request_model.dart';
 import '../../services/lecturer_service.dart';
 
 class LeaveRequestsPage extends StatefulWidget {
@@ -15,9 +15,9 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
   final LecturerService _lecturerService = LecturerService();
   late TabController _tabController;
 
-  List<LeaveRequest> _allRequests = [];
-  List<LeaveRequest> _pendingRequests = [];
-  List<LeaveRequest> _processedRequests = [];
+  List<LeaveRequestModel> _allRequests = [];
+  List<LeaveRequestModel> _pendingRequests = [];
+  List<LeaveRequestModel> _processedRequests = [];
 
   bool isLoading = true;
   String? error;
@@ -47,10 +47,18 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
           setState(() {
             _allRequests = requests;
             _pendingRequests = requests
-                .where((req) => req.status == LeaveRequestStatus.pending)
+                .where(
+                  (req) =>
+                      LeaveRequestStatusX.fromString(req.status) ==
+                      LeaveRequestStatus.pending,
+                )
                 .toList();
             _processedRequests = requests
-                .where((req) => req.status != LeaveRequestStatus.pending)
+                .where(
+                  (req) =>
+                      LeaveRequestStatusX.fromString(req.status) ==
+                      LeaveRequestStatus.pending,
+                )
                 .toList();
             isLoading = false;
           });
@@ -68,7 +76,7 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
   }
 
   Future<void> _respondToRequest(
-    LeaveRequest request,
+    LeaveRequestModel request,
     LeaveRequestStatus status,
   ) async {
     String? response;
@@ -200,7 +208,7 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
     );
   }
 
-  Widget _buildRequestsList(List<LeaveRequest> requests) {
+  Widget _buildRequestsList(List<LeaveRequestModel> requests) {
     if (requests.isEmpty) {
       return Center(
         child: Column(
@@ -242,7 +250,7 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
     );
   }
 
-  Widget _buildRequestCard(LeaveRequest request) {
+  Widget _buildRequestCard(LeaveRequestModel request) {
     return Card(
       elevation: 2,
       child: Padding(
@@ -289,14 +297,16 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
                 ),
                 Chip(
                   label: Text(
-                    request.statusText,
+                    request.status,
                     style: const TextStyle(fontSize: 12),
                   ),
                   backgroundColor: _getStatusColor(
-                    request.status,
+                    LeaveRequestStatusX.fromString(request.status),
                   ).withOpacity(0.1),
                   labelStyle: TextStyle(
-                    color: _getStatusColor(request.status),
+                    color: _getStatusColor(
+                      LeaveRequestStatusX.fromString(request.status),
+                    ),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -345,7 +355,7 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          request.sessionTitle,
+                          request.sessionName,
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),
@@ -386,7 +396,7 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
             const SizedBox(height: 4),
             Text(request.reason, style: Theme.of(context).textTheme.bodyMedium),
 
-            if (request.description.isNotEmpty) ...[
+            if (request.reason.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 'Mô tả chi tiết:',
@@ -396,7 +406,7 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
               ),
               const SizedBox(height: 4),
               Text(
-                request.description,
+                request.reason,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
@@ -422,15 +432,19 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
             ),
 
             // Lecturer response (if processed)
-            if (request.lecturerResponse != null) ...[
+            if (request.approverNote != null) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(request.status).withOpacity(0.1),
+                  color: _getStatusColor(
+                    LeaveRequestStatusX.fromString(request.status),
+                  ).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: _getStatusColor(request.status).withOpacity(0.3),
+                    color: _getStatusColor(
+                      LeaveRequestStatusX.fromString(request.status),
+                    ).withOpacity(0.3),
                   ),
                 ),
                 child: Column(
@@ -443,7 +457,9 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
                               ? Icons.check_circle
                               : Icons.cancel,
                           size: 16,
-                          color: _getStatusColor(request.status),
+                          color: _getStatusColor(
+                            LeaveRequestStatusX.fromString(request.status),
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -451,20 +467,24 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
                           style: Theme.of(context).textTheme.titleSmall
                               ?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: _getStatusColor(request.status),
+                                color: _getStatusColor(
+                                  LeaveRequestStatusX.fromString(
+                                    request.status,
+                                  ),
+                                ),
                               ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      request.lecturerResponse!,
+                      request.approverNote!,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
-                    if (request.responseDate != null) ...[
+                    if (request.reviewedAt != null) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Phản hồi lúc: ${DateFormat('dd/MM/yyyy HH:mm').format(request.responseDate!)}',
+                        'Phản hồi lúc: ${DateFormat('dd/MM/yyyy HH:mm').format(request.reviewedAt!)}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.outline,
                         ),
@@ -476,7 +496,7 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
             ],
 
             // Action buttons for pending requests
-            if (request.isPending && request.canRespond) ...[
+            if (request.isPending && request.reviewedAt == null) ...[
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -531,7 +551,7 @@ class _LeaveRequestsState extends State<LeaveRequestsPage>
 }
 
 class _ResponseDialog extends StatefulWidget {
-  final LeaveRequest request;
+  final LeaveRequestModel request;
   final bool isApproval;
 
   const _ResponseDialog({required this.request, required this.isApproval});

@@ -1,11 +1,13 @@
+// lib/features/student/presentation/pages/create_leave_request_page.dart
+
 import 'package:attendify/features/student/data/services/student_leave_request_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/constants/firestore_collections.dart';
 import '../../../../core/data/models/leave_request_model.dart';
-import '../../../lecturer/models/leave_request.dart';
 
 class CreateLeaveRequestPage extends StatefulWidget {
   const CreateLeaveRequestPage({super.key});
@@ -16,25 +18,30 @@ class CreateLeaveRequestPage extends StatefulWidget {
 
 class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   final _reasonCtl = TextEditingController();
-  final _ds = StudentLeaveRequestService();
+  final _service = StudentLeaveRequestService();
 
-  String? _classCode;
-  String? _className;
-
-  String? _subjectId; // nếu lớp có nhiều môn
-  String? _subjectName;
+  String? _courseCode;
+  String? _courseName;
+  String? _lecturerId;
 
   String? _sessionId;
+  String? _sessionName;
   DateTime? _sessionDate;
 
   bool _submitting = false;
 
   String? _uid() => FirebaseAuth.instance.currentUser?.uid;
 
+  @override
+  void dispose() {
+    _reasonCtl.dispose();
+    super.dispose();
+  }
+
   // ------------------------
-  // 1) STREAM LỚP TỪ ENROLLMENTS → CLASSES
+  // 1) STREAM CÁC MÔN TỪ ENROLLMENTS → COURSES
   // ------------------------
-  Stream<List<DocumentSnapshot>> _studentClassesStream() async* {
+  Stream<List<DocumentSnapshot>> _studentCoursesStream() async* {
     final uid = _uid();
     if (uid == null) {
       yield [];
@@ -42,70 +49,55 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
     }
     final firestore = FirebaseFirestore.instance;
 
-    // B1: enrollments by student
+    // Lấy các enrollments theo sinh viên
     final enrollSnap = await firestore
         .collection(FirestoreCollections.enrollments)
         .where('studentUid', isEqualTo: uid)
         .get();
 
-    final classCodes = enrollSnap.docs
-        .map((d) => (d.data()['classCode'] as String?) ?? '')
+    final courseCodes = enrollSnap.docs
+        .map((d) => (d.data()['courseCode'] as String?) ?? '')
         .where((e) => e.isNotEmpty)
         .toList();
 
-    if (classCodes.isEmpty) {
+    if (courseCodes.isEmpty) {
       yield [];
       return;
     }
 
     // Firestore whereIn ≤ 10 → chia mẻ
-    final List<DocumentSnapshot> allClasses = [];
-    for (var i = 0; i < classCodes.length; i += 10) {
-      final chunk = classCodes.sublist(
+    final List<DocumentSnapshot> allCourses = [];
+    for (var i = 0; i < courseCodes.length; i += 10) {
+      final chunk = courseCodes.sublist(
         i,
-        i + 10 > classCodes.length ? classCodes.length : i + 10,
+        i + 10 > courseCodes.length ? courseCodes.length : i + 10,
       );
       final snap = await firestore
-          .collection(FirestoreCollections.classes)
+          .collection(FirestoreCollections.courses)
           .where(FieldPath.documentId, whereIn: chunk)
           .get();
-      allClasses.addAll(snap.docs);
+      allCourses.addAll(snap.docs);
     }
 
     // sort theo tên hiển thị
-    allClasses.sort((a, b) {
+    allCourses.sort((a, b) {
       final am = (a.data() as Map<String, dynamic>? ?? {});
       final bm = (b.data() as Map<String, dynamic>? ?? {});
-      final an = (am['className'] ?? am['name'] ?? a.id).toString();
-      final bn = (bm['className'] ?? bm['name'] ?? b.id).toString();
+      final an = (am['courseName'] ?? am['name'] ?? a.id).toString();
+      final bn = (bm['courseName'] ?? bm['name'] ?? b.id).toString();
       return an.toLowerCase().compareTo(bn.toLowerCase());
     });
 
-    yield allClasses;
+    yield allCourses;
   }
 
   // ------------------------
-  // 2) SUBJECT PICKER (tuỳ kiến trúc; nếu 1 lớp = 1 môn có thể bỏ phần này)
-  //    Ưu tiên subcollection: classes/{classCode}/subjects
+  // 2) SESSIONS THEO MÔN
+  //    Top-level: sessions.where(courseCode == _courseCode).orderBy(date)
+  //    Fallback subcollection: courses/{courseCode}/sessions
   // ------------------------
-  Stream<QuerySnapshot<Map<String, dynamic>>> _subjectsOfClass(
-    String classCode,
-  ) {
-    return FirebaseFirestore.instance
-        .collection(FirestoreCollections.classes)
-        .doc(classCode)
-        .collection('subjects')
-        .orderBy('name')
-        .snapshots();
-  }
-
-  // ------------------------
-  // 3) SESSIONS THEO LỚP
-  //    Top-level: sessions.where(classCode == _classCode).orderBy(date)
-  //    Fallback subcollection: classes/{classCode}/sessions
-  // ------------------------
-  Stream<QuerySnapshot<Map<String, dynamic>>> _sessionsByClass(
-    String classCode,
+  Stream<QuerySnapshot<Map<String, dynamic>>> _sessionsByCourse(
+    String courseCode,
   ) {
     final col = FirebaseFirestore.instance
         .collection(FirestoreCollections.sessions)
@@ -114,43 +106,43 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
           toFirestore: (m, _) => m,
         );
     return col
-        .where('classCode', isEqualTo: classCode)
+        .where('courseCode', isEqualTo: courseCode)
         .orderBy('startTime', descending: false)
         .snapshots();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> _sessionsSubOfClass(
-    String classCode,
+  Stream<QuerySnapshot<Map<String, dynamic>>> _sessionsSubOfCourse(
+    String courseCode,
   ) {
     return FirebaseFirestore.instance
-        .collection(FirestoreCollections.classes)
-        .doc(classCode)
+        .collection(FirestoreCollections.courses)
+        .doc(courseCode)
         .collection('sessions')
         .orderBy('startTime', descending: false)
         .snapshots();
   }
 
   // ------------------------
-  // 4) WIDGETS PICKER
+  // 3) WIDGETS PICKER
   // ------------------------
-  Widget _classPicker() {
+  Widget _coursePicker() {
     return StreamBuilder<List<DocumentSnapshot>>(
-      stream: _studentClassesStream(),
+      stream: _studentCoursesStream(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const LinearProgressIndicator();
         }
         if (snap.hasError) {
           return Text(
-            'Lỗi lớp: ${snap.error}',
+            'Lỗi môn học: ${snap.error}',
             style: const TextStyle(color: Colors.redAccent),
           );
         }
         final docs = (snap.data ?? []);
-        if (docs.isEmpty) return const Text('Bạn chưa ghi danh lớp nào.');
+        if (docs.isEmpty) return const Text('Bạn chưa tham gia môn học nào.');
 
-        final validValue = docs.any((d) => d.id == _classCode)
-            ? _classCode
+        final validValue = docs.any((d) => d.id == _courseCode)
+            ? _courseCode
             : null;
 
         return DropdownButtonFormField<String>(
@@ -158,74 +150,43 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
           value: validValue,
           items: docs.map((d) {
             final data = (d.data() as Map<String, dynamic>? ?? {});
-            final displayName = (data['className'] ?? data['name'] ?? d.id)
+            final displayName = (data['courseName'] ?? data['name'] ?? d.id)
                 .toString();
             return DropdownMenuItem<String>(
               value: d.id,
               child: Text(displayName, overflow: TextOverflow.ellipsis),
-              onTap: () => _className = displayName,
+              onTap: () => _courseName = displayName,
             );
           }).toList(),
           onChanged: (v) {
             setState(() {
-              _classCode = v;
-              _subjectId = null;
-              _subjectName = null;
+              _courseCode = v;
               _sessionId = null;
+              _sessionName = null;
               _sessionDate = null;
+
+              // Phòng trường hợp onTap ở item không chạy, gán lại _courseName
+              final doc = docs.firstWhere(
+                (d) => d.id == v,
+                orElse: () => docs.first,
+              );
+              final data = (doc.data() as Map<String, dynamic>? ?? {});
+              _courseName = data['courseName'].toString();
+              _courseCode = data['courseCode'].toString();
+              _lecturerId = data['lecturerId'].toString();
             });
           },
-          decoration: const InputDecoration(labelText: 'Lớp'),
-        );
-      },
-    );
-  }
-
-  Widget _subjectPicker() {
-    if (_classCode == null) return const SizedBox.shrink();
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _subjectsOfClass(_classCode!),
-      builder: (context, snap) {
-        if (snap.hasError) {
-          return Text(
-            'Lỗi môn: ${snap.error}',
-            style: const TextStyle(color: Colors.redAccent),
-          );
-        }
-        if (!snap.hasData) return const LinearProgressIndicator();
-
-        final docs = snap.data!.docs;
-        if (docs.isEmpty)
-          return const SizedBox.shrink(); // nếu lớp chỉ có 1 môn mặc định
-
-        final validValue = docs.any((d) => d.id == _subjectId)
-            ? _subjectId
-            : null;
-
-        return DropdownButtonFormField<String>(
-          isExpanded: true,
-          value: validValue,
-          items: docs.map((d) {
-            final m = d.data();
-            final name = (m['name'] ?? d.id).toString();
-            return DropdownMenuItem<String>(
-              value: d.id,
-              child: Text(name, overflow: TextOverflow.ellipsis),
-              onTap: () => _subjectName = name,
-            );
-          }).toList(),
-          onChanged: (v) => setState(() => _subjectId = v),
-          decoration: const InputDecoration(labelText: 'Môn (nếu có)'),
+          decoration: const InputDecoration(labelText: 'Môn học'),
         );
       },
     );
   }
 
   Widget _sessionPicker() {
-    if (_classCode == null) return const SizedBox.shrink();
+    if (_courseCode == null) return const SizedBox.shrink();
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _sessionsByClass(_classCode!), // ưu tiên top-level
+      stream: _sessionsByCourse(_courseCode!), // ưu tiên top-level
       builder: (context, snap) {
         if (snap.hasError) {
           return Text(
@@ -237,9 +198,9 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
 
         final docs = snap.data!.docs;
         if (docs.isEmpty) {
-          // thử subcollection nếu top-level trống
+          // Thử subcollection nếu top-level trống
           return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: _sessionsSubOfClass(_classCode!),
+            stream: _sessionsSubOfCourse(_courseCode!),
             builder: (context, subSnap) {
               if (subSnap.hasError) {
                 return Text(
@@ -250,9 +211,9 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
               if (!subSnap.hasData) return const LinearProgressIndicator();
 
               final subDocs = subSnap.data!.docs;
-              if (subDocs.isEmpty)
-                return const Text('Chưa có buổi học cho lớp này.');
-
+              if (subDocs.isEmpty) {
+                return const Text('Chưa có buổi học cho môn học này.');
+              }
               return _buildSessionDropdown(subDocs);
             },
           );
@@ -272,15 +233,18 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
       value: validValue,
       items: docs.map((d) {
         final m = d.data();
-        final ts = (m['date'] as Timestamp?)?.toDate();
+        // Ưu tiên 'date', fallback 'startTime'
+        final DateTime? ts = (m['startTime'] as Timestamp?)?.toDate();
+
         final order = m['order'];
         final title = ts != null
             ? 'Buổi ${order ?? ''} • ${_fmt(ts)}'
-            : (m['name'] ?? 'Buổi ${order ?? d.id}').toString();
+            : (m['title'] ?? 'Buổi học');
+
         return DropdownMenuItem<String>(
           value: d.id,
           child: Text(title, overflow: TextOverflow.ellipsis),
-          onTap: () => _sessionDate = ts,
+          onTap: () => _sessionDate = ts, // có thể là null nếu dữ liệu thiếu
         );
       }).toList(),
       onChanged: (v) => setState(() => _sessionId = v),
@@ -289,64 +253,71 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   }
 
   // ------------------------
-  // 5) SUBMIT
+  // 4) SUBMIT
   // ------------------------
   Future<void> _submit() async {
     final reason = _reasonCtl.text.trim();
-    if (_classCode == null || _sessionId == null || reason.isEmpty) {
+    if (_courseCode == null || _sessionId == null || reason.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn lớp, buổi và nhập lý do')),
+        const SnackBar(
+          content: Text('Vui lòng chọn môn học, buổi và nhập lý do'),
+        ),
+      );
+      return;
+    }
+
+    if (_sessionDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Buổi học thiếu ngày giờ (sessionDate)')),
       );
       return;
     }
 
     setState(() => _submitting = true);
 
-    final user = FirebaseAuth.instance.currentUser!;
-    final req = LeaveRequestModel(
-      studentId: user.uid,
-      studentName: user.displayName!,
-      classCode: _classCode!,
-      className: _className!,
-      sessionId: _sessionId!,
-      sessionDate: _sessionDate!,
-      reason: reason,
-      id: '',
-      studentEmail: user.email!,
-      status: LeaveRequestStatus.pending.toString(),
-      createdAt: Timestamp.now().toDate(),
-      lecturerId: '',
-      courseCode: '',
-      courseName: '',
-      updatedAt: Timestamp.now().toDate(),
-      requestDate: Timestamp.now().toDate(),
-    );
-
     try {
-      await _ds.create(req);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã gửi yêu cầu (đang chờ duyệt)')),
-        );
-        Navigator.pop(context);
-      }
+      final user = FirebaseAuth.instance.currentUser!;
+      final req = LeaveRequestModel(
+        id: '',
+        studentId: user.uid,
+        studentName: user.displayName ?? '',
+        studentEmail: user.email ?? '',
+        courseCode: _courseCode!,
+        courseName: _courseName ?? '',
+        lecturerId: _lecturerId ?? '',
+        sessionId: _sessionId!,
+        sessionName: '',
+        sessionDate: _sessionDate!,
+        reason: reason,
+        status: 'pending', // ✅ lưu đúng chuỗi
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        requestDate: DateTime.now(),
+      );
+
+      // QUAN TRỌNG: ensure create() dùng await và collection đúng
+      // Ví dụ trong StudentLeaveRequestService:
+      // await FirebaseFirestore.instance.collection(FirestoreCollections.leaveRequests).add(req.toMap());
+      await _service.create(req);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã gửi yêu cầu (đang chờ duyệt)')),
+      );
+      Navigator.pop(context);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lỗi khi gửi: $e')));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
   }
 
-  @override
-  void dispose() {
-    _reasonCtl.dispose();
-    super.dispose();
-  }
-
+  // ------------------------
+  // 5) UI
+  // ------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -358,9 +329,7 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _classPicker(),
-            const SizedBox(height: 12),
-            _subjectPicker(),
+            _coursePicker(),
             const SizedBox(height: 12),
             _sessionPicker(),
             const SizedBox(height: 12),

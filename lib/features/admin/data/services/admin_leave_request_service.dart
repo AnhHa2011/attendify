@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../../core/data/models/leave_request_model.dart';
 import '../../../../core/data/models/user_model.dart';
-import '../../../lecturer/models/leave_request.dart';
 
 class LeaveRequestService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -501,8 +500,8 @@ class LeaveRequestService {
       case UserRole.admin:
         return true; // Admin có thể truy cập tất cả
       case UserRole.lecture:
-        // Lecturer có thể truy cập nếu là reviewer hoặc phụ trách lớp/môn
-        return request.lecturerId == userId; // Simplified, needs more logic
+      // Lecturer có thể truy cập nếu là reviewer hoặc phụ trách lớp/môn
+      // return request.lecturerId == userId; // Simplified, needs more logic
       case UserRole.student:
         return request.studentId == userId; // Student chỉ truy cập đơn của mình
       default:
@@ -549,14 +548,14 @@ class LeaveRequestService {
             'Mã đơn': request.id,
             'Sinh viên': request.studentName,
             'Email': request.studentEmail,
-            'Môn học': request.courseName ?? request.className ?? 'N/A',
+            'Môn học': request.courseName,
             'Buổi học': request.sessionId,
             'Ngày học': request.sessionDate,
             'Lý do': request.reason,
             'Trạng thái': request.status,
             'Ngày gửi': request.createdAt,
-            'Người duyệt': request.lecturerId ?? '',
-            'Ghi chú duyệt': request.reason ?? '',
+            // 'Người duyệt': request.lecturerId,
+            'Ghi chú duyệt': request.reason,
             'Ngày duyệt':
                 request.reviewedAt?.toIso8601String().split('T')[0] ?? '',
           },

@@ -152,7 +152,6 @@ class CoursesService {
             updatedAt: null,
             totalStudents: 0,
             attendedStudents: 0,
-            isAttendanceOpen: false,
             qrCode: null,
             attendanceStatus: const {},
           ),

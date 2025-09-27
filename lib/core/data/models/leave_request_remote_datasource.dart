@@ -28,8 +28,8 @@ class LeaveRequestRemoteDataSource {
 
     // 2) Nếu approved → đánh dấu attendance = excused
     final attRef = _fs
-        .collection('classes')
-        .doc(req.classCode)
+        .collection('courses')
+        .doc(req.courseCode)
         .collection('sessions')
         .doc(req.sessionId)
         .collection('attendances')

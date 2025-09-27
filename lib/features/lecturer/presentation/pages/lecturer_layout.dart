@@ -53,7 +53,7 @@ class LecturerLayout extends StatelessWidget {
       LecturerDashboard(),
       CourseListPage(),
       LeaveRequestsPage(),
-      ProfilePage(),
+      LecturerProfilePage(),
     ];
 
     return RoleLayout(

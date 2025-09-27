@@ -1,8 +1,8 @@
 import 'package:attendify/app_imports.dart' hide LeaveRequestStatus;
-import 'package:attendify/features/lecturer/models/leave_request.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/data/models/course_model.dart';
+import '../../../core/data/models/leave_request_model.dart';
 import '../models/class_session.dart';
 import '../models/attendance_record.dart';
 import 'notification_service.dart';
@@ -183,27 +183,25 @@ class LecturerService {
   }
 
   // Get leave requests for lecturer's courses
-  Stream<List<LeaveRequest>> getLeaveRequests({LeaveRequestStatus? status}) {
+  Stream<List<LeaveRequestModel>> getLeaveRequests({
+    LeaveRequestStatus? status,
+  }) {
     if (currentLecturerId == null) {
       return Stream.value([]);
     }
 
     Query query = _firestore
-        .collection('leaveRequests')
+        .collection('leave_requests')
         .where('lecturerId', isEqualTo: currentLecturerId);
 
     if (status != null) {
       query = query.where('status', isEqualTo: status.name);
     }
 
-    return query
-        .orderBy('requestDate', descending: true)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => LeaveRequest.fromDocumentSnapshot(doc))
-              .toList(),
-        );
+    return query.snapshots().map(
+      (snapshot) =>
+          snapshot.docs.map((doc) => LeaveRequestModel.fromDoc(doc)).toList(),
+    );
   }
 
   // Respond to leave request
@@ -213,10 +211,11 @@ class LecturerService {
     String? response,
   ) async {
     try {
-      await _firestore.collection('leaveRequests').doc(requestId).update({
+      await _firestore.collection('leave_requests').doc(requestId).update({
         'status': status.name,
-        'lecturerResponse': response,
+        'reviewedBy': response,
         'responseDate': Timestamp.now().toDate(),
+        'reviewedAt': Timestamp.now().toDate(),
         'updatedAt': Timestamp.now().toDate(),
       });
     } catch (e) {

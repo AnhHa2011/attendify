@@ -6,11 +6,10 @@ class LeaveRequestModel {
   final String studentName;
   final String studentEmail;
   final String lecturerId;
-  final String classCode;
-  final String className;
   final String courseCode;
   final String courseName;
   final String sessionId;
+  final String sessionName;
   final DateTime sessionDate;
   final String reason;
   final String status; // pending, approved, rejected
@@ -27,11 +26,10 @@ class LeaveRequestModel {
     required this.studentName,
     required this.studentEmail,
     required this.lecturerId,
-    required this.classCode,
-    required this.className,
     required this.courseCode,
     required this.courseName,
     required this.sessionId,
+    required this.sessionName,
     required this.sessionDate,
     required this.reason,
     required this.status,
@@ -51,13 +49,12 @@ class LeaveRequestModel {
       id: doc.id,
       studentId: data['studentId'] ?? '',
       studentName: data['studentName'] ?? '',
-      lecturerId: data['studentName'] ?? '',
+      lecturerId: data['lecturerId'] ?? '',
       studentEmail: data['studentEmail'] ?? '',
-      classCode: data['classCode'] ?? '',
-      className: data['className'] ?? '',
       courseCode: data['courseCode'] ?? '',
       courseName: data['courseName'] ?? '',
       sessionId: data['sessionId'] ?? '',
+      sessionName: data['sessionName'] ?? '',
       sessionDate:
           (data['sessionDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       reason: data['reason'] ?? '',
@@ -73,16 +70,15 @@ class LeaveRequestModel {
   }
 
   // Convert to Firestore document
-  Map<String, dynamic> toFirestore() {
+  Map<String, dynamic> toMap() {
     return {
       'studentId': studentId,
       'studentName': studentName,
       'studentEmail': studentEmail,
-      'classCode': classCode,
-      'className': className,
       'courseCode': courseCode,
       'courseName': courseName,
       'sessionId': sessionId,
+      'sessionName': sessionName,
       'sessionDate': Timestamp.fromDate(sessionDate),
       'reason': reason,
       'status': status,
@@ -123,11 +119,10 @@ class LeaveRequestModel {
       studentName: studentName ?? this.studentName,
       studentEmail: studentEmail ?? this.studentEmail,
       lecturerId: lecturerId ?? this.lecturerId,
-      classCode: classCode ?? this.classCode,
-      className: className ?? this.className,
       courseCode: courseCode ?? this.courseCode,
       courseName: courseName ?? this.courseName,
       sessionId: sessionId ?? this.sessionId,
+      sessionName: sessionName ?? this.sessionName,
       sessionDate: sessionDate ?? this.sessionDate,
       reason: reason ?? this.reason,
       status: status ?? this.status,
@@ -149,8 +144,6 @@ class LeaveRequestModel {
         other.studentId == studentId &&
         other.studentName == studentName &&
         other.studentEmail == studentEmail &&
-        other.classCode == classCode &&
-        other.className == className &&
         other.courseCode == courseCode &&
         other.courseName == courseName &&
         other.sessionId == sessionId &&
@@ -171,8 +164,6 @@ class LeaveRequestModel {
         studentId.hashCode ^
         studentName.hashCode ^
         studentEmail.hashCode ^
-        classCode.hashCode ^
-        className.hashCode ^
         courseCode.hashCode ^
         courseName.hashCode ^
         sessionId.hashCode ^
@@ -188,7 +179,7 @@ class LeaveRequestModel {
 
   @override
   String toString() {
-    return 'LeaveRequestModel(id: $id, studentName: $studentName, className: $className, courseName: $courseName, status: $status, reason: $reason)';
+    return 'LeaveRequestModel(id: $id, studentName: $studentName, courseName: $courseName, status: $status, reason: $reason)';
   }
 
   // Helper methods for status checking
@@ -208,4 +199,51 @@ class LeaveRequestModel {
         return 'Đang chờ';
     }
   }
+}
+
+enum LeaveRequestStatus { pending, approved, rejected }
+
+extension LeaveRequestStatusX on LeaveRequestStatus {
+  /// Chuyển enum thành string
+  String get asString {
+    switch (this) {
+      case LeaveRequestStatus.pending:
+        return 'pending';
+      case LeaveRequestStatus.approved:
+        return 'approved';
+      case LeaveRequestStatus.rejected:
+        return 'rejected';
+    }
+  }
+
+  /// Parse từ string thành enum
+  static LeaveRequestStatus fromString(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'approved':
+        return LeaveRequestStatus.approved;
+      case 'rejected':
+        return LeaveRequestStatus.rejected;
+      case 'pending':
+      default:
+        return LeaveRequestStatus.pending;
+    }
+  }
+}
+
+// Extension for LeaveRequestStatus
+extension LeaveRequestStatusExtension on LeaveRequestStatus {
+  String get displayName {
+    switch (this) {
+      case LeaveRequestStatus.pending:
+        return 'Đang chờ duyệt';
+      case LeaveRequestStatus.approved:
+        return 'Đã duyệt';
+      case LeaveRequestStatus.rejected:
+        return 'Từ chối';
+    }
+  }
+
+  bool get isPending => this == LeaveRequestStatus.pending;
+  bool get isApproved => this == LeaveRequestStatus.approved;
+  bool get isRejected => this == LeaveRequestStatus.rejected;
 }

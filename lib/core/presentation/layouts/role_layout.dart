@@ -10,7 +10,8 @@ class RoleLayout extends StatefulWidget {
     this.initialIndex = 0,
     this.title,
     this.onLogout,
-    this.mobileBreakpoint = 820, // 👈 chỉnh breakpoint tại đây
+    this.onTabChanged, // 👈 thêm callback
+    this.mobileBreakpoint = 820,
   }) : assert(items.length == pages.length, 'items/pages length mismatch');
 
   final List<RoleNavigationItem> items;
@@ -19,6 +20,7 @@ class RoleLayout extends StatefulWidget {
   final String? title;
   final Future<void> Function(BuildContext context)? onLogout;
   final double mobileBreakpoint;
+  final ValueChanged<int>? onTabChanged; // 👈 callback khi tab đổi
 
   @override
   State<RoleLayout> createState() => _RoleLayoutState();
@@ -67,17 +69,24 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  void _onTabSelected(int index) {
+    setState(() => _selectedIndex = index);
+    if (widget.onTabChanged != null) {
+      widget.onTabChanged!(index); // 👈 gọi callback
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final theme = Theme.of(context);
     final w = MediaQuery.of(context).size.width;
-    final isMobile = w < widget.mobileBreakpoint; // 👈 auto chuyển bottom bar
+    final isMobile = w < widget.mobileBreakpoint;
 
     final pages = widget.pages;
 
     if (isMobile) {
-      // ======= MOBILE UI: BottomNavigationBar + icon/text nhỏ gọn =======
+      // ===== MOBILE =====
       return Scaffold(
         appBar: AppBar(
           title: Text(widget.title ?? ''),
@@ -93,11 +102,11 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
         body: IndexedStack(index: _selectedIndex, children: pages),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
-          onTap: (i) => setState(() => _selectedIndex = i),
+          onTap: _onTabSelected, // 👈 dùng hàm wrapper
           type: BottomNavigationBarType.fixed,
-          iconSize: 20, // 👈 icon nhỏ
-          selectedFontSize: 12, // 👈 chữ nhỏ
-          unselectedFontSize: 10, // 👈 chữ nhỏ
+          iconSize: 20,
+          selectedFontSize: 12,
+          unselectedFontSize: 10,
           items: [
             for (final it in widget.items)
               BottomNavigationBarItem(
@@ -111,7 +120,7 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
       );
     }
 
-    // ======= DESKTOP/TABLET UI: Sidebar như cũ =======
+    // ===== DESKTOP/TABLET =====
     return Scaffold(
       body: Row(
         children: [
@@ -161,7 +170,7 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
     );
   }
 
-  // ====== Sidebar (giữ hiệu ứng, thu nhỏ icon/padding để hợp mobile/desktop) ======
+  // ===== Sidebar =====
   Widget _buildSidebar(ThemeData theme, user) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -209,8 +218,6 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
       child: Row(
         children: [
           Container(
-            width: _isExpanded ? 50 : 40,
-            height: _isExpanded ? 50 : 40,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -231,10 +238,9 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
               Icons.workspace_premium_rounded,
               color: Colors.white,
               size: 22,
-            ), // 👈 22 thay vì 24
+            ),
           ),
           if (_isExpanded) ...[
-            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,13 +294,13 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
-          onTap: () => setState(() => _selectedIndex = index),
+          onTap: () => _onTabSelected(index), // 👈 gọi wrapper
           borderRadius: BorderRadius.circular(16),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             padding: EdgeInsets.symmetric(
               horizontal: _isExpanded ? 16 : 12,
-              vertical: 14, // 👈 giảm nhẹ vertical
+              vertical: 14,
             ),
             decoration: BoxDecoration(
               gradient: isSelected ? grad : null,
@@ -313,7 +319,7 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
               children: [
                 Icon(
                   isSelected ? (item.activeIcon ?? item.icon) : item.icon,
-                  size: 22, // 👈 22 thay vì 24
+                  size: 22,
                   color: isSelected
                       ? Colors.white
                       : theme.colorScheme.onSurface.withOpacity(0.75),
@@ -368,7 +374,7 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
                       Icons.logout_rounded,
                       color: Colors.red,
                       size: 20,
-                    ), // 👈 nhỏ hơn
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       'Đăng xuất',

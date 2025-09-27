@@ -1,237 +1,390 @@
+// lib/features/student/presentation/pages/qr_scanner_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../data/services/qr_scanner_service.dart';
+import '../../../../app/providers/auth_provider.dart';
 
-class QRScannerPage extends StatefulWidget {
-  final Function(QRScanResult)? onScanResult;
-  final String title;
-  final String? instructions;
-
-  const QRScannerPage({
-    super.key,
-    this.onScanResult,
-    this.title = 'Quét mã QR',
-    this.instructions,
-  });
+class QrScannerPage extends StatefulWidget {
+  const QrScannerPage({super.key});
 
   @override
-  State<QRScannerPage> createState() => _QRScannerPageState();
+  State<QrScannerPage> createState() => _QrScannerPageState();
 }
 
-class _QRScannerPageState extends State<QRScannerPage> {
-  MobileScannerController? _controller;
-  bool _isFlashOn = false;
-  bool _isProcessing = false;
+class _QrScannerPageState extends State<QrScannerPage>
+    with WidgetsBindingObserver {
+  late final MobileScannerController controller;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  MobileScannerController get controller {
-    return _controller ??= MobileScannerController();
+  bool _isProcessing = false;
+  bool _cameraOn = false; // <-- chỉ bật khi người dùng bấm nút
+
+  // Cho parent (StudentLayout) gọi để tắt camera nếu cần
+  void stopCamera() {
+    if (mounted && _cameraOn) {
+      _toggleCamera(forceOff: true);
+    }
+  }
+
+  // Cho parent bật lại camera nếu cần (vẫn không tự bật trừ khi gọi)
+  void startCamera() {
+    if (mounted && !_cameraOn && !_isProcessing) {
+      _toggleCamera(forceOn: true);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // KHÔNG auto start
+    controller = MobileScannerController(
+      autoStart: false, // <-- quan trọng
+      facing: CameraFacing.back,
+      detectionSpeed: DetectionSpeed.normal,
+    );
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    _controller?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    controller.dispose();
     super.dispose();
   }
 
-  void _onDetect(BarcodeCapture capture) async {
-    if (_isProcessing) return;
-
-    final List<Barcode> barcodes = capture.barcodes;
-    if (barcodes.isEmpty) return;
-
-    final String? qrData = barcodes.first.rawValue;
-    if (qrData == null || qrData.isEmpty) return;
-
-    setState(() {
-      _isProcessing = true;
-    });
-
-    // Parse QR code
-    final result = QRScannerService.parseQRCode(qrData);
-
-    // Show result
-    await _showScanResult(result);
-
-    // Call callback if provided
-    widget.onScanResult?.call(result);
-
-    setState(() {
-      _isProcessing = false;
-    });
-  }
-
-  Future<void> _showScanResult(QRScanResult result) async {
-    final theme = Theme.of(context);
-
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: Icon(
-          result.isValid ? Icons.check_circle : Icons.error,
-          color: result.isValid ? Colors.green : Colors.red,
-          size: 48,
-        ),
-        title: Text(
-          result.isValid ? 'Quét thành công!' : 'Quét thất bại!',
-          style: TextStyle(color: result.isValid ? Colors.green : Colors.red),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (result.isValid) ...[
-              Text('Loại: ${_getTypeText(result.type)}'),
-              const SizedBox(height: 8),
-              if (result.type == QRType.attendance) ...[
-                Text('Lớp: ${result.data['classCode'] ?? 'N/A'}'),
-                Text('Phiên: ${result.data['sessionId'] ?? 'N/A'}'),
-              ] else if (result.type == QRType.joinClass) ...[
-                Text('Lớp: ${result.data['classCode'] ?? 'N/A'}'),
-                Text('Môn học: ${result.data['courseCode'] ?? 'N/A'}'),
-              ],
-            ] else ...[
-              Text(
-                result.error ?? 'Mã QR không hợp lệ',
-                style: TextStyle(color: theme.colorScheme.error),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          if (result.isValid) ...[
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop(result);
-              },
-              child: const Text('Xác nhận'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Quét lại'),
-            ),
-          ] else ...[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Thử lại'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-              },
-              child: const Text('Hủy'),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  String _getTypeText(QRType type) {
-    switch (type) {
-      case QRType.attendance:
-        return 'Điểm danh';
-      case QRType.joinClass:
-        return 'Tham gia lớp';
-      case QRType.unknown:
-        return 'Không xác định';
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // KHÔNG tự bật lại camera.
+        // Nếu trước đó người dùng đang bật (_cameraOn == true) và app quay lại,
+        // vẫn không tự bật — để đúng yêu cầu “chỉ mở khi bấm nút”.
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        // Nếu đang bật thì tắt khi rời app
+        if (_cameraOn) {
+          _toggleCamera(forceOff: true);
+        }
+        break;
     }
   }
 
-  void _toggleFlash() async {
-    setState(() {
-      _isFlashOn = !_isFlashOn;
-    });
-    await controller.toggleTorch();
+  Future<void> _toggleCamera({bool? forceOn, bool? forceOff}) async {
+    try {
+      if (forceOn == true) {
+        await controller.start();
+        setState(() => _cameraOn = true);
+        return;
+      }
+      if (forceOff == true) {
+        await controller.stop();
+        setState(() => _cameraOn = false);
+        return;
+      }
+
+      if (_cameraOn) {
+        await controller.stop();
+        setState(() => _cameraOn = false);
+      } else {
+        await controller.start();
+        setState(() => _cameraOn = true);
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  Future<void> _handleScannedData(String qrData) async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+
+    // Tạm dừng camera trong lúc xử lý
+    if (_cameraOn) {
+      await _toggleCamera(forceOff: true);
+    }
+
+    try {
+      // QR format kỳ vọng: <prefix>|<sessionId>|<...>|<...>
+      final parts = qrData.split('|');
+      if (parts.length != 4) {
+        throw Exception("Mã QR không hợp lệ.");
+      }
+
+      final sessionId = parts[1];
+      final auth = context.read<AuthProvider>();
+      final studentId = auth.user!.uid;
+
+      // 1) Kiểm tra session tồn tại và đang mở
+      final sessionDoc = await _firestore
+          .collection('sessions')
+          .doc(sessionId)
+          .get();
+      if (!sessionDoc.exists) {
+        throw Exception("Session không tồn tại.");
+      }
+      final sessionData = sessionDoc.data()!;
+      final isOpen = (sessionData['isOpen'] as bool?) ?? false;
+      final classId = sessionData['classId'] as String?;
+
+      if (classId == null || classId.isEmpty) {
+        throw Exception("Dữ liệu session không hợp lệ.");
+      }
+      if (!isOpen) {
+        throw Exception("Session đã đóng. Không thể điểm danh.");
+      }
+
+      // 2) Kiểm tra sinh viên thuộc lớp không
+      final enrollmentQuery = await _firestore
+          .collection('enrollments')
+          .where('classId', isEqualTo: classId)
+          .where('studentId', isEqualTo: studentId)
+          .limit(1)
+          .get();
+
+      if (enrollmentQuery.docs.isEmpty) {
+        throw Exception("Bạn không thuộc lớp học này.");
+      }
+
+      // 3) Kiểm tra đã điểm danh chưa
+      final attendanceQuery = await _firestore
+          .collection('attendance')
+          .where('sessionId', isEqualTo: sessionId)
+          .where('studentId', isEqualTo: studentId)
+          .limit(1)
+          .get();
+
+      if (attendanceQuery.docs.isNotEmpty) {
+        throw Exception("Bạn đã điểm danh cho buổi học này rồi.");
+      }
+
+      // 4) Ghi điểm danh
+      await _firestore.collection('attendance').add({
+        'sessionId': sessionId,
+        'studentId': studentId,
+        'status': 'present',
+        'timestamp': FieldValue.serverTimestamp(),
+        'method': 'qr_code',
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Điểm danh thành công!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: ${e.toString().replaceFirst("Exception: ", "")}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } finally {
+      // Cho phép quét tiếp: bật lại camera sau 2s nhưng CHỈ khi người dùng muốn bật
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+      // KHÔNG tự bật lại — để giữ đúng yêu cầu “chỉ mở khi bấm nút”
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Text(widget.title),
+        title: const Text('Quét mã QR điểm danh'),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(_isFlashOn ? Icons.flash_on : Icons.flash_off),
-            onPressed: _toggleFlash,
-            tooltip: 'Đèn flash',
+            onPressed: !_cameraOn
+                ? null
+                : () {
+                    controller.toggleTorch();
+                  },
+            icon: const Icon(Icons.flash_on),
+            tooltip: 'Bật/tắt đèn flash',
           ),
         ],
       ),
       body: Stack(
         children: [
-          // Camera view
-          MobileScanner(controller: controller, onDetect: _onDetect),
-
-          // Overlay with scanning frame
-          _buildScannerOverlay(),
-
-          // Instructions
-          if (widget.instructions != null)
-            Positioned(
-              bottom: 100,
-              left: 20,
-              right: 20,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  widget.instructions!,
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
+          // Camera Scanner (sẽ hiển thị preview khi _cameraOn == true)
+          if (_cameraOn)
+            MobileScanner(
+              controller: controller,
+              onDetect: (capture) {
+                final barcodes = capture.barcodes;
+                if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
+                  _handleScannedData(barcodes.first.rawValue!);
+                }
+              },
+            )
+          else
+            // Placeholder khi camera tắt
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.qr_code_scanner,
+                    color: Colors.white.withOpacity(0.7),
+                    size: 64,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Camera đang tắt\nBấm "Bật camera" để bắt đầu quét',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ],
               ),
             ),
 
-          // Processing indicator
-          if (_isProcessing)
-            Container(
-              color: Colors.black.withOpacity(0.5),
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(color: Colors.white),
-                    SizedBox(height: 16),
-                    Text(
-                      'Đang xử lý...',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+          // Overlay UI (khung ngắm + hướng dẫn)
+          if (_cameraOn)
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Scanner Frame
+                  Container(
+                    width: 280,
+                    height: 280,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: _isProcessing ? Colors.orange : Colors.white,
+                        width: 3,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                  ],
-                ),
+                    child: _isProcessing
+                        ? Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.orange,
+                                strokeWidth: 3,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(height: 30),
+
+                  // Instructions
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 32),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          _isProcessing
+                              ? Icons.hourglass_empty
+                              : Icons.qr_code_scanner,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _isProcessing
+                              ? 'Đang xử lý điểm danh...'
+                              : 'Đưa camera đến mã QR để điểm danh',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (!_isProcessing) ...[
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Đảm bảo mã QR nằm trong khung trên',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
+
+          // Corner decorations
+          if (_cameraOn) ...[
+            Positioned(
+              top: MediaQuery.of(context).size.height / 2 - 140,
+              left: MediaQuery.of(context).size.width / 2 - 140,
+              child: _buildCorner(isTopLeft: true),
+            ),
+            Positioned(
+              top: MediaQuery.of(context).size.height / 2 - 140,
+              right: MediaQuery.of(context).size.width / 2 - 140,
+              child: _buildCorner(isTopRight: true),
+            ),
+            Positioned(
+              bottom: MediaQuery.of(context).size.height / 2 - 140,
+              left: MediaQuery.of(context).size.width / 2 - 140,
+              child: _buildCorner(isBottomLeft: true),
+            ),
+            Positioned(
+              bottom: MediaQuery.of(context).size.height / 2 - 140,
+              right: MediaQuery.of(context).size.width / 2 - 140,
+              child: _buildCorner(isBottomRight: true),
+            ),
+          ],
         ],
       ),
       bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(16),
         color: Colors.black,
-        padding: const EdgeInsets.all(20),
         child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              Text(
-                'Đưa mã QR vào trong khung để quét',
-                style: TextStyle(color: Colors.white, fontSize: 16),
-                textAlign: TextAlign.center,
+              // Bật/Tắt camera (nút chính)
+              _buildActionButton(
+                icon: _cameraOn ? Icons.videocam_off : Icons.videocam,
+                label: _cameraOn ? 'Tắt camera' : 'Bật camera',
+                onTap: () => _toggleCamera(),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Mã QR sẽ được tự động nhận diện',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 14,
-                ),
-                textAlign: TextAlign.center,
+              _buildActionButton(
+                icon: Icons.cameraswitch,
+                label: 'Đổi camera',
+                onTap: _cameraOn ? () => controller.switchCamera() : null,
+              ),
+              _buildActionButton(
+                icon: Icons.help_outline,
+                label: 'Hướng dẫn',
+                onTap: _showInstructions,
               ),
             ],
           ),
@@ -240,102 +393,129 @@ class _QRScannerPageState extends State<QRScannerPage> {
     );
   }
 
-  Widget _buildScannerOverlay() {
-    return CustomPaint(painter: ScannerOverlayPainter(), child: Container());
-  }
-}
-
-class ScannerOverlayPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black.withOpacity(0.5)
-      ..style = PaintingStyle.fill;
-
-    // Draw overlay with cut-out for scanning area
-    final scanAreaSize = size.width * 0.7;
-    final scanAreaLeft = (size.width - scanAreaSize) / 2;
-    final scanAreaTop = (size.height - scanAreaSize) / 2;
-    final scanAreaRect = Rect.fromLTWH(
-      scanAreaLeft,
-      scanAreaTop,
-      scanAreaSize,
-      scanAreaSize,
-    );
-
-    // Create path for overlay
-    final overlayPath = Path()
-      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..addRRect(
-        RRect.fromRectAndRadius(scanAreaRect, const Radius.circular(12)),
-      )
-      ..fillType = PathFillType.evenOdd;
-
-    canvas.drawPath(overlayPath, paint);
-
-    // Draw scanning frame corners
-    final cornerPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
-
-    final cornerLength = 20.0;
-
-    // Top-left corner
-    canvas.drawLine(
-      Offset(scanAreaLeft, scanAreaTop + cornerLength),
-      Offset(scanAreaLeft, scanAreaTop),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      Offset(scanAreaLeft, scanAreaTop),
-      Offset(scanAreaLeft + cornerLength, scanAreaTop),
-      cornerPaint,
-    );
-
-    // Top-right corner
-    canvas.drawLine(
-      Offset(scanAreaLeft + scanAreaSize - cornerLength, scanAreaTop),
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop),
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop + cornerLength),
-      cornerPaint,
-    );
-
-    // Bottom-left corner
-    canvas.drawLine(
-      Offset(scanAreaLeft, scanAreaTop + scanAreaSize - cornerLength),
-      Offset(scanAreaLeft, scanAreaTop + scanAreaSize),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      Offset(scanAreaLeft, scanAreaTop + scanAreaSize),
-      Offset(scanAreaLeft + cornerLength, scanAreaTop + scanAreaSize),
-      cornerPaint,
-    );
-
-    // Bottom-right corner
-    canvas.drawLine(
-      Offset(
-        scanAreaLeft + scanAreaSize - cornerLength,
-        scanAreaTop + scanAreaSize,
+  Widget _buildCorner({
+    bool isTopLeft = false,
+    bool isTopRight = false,
+    bool isBottomLeft = false,
+    bool isBottomRight = false,
+  }) {
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        border: Border(
+          top: (isTopLeft || isTopRight)
+              ? const BorderSide(color: Colors.green, width: 4)
+              : BorderSide.none,
+          left: (isTopLeft || isBottomLeft)
+              ? const BorderSide(color: Colors.green, width: 4)
+              : BorderSide.none,
+          right: (isTopRight || isBottomRight)
+              ? const BorderSide(color: Colors.green, width: 4)
+              : BorderSide.none,
+          bottom: (isBottomLeft || isBottomRight)
+              ? const BorderSide(color: Colors.green, width: 4)
+              : BorderSide.none,
+        ),
       ),
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop + scanAreaSize),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      Offset(
-        scanAreaLeft + scanAreaSize,
-        scanAreaTop + scanAreaSize - cornerLength,
-      ),
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop + scanAreaSize),
-      cornerPaint,
     );
   }
 
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+  }) {
+    final disabled = onTap == null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Opacity(
+        opacity: disabled ? 0.4 : 1,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 24),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showInstructions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Icon(
+                    Icons.help_outline,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Hướng dẫn điểm danh',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                '1. Bấm nút "Bật camera" để mở camera\n'
+                '2. Đưa camera đến mã QR do giảng viên cung cấp\n'
+                '3. Đảm bảo mã QR nằm trong khung quét\n'
+                '4. Giữ máy ổn định và đợi quét tự động\n'
+                '5. Mỗi session chỉ có thể điểm danh một lần',
+                style: TextStyle(fontSize: 16, height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Đã hiểu'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

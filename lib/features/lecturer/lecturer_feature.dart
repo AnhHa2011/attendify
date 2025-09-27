@@ -1,7 +1,6 @@
 // Lecturer Feature Exports
 // Models
 export 'models/class_session.dart';
-export 'models/leave_request.dart';
 export 'models/attendance_record.dart';
 
 // Services
