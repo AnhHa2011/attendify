@@ -24,7 +24,7 @@ class _UserManagementPageState extends State<UserManagementPage>
     _tabController = TabController(length: 2, vsync: this);
     _searchController.addListener(() {
       setState(() {
-        _searchQuery = _searchController.text;
+        _searchQuery = _searchController.text.toLowerCase().trim();
       });
     });
   }
@@ -32,6 +32,7 @@ class _UserManagementPageState extends State<UserManagementPage>
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -52,7 +53,12 @@ class _UserManagementPageState extends State<UserManagementPage>
             suffixIcon: _searchQuery.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.clear),
-                    onPressed: _searchController.clear,
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() {
+                        _searchQuery = '';
+                      });
+                    },
                   )
                 : null,
           ),
@@ -104,9 +110,9 @@ class _UserManagementPageState extends State<UserManagementPage>
         ],
         // hiển thị như FAB
         child: FloatingActionButton(
-          heroTag: 'fab_user_management_page', // icon hợp lý hơn dấu +
+          heroTag: 'fab_user_management_page',
           onPressed: null,
-          child: const Icon(Icons.add), // PopupMenuButton xử lý việc mở menu
+          child: const Icon(Icons.add),
         ),
       ),
     );
@@ -122,53 +128,159 @@ class _UserManagementPageState extends State<UserManagementPage>
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        final users = snapshot.data!;
-        if (users.isEmpty) {
+
+        final allUsers = snapshot.data!;
+
+        // Apply search filter
+        final filteredUsers = _searchQuery.isEmpty
+            ? allUsers
+            : allUsers.where((user) {
+                final searchLower = _searchQuery.toLowerCase();
+                return user.displayName.toLowerCase().contains(searchLower) ||
+                    user.email.toLowerCase().contains(searchLower) ||
+                    user.role.name.toLowerCase().contains(searchLower);
+              }).toList();
+
+        if (allUsers.isEmpty) {
           return const Center(child: Text('Chưa có người dùng'));
         }
-        return ListView.builder(
-          itemCount: users.length,
-          itemBuilder: (context, index) {
-            final user = users[index];
-            return ListTile(
-              leading: CircleAvatar(
+
+        if (filteredUsers.isEmpty && _searchQuery.isNotEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.search_off, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(
+                  'Không tìm thấy người dùng nào\nphù hợp với "${_searchQuery}"',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.grey, fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                    });
+                  },
+                  child: const Text('Xóa bộ lọc'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          children: [
+            // Search result info
+            if (_searchQuery.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                color: Theme.of(context).colorScheme.surfaceVariant,
                 child: Text(
-                  user.displayName.isNotEmpty
-                      ? user.displayName[0].toUpperCase()
-                      : '?',
+                  'Tìm thấy ${filteredUsers.length} kết quả cho "${_searchQuery}"',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
-              title: Text(user.displayName),
-              subtitle: Text('${user.email} • ${user.role.name}'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                spacing: 4,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined),
-                    tooltip: 'Sửa',
-                    onPressed: () => _editUser(context, user),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.vpn_key_outlined),
-                    tooltip: 'Gửi email đặt lại mật khẩu (Admin)',
-                    onPressed: () => _resetPasswordAsAdmin(
-                      context,
-                      adminService,
-                      user.email,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    tooltip: 'Xoá',
-                    onPressed: () => _deleteUser(context, adminService, user),
-                  ),
-                ],
+
+            // User list
+            Expanded(
+              child: ListView.builder(
+                itemCount: filteredUsers.length,
+                itemBuilder: (context, index) {
+                  final user = filteredUsers[index];
+                  return _buildUserTile(user);
+                },
               ),
-            );
-          },
+            ),
+          ],
         );
       },
+    );
+  }
+
+  Widget _buildUserTile(UserModel user) {
+    return ListTile(
+      leading: CircleAvatar(
+        child: Text(
+          user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',
+        ),
+      ),
+      title: _highlightSearchText(user.displayName),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _highlightSearchText(user.email),
+          Text(
+            user.role.name,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+      isThreeLine: true,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Sửa',
+            onPressed: () => _editUser(context, user),
+          ),
+          IconButton(
+            icon: const Icon(Icons.vpn_key_outlined),
+            tooltip: 'Gửi email đặt lại mật khẩu (Admin)',
+            onPressed: () =>
+                _resetPasswordAsAdmin(context, adminService, user.email),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.red),
+            tooltip: 'Xoá',
+            onPressed: () => _deleteUser(context, adminService, user),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _highlightSearchText(String text) {
+    if (_searchQuery.isEmpty) {
+      return Text(text);
+    }
+
+    final searchLower = _searchQuery.toLowerCase();
+    final textLower = text.toLowerCase();
+
+    if (!textLower.contains(searchLower)) {
+      return Text(text);
+    }
+
+    final startIndex = textLower.indexOf(searchLower);
+    final endIndex = startIndex + searchLower.length;
+
+    return RichText(
+      text: TextSpan(
+        style: DefaultTextStyle.of(context).style,
+        children: [
+          if (startIndex > 0) TextSpan(text: text.substring(0, startIndex)),
+          TextSpan(
+            text: text.substring(startIndex, endIndex),
+            style: TextStyle(
+              backgroundColor: Colors.yellow.shade200,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (endIndex < text.length) TextSpan(text: text.substring(endIndex)),
+        ],
+      ),
     );
   }
 
@@ -204,15 +316,28 @@ class _UserManagementPageState extends State<UserManagementPage>
     if (confirm == true) {
       final uid = user.uid;
       if (uid.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không xác định được UID người dùng')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Không xác định được UID người dùng')),
+          );
+        }
         return;
       }
-      await adminService.deleteUser(uid);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Đã xoá tài khoản')));
+
+      try {
+        await adminService.deleteUser(uid);
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Đã xoá tài khoản')));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Lỗi xóa người dùng: $e')));
+        }
+      }
     }
   }
 
@@ -251,13 +376,17 @@ class _UserManagementPageState extends State<UserManagementPage>
 
     try {
       await adminService.sendPasswordResetForUserAsAdmin(email);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã gửi email đặt lại mật khẩu tới $email')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Đã gửi email đặt lại mật khẩu tới $email')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     }
   }
 }
