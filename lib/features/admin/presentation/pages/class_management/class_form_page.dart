@@ -20,24 +20,11 @@ class _ClassFormPageState extends State<ClassFormPage> {
 
   late final TextEditingController _codeCtrl;
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _creditsCtrl;
   late final TextEditingController _minStudentsCtrl;
   late final TextEditingController _maxStudentsCtrl;
 
   bool _isLoading = false;
   bool get _isEditMode => widget.classModel != null;
-
-  // ====== Lecturer dropdown state ======
-  List<LecturerLite> _lecturers = [];
-  String? _selectedLecturerId;
-  bool _lecturersLoading = true;
-  String? _lecturersError;
-
-  // ====== Weekday slots (Mon..Sun) with time range ======
-  final List<_WeekdaySlot> _weekdaySlots = List.generate(
-    7,
-    (i) => _WeekdaySlot(weekday: i + 1), // 1=Mon ... 7=Sun
-  );
 
   @override
   void initState() {
@@ -56,173 +43,30 @@ class _ClassFormPageState extends State<ClassFormPage> {
           ? widget.classModel!.maxStudents.toString()
           : '',
     );
-
-    // Load lecturers
-    Future.microtask(_loadLecturers);
-
-    // If editing and class has weekly schedule, you can map it here
-    // TODO: nếu ClassModel đã có dữ liệu lịch tuần, parse và set vào _weekdaySlots
-  }
-
-  Future<void> _loadLecturers() async {
-    try {
-      final adminService = context.read<AdminService>();
-
-      // TODO: Đổi tên & map theo service thực tế.
-      // Yêu cầu: trả danh sách có id + displayName (hoặc name)
-      final raw = await adminService.fetchLecturers();
-      final list = raw
-          .map<LecturerLite>(
-            (e) => LecturerLite(
-              uid: e.uid,
-              displayName: e.displayName.toString(),
-              email: e.email.toString(),
-            ),
-          )
-          .toList();
-
-      if (!mounted) return;
-      setState(() {
-        _lecturers = list;
-        _lecturersLoading = false;
-        // nếu đang edit mà _selectedLecturerId null, thử auto chọn theo trùng tên (tuỳ bạn)
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _lecturersError = e.toString();
-        _lecturersLoading = false;
-      });
-    }
   }
 
   @override
   void dispose() {
     _codeCtrl.dispose();
     _nameCtrl.dispose();
-    _creditsCtrl.dispose();
     _minStudentsCtrl.dispose();
     _maxStudentsCtrl.dispose();
     super.dispose();
   }
 
-  // ====== Helpers ======
-  String _weekdayLabel(int weekday) {
-    switch (weekday) {
-      case 1:
-        return 'Thứ 2';
-      case 2:
-        return 'Thứ 3';
-      case 3:
-        return 'Thứ 4';
-      case 4:
-        return 'Thứ 5';
-      case 5:
-        return 'Thứ 6';
-      case 6:
-        return 'Thứ 7';
-      case 7:
-        return 'Chủ nhật';
-      default:
-        return 'N/A';
-    }
-  }
-
-  String _formatTime(TimeOfDay? t) {
-    if (t == null) return '--:--';
-    final h = t.hour.toString().padLeft(2, '0');
-    final m = t.minute.toString().padLeft(2, '0');
-    return '$h:$m';
-    // Nếu muốn 12h: DateFormat('hh:mm a').format(...)
-  }
-
-  int _toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
-
-  Future<void> _pickTime({
-    required _WeekdaySlot slot,
-    required bool isStart,
-  }) async {
-    final initial = isStart
-        ? (slot.start ?? const TimeOfDay(hour: 7, minute: 0))
-        : (slot.end ?? const TimeOfDay(hour: 9, minute: 0));
-
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initial,
-      helpText: isStart ? 'Chọn giờ bắt đầu' : 'Chọn giờ kết thúc',
-    );
-    if (picked == null) return;
-
-    setState(() {
-      if (isStart) {
-        slot.start = picked;
-      } else {
-        slot.end = picked;
-      }
-    });
-  }
-
-  // Validate chung cho các slot (nếu bật) thì phải có start < end
-  String? _validateSlots() {
-    for (final s in _weekdaySlots) {
-      if (!s.enabled) continue;
-      if (s.start == null || s.end == null) {
-        return 'Vui lòng chọn giờ cho ${_weekdayLabel(s.weekday)}';
-      }
-      if (_toMinutes(s.end!) <= _toMinutes(s.start!)) {
-        return 'Giờ kết thúc phải sau giờ bắt đầu (${_weekdayLabel(s.weekday)})';
-      }
-    }
-    return null;
-  }
-
-  List<Map<String, dynamic>> _collectSchedulePayload() {
-    // Trả list map day/start/end (24h) để lưu backend
-    final out = <Map<String, dynamic>>[];
-    for (final s in _weekdaySlots) {
-      if (!s.enabled || s.start == null || s.end == null) continue;
-      out.add({
-        'weekday': s.weekday, // 1..7
-        'start': _formatTime(s.start), // "HH:mm"
-        'end': _formatTime(s.end),
-      });
-    }
-    return out;
-  }
-
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
-
-    // Check lecturer chosen
-    if (_selectedLecturerId == null || _selectedLecturerId!.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Vui lòng chọn giảng viên')));
-      return;
-    }
-
-    // Validate slots (nếu cần bắt buộc có ít nhất 1 buổi thì kiểm tra ở đây)
-    final slotError = _validateSlots();
-    if (slotError != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(slotError)));
-      return;
-    }
 
     setState(() => _isLoading = true);
 
     final adminService = context.read<AdminService>();
     final classCode = _codeCtrl.text.trim().toUpperCase();
     final className = _nameCtrl.text.trim();
-    final credits = int.parse(_creditsCtrl.text);
     final minStudents = int.parse(_minStudentsCtrl.text);
     final maxStudents = int.parse(_maxStudentsCtrl.text);
-    final lecturerId = _selectedLecturerId!;
-    final weeklySchedule = _collectSchedulePayload();
 
     try {
-      // Kiểm tra trùng mã môn học
+      // Kiểm tra trùng mã lớp học
       final isTaken = await adminService.isClassCodeTaken(
         classCode,
         currentclassCode: widget.classModel?.id,
@@ -231,7 +75,7 @@ class _ClassFormPageState extends State<ClassFormPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Mã môn học "$classCode" đã tồn tại.'),
+              content: Text('Mã lớp học "$classCode" đã tồn tại.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -241,25 +85,19 @@ class _ClassFormPageState extends State<ClassFormPage> {
 
       // Tạo/Cập nhật
       if (_isEditMode) {
-        // TODO: sửa tham số cho khớp với service của bạn (nếu khác tên)
         await adminService.updateClass(
           id: widget.classModel!.id,
           classCode: classCode,
           className: className,
-          minStudents: minStudents,
-          maxStudents: maxStudents,
-          lecturerId: lecturerId,
-          weeklySchedule: weeklySchedule,
+          minStudents: minStudents > 0 ? minStudents : null,
+          maxStudents: maxStudents > 0 ? maxStudents : null,
         );
       } else {
-        // TODO: sửa tham số cho khớp với service của bạn (nếu khác tên)
         await adminService.createClass(
           classCode: classCode,
           className: className,
-          minStudents: minStudents,
-          maxStudents: maxStudents,
-          lecturerId: lecturerId,
-          weeklySchedule: weeklySchedule,
+          minStudents: minStudents > 0 ? minStudents : 10, // default
+          maxStudents: maxStudents > 0 ? maxStudents : 50, // default
         );
       }
 
@@ -267,7 +105,7 @@ class _ClassFormPageState extends State<ClassFormPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _isEditMode ? 'Cập nhật thành công!' : 'Thêm môn học thành công!',
+            _isEditMode ? 'Cập nhật thành công!' : 'Thêm lớp học thành công!',
           ),
           backgroundColor: Colors.green,
         ),
@@ -288,11 +126,9 @@ class _ClassFormPageState extends State<ClassFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditMode ? 'Cập nhật môn học' : 'Thêm môn học mới'),
+        title: Text(_isEditMode ? 'Cập nhật lớp học' : 'Thêm lớp học mới'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -306,7 +142,7 @@ class _ClassFormPageState extends State<ClassFormPage> {
               TextFormField(
                 controller: _codeCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Mã môn học',
+                  labelText: 'Mã lớp học',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.tag),
                   helperText: 'Ví dụ: IT4440. Sẽ tự động viết hoa.',
@@ -324,74 +160,12 @@ class _ClassFormPageState extends State<ClassFormPage> {
               TextFormField(
                 controller: _nameCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Tên môn học',
+                  labelText: 'Tên lớp học',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.school_outlined),
                 ),
                 validator: (v) =>
                     v!.trim().isEmpty ? 'Không được để trống' : null,
-              ),
-              const SizedBox(height: 16),
-
-              // ====== Lecturer Dropdown ======
-              Builder(
-                builder: (context) {
-                  if (_lecturersLoading) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
-                      child: LinearProgressIndicator(),
-                    );
-                  }
-                  if (_lecturersError != null) {
-                    return Text(
-                      'Lỗi tải danh sách giảng viên: $_lecturersError',
-                      style: TextStyle(color: cs.error),
-                    );
-                  }
-                  return DropdownButtonFormField<String>(
-                    value: _selectedLecturerId,
-                    items: _lecturers
-                        .map(
-                          (l) => DropdownMenuItem<String>(
-                            value: l.uid.toString(),
-                            child: Text(
-                              '${l.displayName}( ${l.email})',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    decoration: const InputDecoration(
-                      labelText: 'Chọn giảng viên',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person_outline_rounded),
-                    ),
-                    onChanged: (v) => setState(() => _selectedLecturerId = v),
-                    validator: (v) => (v == null || v.isEmpty)
-                        ? 'Vui lòng chọn giảng viên'
-                        : null,
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // ====== Credits ======
-              TextFormField(
-                controller: _creditsCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Số tín chỉ',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.format_list_numbered),
-                ),
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty)
-                    return 'Không được để trống';
-                  final n = int.tryParse(v);
-                  if (n == null || n <= 0) return 'Số tín chỉ phải là số > 0';
-                  return null;
-                },
               ),
               const SizedBox(height: 16),
 
@@ -406,8 +180,9 @@ class _ClassFormPageState extends State<ClassFormPage> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty)
+                  if (v == null || v.trim().isEmpty) {
                     return 'Không được để trống';
+                  }
                   final n = int.tryParse(v);
                   if (n == null || n <= 0) return 'Phải là số > 0';
                   return null;
@@ -426,8 +201,9 @@ class _ClassFormPageState extends State<ClassFormPage> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty)
+                  if (v == null || v.trim().isEmpty) {
                     return 'Không được để trống';
+                  }
                   final maxN = int.tryParse(v);
                   final minN = int.tryParse(_minStudentsCtrl.text);
                   if (maxN == null || maxN <= 0) return 'Phải là số > 0';
@@ -438,73 +214,6 @@ class _ClassFormPageState extends State<ClassFormPage> {
                 },
               ),
               const SizedBox(height: 24),
-
-              // ====== Weekly schedule selection ======
-              Text(
-                'Lịch học trong tuần',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-
-              ..._weekdaySlots.map((slot) {
-                final label = _weekdayLabel(slot.weekday);
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Column(
-                      children: [
-                        SwitchListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(label),
-                          value: slot.enabled,
-                          onChanged: (v) => setState(() {
-                            slot.enabled = v;
-                            if (!v) {
-                              slot.start = null;
-                              slot.end = null;
-                            }
-                          }),
-                        ),
-                        if (slot.enabled)
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  icon: const Icon(Icons.schedule, size: 18),
-                                  onPressed: () =>
-                                      _pickTime(slot: slot, isStart: true),
-                                  label: Text(
-                                    'Bắt đầu: ${_formatTime(slot.start)}',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  icon: const Icon(Icons.schedule, size: 18),
-                                  onPressed: () =>
-                                      _pickTime(slot: slot, isStart: false),
-                                  label: Text(
-                                    'Kết thúc: ${_formatTime(slot.end)}',
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-
-              const SizedBox(height: 28),
 
               FilledButton.icon(
                 onPressed: _isLoading ? null : _submitForm,
@@ -517,7 +226,7 @@ class _ClassFormPageState extends State<ClassFormPage> {
                         height: 24,
                         child: CircularProgressIndicator(strokeWidth: 3),
                       )
-                    : Text(_isEditMode ? 'Lưu thay đổi' : 'Thêm môn học'),
+                    : Text(_isEditMode ? 'Lưu thay đổi' : 'Thêm lớp học'),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -542,18 +251,4 @@ class UpperCaseTextFormatter extends TextInputFormatter {
       selection: newValue.selection,
     );
   }
-}
-
-class _WeekdaySlot {
-  final int weekday; // 1=Mon ... 7=Sun
-  bool enabled;
-  TimeOfDay? start;
-  TimeOfDay? end;
-
-  _WeekdaySlot({
-    required this.weekday,
-    this.enabled = false,
-    this.start,
-    this.end,
-  });
 }

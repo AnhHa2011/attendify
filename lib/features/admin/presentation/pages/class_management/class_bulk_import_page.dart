@@ -160,7 +160,8 @@ class _ClassBulkImportPageState extends State<ClassBulkImportPage> {
           await admin.createClass(
             classCode: r.classCode,
             className: r.className,
-            lecturerId: '',
+            minStudents: 0,
+            maxStudents: 0,
           );
           created++;
         } else if (r.matchedclassCode != null) {
@@ -168,7 +169,6 @@ class _ClassBulkImportPageState extends State<ClassBulkImportPage> {
             id: r.matchedclassCode!,
             classCode: r.classCode,
             className: r.className,
-            lecturerId: '',
           );
           updated++;
         }

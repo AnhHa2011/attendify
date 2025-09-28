@@ -205,66 +205,76 @@ class AdminService {
   // === QUẢN LÝ lớp HỌC (COURSES) ===
 
   /// Tạo một lớp học mới
-  Future<void> createClass({
+  /// Tạo 1 lớp học mới theo schema của ClassModel
+  Future<String> createClass({
     required String classCode,
     required String className,
-    String? lecturerId, // NEW (optional)
-    int? minStudents, // NEW (optional)
-    int? maxStudents, // NEW (optional)
-    List<Map<String, dynamic>>? weeklySchedule, // NEW (optional)
-  }) {
-    final data = <String, dynamic>{
-      'classCode': classCode.trim().toUpperCase(),
-      'className': className.trim(),
-      'isArchived': false,
-      'createdAt': Timestamp.now().toDate(),
-    };
+    int minStudents = 10,
+    int maxStudents = 50,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? description,
+    List<String> enrolledStudents = const [],
+    bool isArchived = false,
+  }) async {
+    final data =
+        <String, dynamic>{
+          'classCode': classCode.trim().toUpperCase(),
+          'className': className.trim(),
+          'isArchived': isArchived,
+          'minStudents': minStudents,
+          'maxStudents': maxStudents,
+          'startDate': startDate != null ? Timestamp.fromDate(startDate) : null,
+          'endDate': endDate != null ? Timestamp.fromDate(endDate) : null,
+          'enrolledStudents': enrolledStudents,
+          'description': description,
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        }..removeWhere(
+          (k, v) => v == null,
+        ); // bỏ các key null để Firestore gọn gàng
 
-    if (lecturerId != null) data['lecturerId'] = lecturerId;
-    if (minStudents != null) data['minStudents'] = minStudents;
-    if (maxStudents != null) data['maxStudents'] = maxStudents;
-    if (weeklySchedule != null) data['weeklySchedule'] = weeklySchedule;
-
-    return _db.collection(FirestoreCollections.classes).add(data);
+    final docRef = await _db.collection(FirestoreCollections.classes).add(data);
+    return docRef.id;
   }
 
-  /// ===  Cập nhật thông tin một lớp học ===
+  /// Cập nhật thông tin lớp học theo document id (ClassModel.id)
   Future<void> updateClass({
-    required String id,
-    required String classCode,
-    required String className,
-    String? lecturerId, // NEW (optional)
-    int? minStudents, // NEW (optional)
-    int? maxStudents, // NEW (optional)
-    List<Map<String, dynamic>>? weeklySchedule, // NEW (optional)
-  }) {
+    required String id, // document id
+    String? classCode, // nếu đổi mã lớp
+    String? className,
+    bool? isArchived,
+    int? minStudents,
+    int? maxStudents,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? description,
+    List<String>? enrolledStudents, // tuỳ nhu cầu cập nhật danh sách
+  }) async {
     final data = <String, dynamic>{
-      'classCode': classCode.trim().toUpperCase(),
-      'className': className.trim(),
-      'updatedAt': Timestamp.now().toDate(),
+      if (classCode != null) 'classCode': classCode.trim().toUpperCase(),
+      if (className != null) 'className': className.trim(),
+      if (isArchived != null) 'isArchived': isArchived,
+      if (minStudents != null) 'minStudents': minStudents,
+      if (maxStudents != null) 'maxStudents': maxStudents,
+      if (startDate != null) 'startDate': Timestamp.fromDate(startDate),
+      if (endDate != null) 'endDate': Timestamp.fromDate(endDate),
+      if (description != null) 'description': description,
+      if (enrolledStudents != null) 'enrolledStudents': enrolledStudents,
+      'updatedAt': Timestamp.now(),
     };
 
-    // Chỉ update các trường nếu có truyền vào (tránh xóa dữ liệu cũ)
-    if (lecturerId != null) data['lecturerId'] = lecturerId;
-    if (minStudents != null) data['minStudents'] = minStudents;
-    if (maxStudents != null) data['maxStudents'] = maxStudents;
-    if (weeklySchedule != null) data['weeklySchedule'] = weeklySchedule;
-
-    return _db
-        .collection(FirestoreCollections.classes)
-        .doc(classCode)
-        .update(data);
+    await _db.collection(FirestoreCollections.classes).doc(id).update(data);
   }
 
-  /// ===  Xoá một lớp học ===
   Future<void> deleteClass(String classCode) {
-    return _db.collection('classes').doc(classCode).delete();
+    return _db.collection(FirestoreCollections.classes).doc(classCode).delete();
   }
 
   /// === THAY ĐỔI: Chuyển từ Xoá cứng sang Xoá mềm (Lưu trữ) ===
   /// Đánh dấu một lớp học là đã được lưu trữ.
   Future<void> archiveClass(String classCode) {
-    return _db.collection('classes').doc(classCode).update({
+    return _db.collection(FirestoreCollections.classes).doc(classCode).update({
       'isArchived': true, // Thêm một trường để đánh dấu
     });
   }

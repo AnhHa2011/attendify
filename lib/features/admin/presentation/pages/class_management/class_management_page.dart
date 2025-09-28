@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../../core/data/models/class_model.dart';
 import '../../../data/services/admin_service.dart';
+import 'admin_class_detail_page.dart';
 import 'class_bulk_import_page.dart';
 import 'class_form_page.dart';
 
@@ -76,27 +77,27 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
             value: 'single',
             child: ListTile(
               leading: Icon(Icons.add),
-              title: Text('Thêm 1 môn học'),
+              title: Text('Thêm 1 lớp học'),
             ),
           ),
           PopupMenuItem(
             value: 'bulk',
             child: ListTile(
               leading: Icon(Icons.upload_file),
-              title: Text('Thêm danh sách môn học từ file'),
+              title: Text('Thêm danh sách lớp học từ file'),
             ),
           ),
         ],
         child: FloatingActionButton(
           heroTag: 'fab_class_management_page',
-          tooltip: 'Thêm môn học',
+          tooltip: 'Thêm lớp học',
           onPressed: null,
           child: const Icon(Icons.add), // Để PopupMenuButton xử lý
         ),
       ),
-      // Đây chính là phần chịu trách nhiệm lấy và liệt kê danh sách môn học
+      // Đây chính là phần chịu trách nhiệm lấy và liệt kê danh sách lớp học
       body: StreamBuilder<List<ClassModel>>(
-        // 1. Dùng stream này để LẤY danh sách môn học từ Firebase
+        // 1. Dùng stream này để LẤY danh sách lớp học từ Firebase
         stream: adminService.getAllClassesStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -136,6 +137,7 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 elevation: 2,
+
                 child: ListTile(
                   leading: const CircleAvatar(
                     child: Icon(Icons.school_outlined),
@@ -145,6 +147,15 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Text('${classModel.classCode} '),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            AdminClassDetailPage(classId: classModel.id),
+                      ),
+                    );
+                  },
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -181,7 +192,7 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
     );
   }
 
-  // Hàm xử lý việc lưu trữ môn học
+  // Hàm xử lý việc lưu trữ lớp học
   void _archiveClass(
     BuildContext context,
     AdminService adminService,
@@ -193,7 +204,7 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
       builder: (ctx) => AlertDialog(
         title: const Text('Xác nhận lưu trữ'),
         content: Text(
-          'Môn học "${classModel.className}" sẽ được ẩn đi. Bạn có chắc chắn?',
+          'Lớp học "${classModel.className}" sẽ được ẩn đi. Bạn có chắc chắn?',
         ),
         actions: [
           TextButton(
@@ -217,7 +228,7 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Đã lưu trữ môn học thành công.'),
+            content: Text('Đã lưu trữ lớp học thành công.'),
             backgroundColor: Colors.green,
           ),
         );

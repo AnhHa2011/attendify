@@ -1,6 +1,7 @@
 // lib/main.dart - Updated version with new routing
 import 'package:attendify/core/data/repositories/session_repository.dart';
 import 'package:attendify/core/data/repositories/user_repository.dart';
+import 'package:attendify/core/data/services/class_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -62,6 +63,7 @@ Future<void> main() async {
           ),
         ),
         Provider<AdminService>(create: (_) => AdminService()),
+        Provider<ClassService>(create: (_) => ClassService()),
 
         // // providers theo role
         // ChangeNotifierProvider(
