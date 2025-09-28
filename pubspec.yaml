@@ -46,6 +46,16 @@ dependencies:
   cloud_firestore: ^6.0.0
   qr_flutter: ^4.1.0
   get_it: ^8.2.0
+  intl: ^0.20.2
+  excel: ^4.0.6
+  file_picker: ^10.3.3
+  mobile_scanner: ^7.0.1
+  firebase_storage: ^13.0.1
+  path_provider: ^2.1.4
+  open_filex: ^4.5.0
+  flutter_local_notifications: ^17.1.2
+  timezone: ^0.9.4
+  share_plus: ^12.0.0
 
 dev_dependencies:
   flutter_test:
@@ -70,7 +80,11 @@ flutter:
     - assets/icons/app_icon.png
     - assets/icons/google_logo.png
     - assets/images/
-
+    - assets/templates/attendify_class_import_template.xlsx
+    - assets/templates/attendify_course_import_template.xlsx
+    - assets/templates/attendify_class_with_enrollments_template.xlsx
+    - assets/templates/attendify_user_import_template.xlsx
+    
   fonts:
     - family: Mali
       fonts:
