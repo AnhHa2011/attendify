@@ -291,7 +291,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                     } else if (screenWidth < 500) {
                       aspectRatio = 1.4;
                     } else {
-                      aspectRatio = 1.2;
+                      aspectRatio = 3.5;
                     }
                     final isSmallScreen = screenWidth < 400;
 
@@ -550,7 +550,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                   } else if (screenWidth < 500) {
                     aspectRatio = 1.4;
                   } else {
-                    aspectRatio = 1.2;
+                    aspectRatio = 3.5;
                   }
                   final isSmallScreen = screenWidth < 400;
 

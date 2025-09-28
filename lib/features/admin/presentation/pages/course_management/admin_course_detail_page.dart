@@ -2,13 +2,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../../core/data/models/attendance_model.dart';
+import '../../../../../core/data/models/enrollment_mdel.dart';
+import '../../../../../core/data/models/leave_request_model.dart';
 import '../../../../../core/data/models/rich_course_model.dart';
 import '../../../../../core/data/models/session_model.dart';
 import '../../../../../core/data/models/user_model.dart';
 import '../../../../../core/data/services/courses_service.dart';
 import '../../../../../core/data/services/session_service.dart';
+import '../../../../attendance/export/export_attendance_excel_service.dart';
 import '../../../data/services/admin_service.dart';
 
 class AdminCourseDetailPage extends StatelessWidget {
@@ -90,13 +95,25 @@ class AdminCourseDetailPage extends StatelessWidget {
               _buildSectionHeader(
                 context,
                 title: 'Lịch học',
-                onSelected: (_) => _showCourseSelectorForSessionDialog(
-                  context,
-                  sessionService,
-                  courseInfo.id,
-                  courseInfo.courseName, // Pass course name
-                  lecturer,
-                ),
+                onSelected: (value) async {
+                  if (value == 'select_course') {
+                    _showCourseSelectorForSessionDialog(
+                      context,
+                      sessionService,
+                      courseInfo.id,
+                      courseInfo.courseName,
+                      lecturer,
+                    );
+                  } else if (value == 'export_attendance') {
+                    final adminSvc = context.read<AdminService>();
+                    await _exportAttendance(
+                      context: context,
+                      adminSvc: adminSvc,
+                      courseCode: courseInfo.id, // id khoá học (doc id)
+                      courseName: courseInfo.courseName, // tên môn
+                    );
+                  }
+                },
               ),
               const SizedBox(height: 8),
               StreamBuilder<List<SessionModel>>(
@@ -346,7 +363,14 @@ class AdminCourseDetailPage extends StatelessWidget {
           value: 'select_course',
           child: ListTile(
             leading: Icon(Icons.add),
-            title: Text('Thêm lịch học...'),
+            title: Text('Thêm lịch học'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'export_attendance',
+          child: ListTile(
+            leading: Icon(Icons.import_export),
+            title: Text('Xuất thống kê quá trình'),
           ),
         ),
       ],
@@ -842,6 +866,68 @@ class AdminCourseDetailPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _exportAttendance({
+    required BuildContext context,
+    required AdminService adminSvc,
+    required String courseCode,
+    required String courseName,
+  }) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final course = await adminSvc.getCourseById(courseCode);
+      final students = await adminSvc.getUsersByRole(UserRole.student);
+      final sessions = await adminSvc.getSessionsForCourse(courseCode);
+      final enrollments = await adminSvc.getEnrollmentsByCourse(courseCode);
+      final attendances = await adminSvc.getAttendancesByCourse(courseCode);
+      final leaveRequests = await adminSvc.getLeaveRequestsByCourse(courseCode);
+
+      // === gọi export service ===
+      final savedPath = await ExportAttendanceExcelService.export(
+        users: students,
+        course: course,
+        enrollments: enrollments,
+        attendances: attendances,
+        leaveRequests: leaveRequests,
+        sessions: sessions,
+      );
+
+      if (context.mounted) Navigator.of(context).pop(); // đóng progress
+
+      if (!context.mounted) return;
+
+      // === Thông báo ===
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            savedPath == null
+                ? 'Đã tải báo cáo (xem trong thư mục Downloads của trình duyệt)'
+                : 'Đã lưu báo cáo: $savedPath',
+          ),
+        ),
+      );
+
+      // === Mở file nếu có path (mobile/desktop) ===
+      if (savedPath != null) {
+        await OpenFilex.open(savedPath);
+      }
+    } catch (e) {
+      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Xuất báo cáo thất bại: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 

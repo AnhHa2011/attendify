@@ -1,7 +1,9 @@
 import 'package:attendify/app_imports.dart' hide LeaveRequestStatus;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../core/data/models/attendance_model.dart';
 import '../../../core/data/models/course_model.dart';
+import '../../../core/data/models/enrollment_mdel.dart';
 import '../../../core/data/models/leave_request_model.dart';
 import '../models/class_session.dart';
 import '../models/attendance_record.dart';
@@ -302,5 +304,59 @@ class LecturerService {
           .map((doc) => ClassSession.fromDocumentSnapshot(doc))
           .toList();
     });
+  }
+
+  Future<List<UserModel>> getAllStudents() async {
+    final snapshot = await _firestore
+        .collection('users')
+        .where('role', isEqualTo: UserRole.student)
+        .get();
+
+    return snapshot.docs.map((doc) => UserModel.fromDoc(doc)).toList();
+  }
+
+  Future<List<SessionModel>> getSessionsForCourse(String courseId) async {
+    final snapshot = await _firestore
+        .collection('sessions')
+        .where('courseCode', isEqualTo: courseId)
+        .get();
+
+    return snapshot.docs.map((doc) => SessionModel.fromDoc(doc)).toList();
+  }
+
+  // Lấy toàn bộ danh sách sinh viên đăng ký của 1 môn học
+  Future<List<EnrollmentModel>> getEnrollmentsByCourse(
+    String courseCode,
+  ) async {
+    final snap = await _firestore
+        .collection('enrollments')
+        .where('courseCode', isEqualTo: courseCode)
+        .get();
+
+    return snap.docs.map((doc) => EnrollmentModel.fromDoc(doc)).toList();
+  }
+
+  /// Lấy toàn bộ bản ghi điểm danh của 1 môn học
+  Future<List<AttendanceModel>> getAttendancesByCourse(
+    String courseCode,
+  ) async {
+    final snap = await _firestore
+        .collection('attendance')
+        .where('courseCode', isEqualTo: courseCode)
+        .get();
+
+    return snap.docs.map((doc) => AttendanceModel.fromDoc(doc)).toList();
+  }
+
+  /// Lấy toàn bộ đơn xin nghỉ của 1 môn học
+  Future<List<LeaveRequestModel>> getLeaveRequestsByCourse(
+    String courseCode,
+  ) async {
+    final snap = await _firestore
+        .collection('leaveRequests')
+        .where('courseCode', isEqualTo: courseCode)
+        .get();
+
+    return snap.docs.map((doc) => LeaveRequestModel.fromDoc(doc)).toList();
   }
 }

@@ -1,21 +1,19 @@
 // lib/features/coursees/presentation/pages/course_detail_page.dart
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:attendify/app_imports.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/data/models/rich_course_model.dart';
-import '../../../../core/data/models/session_model.dart';
-import '../../../../core/data/models/user_model.dart';
 import '../../../../core/data/services/courses_service.dart';
-import '../../../../../app/providers/auth_provider.dart';
 import '../../../../core/data/services/session_service.dart';
 import '../../../../core/presentation/pages/session_detail_page.dart';
+import '../../../attendance/export/export_attendance_excel_service.dart';
 import '../../widgets/dynamic_qr_code_dialog.dart';
 
 class CourseDetailPage extends StatefulWidget {
-  final String dataId;
-  const CourseDetailPage({super.key, required this.dataId});
+  final CourseModel courseModel;
+  const CourseDetailPage({super.key, required this.courseModel});
 
   @override
   State<CourseDetailPage> createState() => _CourseDetailPageState();
@@ -31,7 +29,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
     try {
       // === THAY ĐỔI: GỌI HÀM MỚI ĐỂ LẤY DANH SÁCH BUỔI HỌC PHÙ HỢP ===
       final attendableSessions = await sessionService
-          .getAttendableSessionsForCourse(widget.dataId)
+          .getAttendableSessionsForCourse(widget.courseModel.id)
           .first;
       if (!mounted) return;
 
@@ -95,7 +93,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
           context: context,
           barrierDismissible: false,
           builder: (context) => DynamicQrCodeDialog(
-            courseCode: widget.dataId,
+            courseCode: widget.courseModel.id,
             sessionId: selectedSession.id,
             sessionTitle: selectedSession.title,
             refreshInterval: 60,
@@ -115,6 +113,70 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
     }
   }
 
+  Future<void> _exportAttendance(
+    BuildContext context,
+    CourseModel course,
+  ) async {
+    final adminSvc = context.read<AdminService>();
+    final sessionSvc = context.read<SessionService>();
+
+    // Hiển thị loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // Lấy dữ liệu cần export
+      final users = await adminSvc
+          .getEnrolledStudentsStream(course.id)
+          .first; // List<UserModel>
+      final enrollments = await adminSvc.getEnrollmentsByCourse(course.id);
+      final attendances = await adminSvc.getAttendancesByCourse(course.id);
+      final leaveRequests = await adminSvc.getLeaveRequestsByCourse(course.id);
+      final sessions = await sessionSvc.sessionsOfCourse(course.id).first;
+
+      // Gọi export
+      final savedPath = await ExportAttendanceExcelService.export(
+        course: course,
+        users: users,
+        enrollments: enrollments,
+        attendances: attendances,
+        leaveRequests: leaveRequests,
+        sessions: sessions,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // đóng loading
+
+      // Thông báo
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            savedPath == null
+                ? 'Đã tải báo cáo (xem trong Downloads của trình duyệt)'
+                : 'Đã lưu báo cáo: $savedPath',
+          ),
+        ),
+      );
+
+      // Mở file (mobile/desktop)
+      if (savedPath != null) {
+        await OpenFilex.open(savedPath);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // đóng loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Xuất thống kê thất bại: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final courseSvc = context.read<CourseService>();
@@ -125,7 +187,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
     // === THAY ĐỔI 1: STREAMBUILDER CHÍNH SỬ DỤNG RICHCLASSMODEL ===
     return StreamBuilder<RichCourseModel>(
       // <<<--- Đổi thành RichCourseModel
-      stream: courseSvc.getRichCourseStream(widget.dataId),
+      stream: courseSvc.getRichCourseStream(widget.courseModel.id),
       builder: (context, courseSnap) {
         if (courseSnap.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -147,27 +209,41 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
         final lecturer = richCourse.lecturer;
 
         return Scaffold(
-          // === THAY ĐỔI 2: CẬP NHẬT APPBAR VÀ CÁC PHẦN UI KHÁC ===
-          appBar: AppBar(title: Text(courseInfo.courseName)),
-          floatingActionButton: isLecturer
-              ? FloatingActionButton.extended(
-                  heroTag: 'fab_lecturer_course_detail',
-                  onPressed: _isStartingSession
-                      ? null
-                      : _showSessionSelectorAndStartAttendance,
-                  label: const Text('Bắt đầu điểm danh'),
-                  icon: _isStartingSession
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.qr_code_scanner),
-                )
-              : null,
+          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+          floatingActionButton: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8, right: 8),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  FloatingActionButton.extended(
+                    heroTag: 'fab_start_att',
+                    onPressed: _isStartingSession
+                        ? null
+                        : _showSessionSelectorAndStartAttendance,
+                    icon: _isStartingSession
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.qr_code_scanner),
+                    label: const Text('Bắt đầu điểm danh'),
+                  ),
+                  FloatingActionButton.extended(
+                    heroTag: 'fab_export',
+                    onPressed: () => _exportAttendance(context, courseInfo),
+                    icon: const Icon(Icons.download),
+                    label: const Text('Export'),
+                  ),
+                ],
+              ),
+            ),
+          ),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
             children: [
@@ -219,7 +295,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
               ),
               const SizedBox(height: 8),
               StreamBuilder<List<SessionModel>>(
-                stream: sessionSvc.sessionsOfCourse(widget.dataId),
+                stream: sessionSvc.sessionsOfCourse(widget.courseModel.id),
                 builder: (context, sessionSnap) {
                   if (sessionSnap.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());

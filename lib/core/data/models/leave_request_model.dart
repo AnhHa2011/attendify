@@ -199,6 +199,30 @@ class LeaveRequestModel {
         return 'Đang chờ';
     }
   }
+
+  // Factory rỗng
+  factory LeaveRequestModel.empty() {
+    return LeaveRequestModel(
+      id: '',
+      studentId: '',
+      studentName: '',
+      studentEmail: '',
+      lecturerId: '',
+      courseCode: '',
+      courseName: '',
+      sessionId: '',
+      sessionName: '',
+      sessionDate: DateTime.now(),
+      reason: '',
+      status: 'pending',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      requestDate: DateTime.now(),
+      reviewedAt: null,
+      reviewedBy: null,
+      approverNote: null,
+    );
+  }
 }
 
 enum LeaveRequestStatus { pending, approved, rejected }

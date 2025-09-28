@@ -2,7 +2,6 @@
 export 'presentation/pages/lecturer_main.dart';
 export 'presentation/pages/lecturer_dashboard.dart';
 export 'presentation/pages/lecturer_layout.dart';
-export 'presentation/pages/lecturer_menu.dart';
 export 'presentation/pages/lecturer_profile.dart';
 
 // Course Management

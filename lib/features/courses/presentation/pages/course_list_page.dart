@@ -101,7 +101,7 @@ class CourseListPage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => CourseDetailPage(dataId: courseInfo.id),
+                      builder: (_) => CourseDetailPage(courseModel: courseInfo),
                     ),
                   );
                 },

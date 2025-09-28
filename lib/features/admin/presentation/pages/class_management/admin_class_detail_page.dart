@@ -150,15 +150,6 @@ class AdminClassDetailPage extends StatelessWidget {
     required Function(String) onSelected,
   }) {
     final Map<String, List<PopupMenuEntry<String>>> menuItems = {
-      'Lịch học': [
-        const PopupMenuItem(
-          value: 'select_class',
-          child: ListTile(
-            leading: Icon(Icons.add),
-            title: Text('Thêm lịch học...'),
-          ),
-        ),
-      ],
       'Sinh viên': [
         const PopupMenuItem(
           value: 'add_single',

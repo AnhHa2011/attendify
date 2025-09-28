@@ -1,7 +1,9 @@
 import '../../../../app_imports.dart';
+import '../../../../core/data/models/attendance_model.dart';
 import '../../../../core/data/models/class_model.dart';
 import '../../../../core/data/models/course_model.dart';
 import '../../../../core/data/models/course_schedule_model.dart';
+import '../../../../core/data/models/enrollment_mdel.dart';
 import '../../../../core/data/models/lecturer_lite.dart';
 import '../../../../core/data/models/session_model.dart';
 import '../../../../core/data/models/user_model.dart';
@@ -58,6 +60,15 @@ class AdminService {
               // Chuyển đổi mỗi document thành một đối tượng UserModel
               snapshot.docs.map((doc) => UserModel.fromDoc(doc)).toList(),
         );
+  }
+
+  Future<List<UserModel>> getUsersByRole(UserRole role) async {
+    final snapshot = await _db
+        .collection('users')
+        .where('role', isEqualTo: role.toKey())
+        .get();
+
+    return snapshot.docs.map((doc) => UserModel.fromDoc(doc)).toList();
   }
 
   /// Lấy danh sách tất cả giảng viên (sử dụng hàm trên)
@@ -201,6 +212,15 @@ class AdminService {
         .get();
 
     return snapshot.docs.map((doc) => CourseModel.fromDoc(doc)).toList();
+  }
+
+  Future<List<SessionModel>> getSessionsForCourse(String courseId) async {
+    final snapshot = await _db
+        .collection('sessions')
+        .where('courseCode', isEqualTo: courseId)
+        .get();
+
+    return snapshot.docs.map((doc) => SessionModel.fromDoc(doc)).toList();
   }
 
   // === QUẢN LÝ lớp HỌC (COURSES) ===
@@ -818,7 +838,7 @@ class AdminService {
   }
 
   // === Helpers: tra id theo code/email ===
-  Future<String?> getcourseCodeByCode(String courseCode) async {
+  Future<String?> getCourseIdByCode(String courseCode) async {
     final snap = await _db
         .collection('courses')
         .where('courseCode', isEqualTo: courseCode)
@@ -826,6 +846,15 @@ class AdminService {
         .get();
     if (snap.docs.isEmpty) return null;
     return snap.docs.first.id;
+  }
+
+  // === Helpers: tra id theo code/email ===
+  Future<CourseModel> getCourseById(String courseId) async {
+    final courseDoc = await _db.collection('courses').doc(courseId).get();
+    if (courseDoc.exists) {
+      return CourseModel.fromDoc(courseDoc);
+    }
+    return CourseModel.empty();
   }
 
   Future<String?> getUserIdByEmail(String email) async {
@@ -890,5 +919,41 @@ class AdminService {
       final email = (data['email'] ?? '').toString();
       return LecturerLite(uid: d.id, displayName: displayName, email: email);
     }).toList();
+  }
+
+  /// Lấy toàn bộ danh sách sinh viên đăng ký của 1 môn học
+  Future<List<EnrollmentModel>> getEnrollmentsByCourse(
+    String courseCode,
+  ) async {
+    final snap = await _db
+        .collection('enrollments')
+        .where('courseCode', isEqualTo: courseCode)
+        .get();
+
+    return snap.docs.map((doc) => EnrollmentModel.fromDoc(doc)).toList();
+  }
+
+  /// Lấy toàn bộ bản ghi điểm danh của 1 môn học
+  Future<List<AttendanceModel>> getAttendancesByCourse(
+    String courseCode,
+  ) async {
+    final snap = await _db
+        .collection('attendance')
+        .where('courseCode', isEqualTo: courseCode)
+        .get();
+
+    return snap.docs.map((doc) => AttendanceModel.fromDoc(doc)).toList();
+  }
+
+  /// Lấy toàn bộ đơn xin nghỉ của 1 môn học
+  Future<List<LeaveRequestModel>> getLeaveRequestsByCourse(
+    String courseCode,
+  ) async {
+    final snap = await _db
+        .collection('leaveRequests')
+        .where('courseCode', isEqualTo: courseCode)
+        .get();
+
+    return snap.docs.map((doc) => LeaveRequestModel.fromDoc(doc)).toList();
   }
 }

@@ -1,19 +1,17 @@
 // lib/main.dart - Updated version with new routing
-import 'package:attendify/core/data/repositories/session_repository.dart';
-import 'package:attendify/core/data/repositories/user_repository.dart';
 import 'package:attendify/core/data/services/class_service.dart';
+import 'package:attendify/features/admin/data/services/admin_leave_request_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
-import 'core/data/repositories/course_repository.dart';
 import 'core/data/services/courses_service.dart';
-import 'core/data/services/firestore_service.dart';
 import 'app/providers/navigation_provider.dart';
 import 'app/providers/auth_provider.dart';
 import 'features/admin/data/services/admin_service.dart';
 import 'features/auth/data/services/firebase_auth_service.dart';
+import 'features/lecturer/services/lecturer_service.dart';
 import 'features/notifications/local_notification_service.dart';
 import 'core/data/services/schedule_service.dart';
 import 'core/data/services/session_service.dart';
@@ -27,10 +25,6 @@ Future<void> main() async {
   await initializeDateFormatting('vi_VN', null);
   await LocalNotificationService.instance.init();
 
-  final firestoreService = FirestoreService();
-  final courseRepo = CourseRepository(firestoreService);
-  final userRepo = UserRepository(firestoreService);
-  final sesionRepo = SessionRepository(firestoreService);
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.dumpErrorToConsole(details);
   };
@@ -64,7 +58,8 @@ Future<void> main() async {
         ),
         Provider<AdminService>(create: (_) => AdminService()),
         Provider<ClassService>(create: (_) => ClassService()),
-
+        Provider<CourseService>(create: (_) => CourseService()),
+        Provider<LeaveRequestService>(create: (_) => LeaveRequestService()),
         // // providers theo role
         // ChangeNotifierProvider(
         //   create: (ctx) => AdminCourseProvider(ctx.read<CourseService>()),

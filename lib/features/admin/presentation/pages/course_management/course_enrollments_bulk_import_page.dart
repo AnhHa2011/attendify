@@ -267,7 +267,7 @@ class _CourseEnrollmentsBulkImportPageState
           coursesCreated++;
 
           // Re-fetch to get the new course ID
-          final newCourse = await admin.getcourseCodeByCode(row.courseCode);
+          final newCourse = await admin.getCourseIdByCode(row.courseCode);
           row.courseCode = newCourse ?? '';
         }
 
