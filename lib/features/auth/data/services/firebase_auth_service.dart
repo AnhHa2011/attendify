@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart' as g;
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 
 import '../../../../core/data/models/user_model.dart';
 
@@ -9,7 +10,17 @@ class FirebaseAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  // Trong Firebase Console: Remote Config, tạo key 'support_email'
+  final remoteConfig = FirebaseRemoteConfig.instance;
+
   Stream<User?> authStateChanges() => _auth.authStateChanges();
+
+  // ===================== EMAIL/PASSWORD =====================
+  Future<String> getEmailSupport() async {
+    await remoteConfig.fetchAndActivate();
+    final supportEmail = remoteConfig.getString('support_email');
+    return supportEmail;
+  }
 
   // ===================== EMAIL/PASSWORD =====================
   Future<UserCredential> signInWithEmail(String email, String password) {

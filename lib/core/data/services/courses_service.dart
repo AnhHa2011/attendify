@@ -489,31 +489,6 @@ class CourseService {
         );
   }
 
-  // Sửa lại hàm createCourse để nhận ID thay vì tên
-  Future<String> createCourse({
-    required String courseCode, // THAY ĐỔI
-    required String lecturerId, // THAY ĐỔI
-    required String semester, // THAY ĐỔI
-    required List<CourseSchedule> schedules,
-    required int maxAbsences,
-  }) async {
-    final now = DateTime.now();
-    // Tạo mã tham gia ngẫu nhiên
-    final joinCode = _generateRandomCode(6);
-
-    final ref = await _db.collection('courses').add({
-      'courseCode': courseCode,
-      'lecturerId': lecturerId,
-      'semester': semester,
-      'schedules': schedules.map((e) => e.toMap()).toList(),
-      'maxAbsences': maxAbsences,
-      'joinCode': joinCode,
-      'createdAt': Timestamp.fromDate(now),
-    });
-
-    return ref.id;
-  }
-
   // Bạn có thể giữ lại hàm tạo mã ngẫu nhiên này
   String _generateRandomCode(int length) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

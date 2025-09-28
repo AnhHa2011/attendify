@@ -6,6 +6,7 @@ class CourseModel {
   final String courseCode;
   final String courseName;
   final String lecturerId;
+  final String? lecturerName; // Thêm field mới
   final int minStudents;
   final int maxStudents;
   final String semester;
@@ -24,6 +25,7 @@ class CourseModel {
     required this.courseCode,
     required this.courseName,
     required this.lecturerId,
+    this.lecturerName, // Optional parameter
     required this.minStudents,
     required this.maxStudents,
     required this.semester,
@@ -46,6 +48,7 @@ class CourseModel {
       courseCode: data['courseCode'] ?? '',
       courseName: data['courseName'] ?? '',
       lecturerId: data['lecturerId'] ?? '',
+      lecturerName: data['lecturerName'], // Đọc từ Firestore
       minStudents: data['minStudents'] ?? 0,
       maxStudents: data['maxStudents'] ?? 0,
       semester: data['semester'] ?? '',
@@ -68,6 +71,7 @@ class CourseModel {
       'courseCode': courseCode,
       'courseName': courseName,
       'lecturerId': lecturerId,
+      'lecturerName': lecturerName, // Lưu vào Firestore
       'minStudents': minStudents,
       'maxStudents': maxStudents,
       'semester': semester,
@@ -89,6 +93,7 @@ class CourseModel {
       courseCode: '',
       courseName: '',
       lecturerId: '',
+      lecturerName: null, // Null cho empty model
       minStudents: 0,
       maxStudents: 0,
       semester: '',
@@ -102,5 +107,10 @@ class CourseModel {
       endDate: Timestamp.now().toDate(),
       description: '',
     );
+  }
+
+  // Helper method để get lecturer display name
+  String get lecturerDisplayName {
+    return lecturerName ?? 'Chưa phân công';
   }
 }

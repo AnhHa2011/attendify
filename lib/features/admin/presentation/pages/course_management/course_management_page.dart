@@ -94,13 +94,13 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
             ),
           ),
           // <<< TÍCH HỢP: Thêm mục menu để import nhiều môn học
-          PopupMenuItem(
-            value: 'bulk_enroll',
-            child: ListTile(
-              leading: Icon(Icons.upload_file),
-              title: Text('Thêm nhiều môn học từ file'),
-            ),
-          ),
+          // PopupMenuItem(
+          //   value: 'bulk_enroll',
+          //   child: ListTile(
+          //     leading: Icon(Icons.upload_file),
+          //     title: Text('Thêm nhiều môn học từ file'),
+          //   ),
+          // ),
         ],
         child: FloatingActionButton(
           heroTag: 'fab_course_management_page',
@@ -165,7 +165,7 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
                           children: [
                             // Dùng widget helper để hiển thị danh sách môn học
                             Text(
-                              'GV: ${courseInfo.lecturerId ?? '...'} | HK: ${courseInfo.semester}',
+                              'GV: ${courseInfo.lecturerDisplayName} | HK: ${courseInfo.semester}',
                             ),
                           ],
                         ),

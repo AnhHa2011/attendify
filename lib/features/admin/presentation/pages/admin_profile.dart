@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../app/providers/auth_provider.dart';
 import '../../../auth/presentation/pages/edit_account_page.dart';
+import '../../../auth/presentation/pages/update_my_password.dart';
 
 class AdminProfile extends StatefulWidget {
   const AdminProfile({super.key});
@@ -363,17 +364,12 @@ class _AdminProfileState extends State<AdminProfile>
           theme: theme,
           icon: Icons.security_rounded,
           title: 'Bảo mật',
-          subtitle: 'Quản lý mật khẩu và xác thực',
+          subtitle: 'Quản lý mật khẩu',
           trailing: Icons.chevron_right_rounded,
-          onTap: () => _showSecurityDialog(),
-        ),
-        _buildInfoTile(
-          theme: theme,
-          icon: Icons.backup_rounded,
-          title: 'Sao lưu dữ liệu',
-          subtitle: 'Export toàn bộ dữ liệu hệ thống',
-          trailing: Icons.chevron_right_rounded,
-          onTap: () => _showBackupDialog(),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => UpdateMyPassWordPage()),
+          ),
         ),
         _buildInfoTile(
           theme: theme,
@@ -578,104 +574,6 @@ class _AdminProfileState extends State<AdminProfile>
               color: theme.colorScheme.onSurface.withOpacity(0.7),
             ),
             textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSecurityDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.security_rounded, color: Colors.blue),
-            SizedBox(width: 12),
-            Text('Cài đặt bảo mật'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Các tùy chọn bảo mật:'),
-            SizedBox(height: 16),
-            ListTile(
-              leading: Icon(Icons.password_rounded),
-              title: Text('Đổi mật khẩu'),
-              dense: true,
-            ),
-            ListTile(
-              leading: Icon(Icons.phone_android_rounded),
-              title: Text('Xác thực 2 bước'),
-              dense: true,
-            ),
-            ListTile(
-              leading: Icon(Icons.history_rounded),
-              title: Text('Lịch sử đăng nhập'),
-              dense: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Tính năng bảo mật đang phát triển'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            child: const Text('Cấu hình'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showBackupDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.backup_rounded, color: Colors.green),
-            SizedBox(width: 12),
-            Text('Sao lưu dữ liệu'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Tạo bản sao lưu toàn bộ dữ liệu hệ thống?'),
-            SizedBox(height: 16),
-            LinearProgressIndicator(value: 0.8),
-            SizedBox(height: 8),
-            Text('Dung lượng ước tính: ~4.2MB'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              _simulateBackup();
-            },
-            icon: const Icon(Icons.download_rounded),
-            label: const Text('Tải xuống'),
-            style: FilledButton.styleFrom(backgroundColor: Colors.green),
           ),
         ],
       ),

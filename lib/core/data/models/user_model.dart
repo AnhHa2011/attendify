@@ -76,4 +76,13 @@ class UserModel {
       'role': role.toKey(),
     };
   }
+
+  factory UserModel.empty() {
+    return UserModel(
+      uid: '',
+      email: '',
+      displayName: '',
+      role: UserRole.student,
+    );
+  }
 }

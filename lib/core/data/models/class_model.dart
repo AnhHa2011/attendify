@@ -8,12 +8,14 @@ class ClassModel {
   final String className;
   final bool isArchived;
 
-  // New fields for enhanced class management
+  // Quản lý theo năm học
+  final int? startYear;
+  final int? endYear;
+
+  // Quản lý sĩ số/mô tả
   final int minStudents;
   final int maxStudents;
-  final DateTime? startDate;
-  final DateTime? endDate;
-  final List<String> enrolledStudents; // Student UIDs enrolled in this class
+  final List<String> enrolledStudents;
   final String? description;
 
   ClassModel({
@@ -21,86 +23,85 @@ class ClassModel {
     required this.classCode,
     required this.className,
     required this.isArchived,
+    this.startYear,
+    this.endYear,
     this.minStudents = 10,
     this.maxStudents = 50,
-    this.startDate,
-    this.endDate,
     this.enrolledStudents = const [],
     this.description,
   });
 
-  // Enhanced factory constructor
   factory ClassModel.fromDoc(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final data = doc.data() as Map<String, dynamic>? ?? {};
     return ClassModel(
       id: doc.id,
       classCode: data['classCode'] ?? '',
       className: data['className'] ?? '',
       isArchived: data['isArchived'] ?? false,
-      minStudents: data['minStudents'] ?? 10,
-      maxStudents: data['maxStudents'] ?? 50,
-      startDate: data['startDate'] != null
-          ? (data['startDate'] as Timestamp).toDate()
-          : null,
-      endDate: data['endDate'] != null
-          ? (data['endDate'] as Timestamp).toDate()
-          : null,
+
+      startYear: (data['startYear'] as num?)?.toInt(),
+      endYear: (data['endYear'] as num?)?.toInt(),
+
+      minStudents: (data['minStudents'] as num?)?.toInt() ?? 10,
+      maxStudents: (data['maxStudents'] as num?)?.toInt() ?? 50,
+
       enrolledStudents: List<String>.from(data['enrolledStudents'] ?? []),
       description: data['description'],
     );
   }
 
-  // Enhanced toMap method
   Map<String, dynamic> toMap() {
     return {
       'classCode': classCode,
       'className': className,
       'isArchived': isArchived,
+
+      'startYear': startYear,
+      'endYear': endYear,
+
       'minStudents': minStudents,
       'maxStudents': maxStudents,
-      'startDate': startDate != null ? Timestamp.fromDate(startDate!) : null,
-      'endDate': endDate != null ? Timestamp.fromDate(endDate!) : null,
+
       'enrolledStudents': enrolledStudents,
       'description': description,
     };
   }
 
-  // copyWith method for easy updates
   ClassModel copyWith({
     String? id,
     String? classCode,
     String? className,
-    int? credits,
     bool? isArchived,
+    int? startYear,
+    int? endYear,
     int? minStudents,
     int? maxStudents,
-    DateTime? startDate,
-    DateTime? endDate,
-    String? lecturerId,
-    String? lecturerName,
     List<String>? enrolledStudents,
     String? description,
-    String? semester,
   }) {
     return ClassModel(
       id: id ?? this.id,
       classCode: classCode ?? this.classCode,
       className: className ?? this.className,
       isArchived: isArchived ?? this.isArchived,
+
+      startYear: startYear ?? this.startYear,
+      endYear: endYear ?? this.endYear,
+
       minStudents: minStudents ?? this.minStudents,
       maxStudents: maxStudents ?? this.maxStudents,
-      startDate: startDate ?? this.startDate,
-      endDate: endDate ?? this.endDate,
       enrolledStudents: enrolledStudents ?? this.enrolledStudents,
       description: description ?? this.description,
     );
   }
 
   bool get isEnrollmentOpen {
-    final now = DateTime.now();
-    if (startDate != null && now.isBefore(startDate!)) return false;
-    if (endDate != null && now.isAfter(endDate!)) return false;
-    return enrolledStudents.length < maxStudents;
+    // Nếu quản lý theo năm: mở nếu còn slot và năm hiện tại nằm trong [startYear, endYear]
+    final year = DateTime.now().year;
+    final yearOk = (startYear == null && endYear == null)
+        ? true
+        : (startYear ?? year) <= year && year <= (endYear ?? year);
+    return yearOk && (enrolledStudents.length < maxStudents);
   }
 
   bool get isEnrollmentFull => enrolledStudents.length >= maxStudents;
@@ -111,20 +112,8 @@ class ClassModel {
       maxStudents > 0 ? (enrolledStudents.length / maxStudents) * 100 : 0;
 
   bool canEnrollStudent() => isEnrollmentOpen && !isEnrollmentFull;
-
-  // Empty constructor for placeholder
-  ClassModel.empty()
-    : this(
-        id: '',
-        classCode: 'N/A',
-        className: 'Không rõ',
-        isArchived: false,
-        minStudents: 0,
-        maxStudents: 0,
-      );
 }
 
-// Enum for class status
 enum ClassStatus { upcoming, active, completed, cancelled }
 
 extension ClassStatusExtension on ClassStatus {
@@ -144,51 +133,36 @@ extension ClassStatusExtension on ClassStatus {
   Color get color {
     switch (this) {
       case ClassStatus.upcoming:
-        return const Color(0xFF3B82F6); // Blue
+        return const Color(0xFF3B82F6);
       case ClassStatus.active:
-        return const Color(0xFF10B981); // Green
+        return const Color(0xFF10B981);
       case ClassStatus.completed:
-        return const Color(0xFF6B7280); // Gray
+        return const Color(0xFF6B7280);
       case ClassStatus.cancelled:
-        return const Color(0xFFEF4444); // Red
+        return const Color(0xFFEF4444);
     }
   }
 }
 
-// Extension for ClassModel
 extension ClassModelExtension on ClassModel {
   ClassStatus get status {
-    final now = DateTime.now();
+    final year = DateTime.now().year;
 
-    if (startDate != null && now.isBefore(startDate!)) {
-      return ClassStatus.upcoming;
+    if (startYear != null && year < startYear!) return ClassStatus.upcoming;
+    if (endYear != null && year > endYear!) return ClassStatus.completed;
+
+    if (startYear != null && endYear != null) {
+      if (startYear! <= year && year <= endYear!) return ClassStatus.active;
     }
-
-    if (endDate != null && now.isAfter(endDate!)) {
-      return ClassStatus.completed;
-    }
-
-    if (startDate != null && endDate != null) {
-      if (now.isAfter(startDate!) && now.isBefore(endDate!)) {
-        return ClassStatus.active;
-      }
-    }
-
-    return ClassStatus.active; // Default to active if dates are not set
+    // Nếu không set năm → mặc định active
+    return ClassStatus.active;
   }
 
   String get dateRangeString {
-    if (startDate == null && endDate == null) return 'Chưa xác định';
-
-    final startStr = startDate != null
-        ? '${startDate!.day}/${startDate!.month}/${startDate!.year}'
-        : 'Chưa xác định';
-
-    final endStr = endDate != null
-        ? '${endDate!.day}/${endDate!.month}/${endDate!.year}'
-        : 'Chưa xác định';
-
-    return '$startStr - $endStr';
+    if (startYear == null && endYear == null) return 'Chưa xác định';
+    final s = startYear?.toString() ?? '—';
+    final e = endYear?.toString() ?? '—';
+    return '$s - $e';
   }
 
   String get enrollmentInfo =>

@@ -285,13 +285,13 @@ class _AdminDashboardState extends State<AdminDashboard>
                     final screenWidth = MediaQuery.of(context).size.width;
                     double aspectRatio;
                     if (screenWidth < 350) {
-                      aspectRatio = 3.6; // Nexus 4 và các màn hình nhỏ hơn
+                      aspectRatio = 3.6;
                     } else if (screenWidth < 400) {
-                      aspectRatio = 2.2; // Màn hình nhỏ
+                      aspectRatio = 1.8;
                     } else if (screenWidth < 500) {
-                      aspectRatio = 1.8; // Màn hình trung bình
+                      aspectRatio = 1.4;
                     } else {
-                      aspectRatio = 1.6; // Màn hình lớn
+                      aspectRatio = 1.2;
                     }
                     final isSmallScreen = screenWidth < 400;
 
@@ -546,11 +546,11 @@ class _AdminDashboardState extends State<AdminDashboard>
                   if (screenWidth < 350) {
                     aspectRatio = 3.6;
                   } else if (screenWidth < 400) {
-                    aspectRatio = 2.2;
-                  } else if (screenWidth < 500) {
                     aspectRatio = 1.8;
+                  } else if (screenWidth < 500) {
+                    aspectRatio = 1.4;
                   } else {
-                    aspectRatio = 1.6;
+                    aspectRatio = 1.2;
                   }
                   final isSmallScreen = screenWidth < 400;
 

@@ -74,21 +74,6 @@ class _EditAccountPageState extends State<EditAccountPage> {
         setState(() => _previewUrl = url);
       }
 
-      // 3) đổi mật khẩu nếu có nhập
-      final oldPwd = _oldPwdCtrl.text;
-      final newPwd = _newPwdCtrl.text;
-      final confirm = _confirmPwdCtrl.text;
-
-      if (oldPwd.isNotEmpty || newPwd.isNotEmpty || confirm.isNotEmpty) {
-        if (newPwd.length < 6) {
-          throw Exception('Mật khẩu mới tối thiểu 6 ký tự.');
-        }
-        if (newPwd != confirm) {
-          throw Exception('Mật khẩu mới và xác nhận không khớp.');
-        }
-        await _svc.changePassword(currentPassword: oldPwd, newPassword: newPwd);
-      }
-
       if (mounted) {
         ScaffoldMessenger.of(
           context,

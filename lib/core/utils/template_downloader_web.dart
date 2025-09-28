@@ -3,11 +3,11 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'dart:html' as html;
 
 const _assetMap = {
-  'course': 'assets/templates/attendify_course_import_template.xlsx',
-  'class': 'assets/templates/attendify_class_import_template.xlsx',
-  'class_enroll':
-      'assets/templates/attendify_class_with_enrollments_template.xlsx',
-  'user': 'assets/templates/attendify_user_import_template.xlsx',
+  'course': 'assets/templates/course_import_template.xlsx',
+  'class': 'assets/templates/class_import_template.xlsx',
+  // 'class_enroll':
+  //     'assets/templates/attendify_class_with_enrollments_template.xlsx',
+  'user': 'assets/templates/user_import_template.xlsx',
 };
 
 Future<void> download(String kind) async {

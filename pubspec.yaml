@@ -56,6 +56,7 @@ dependencies:
   flutter_local_notifications: ^17.1.2
   timezone: ^0.9.4
   share_plus: ^12.0.0
+  firebase_remote_config: ^6.0.2
 
 dev_dependencies:
   flutter_test:
@@ -80,10 +81,9 @@ flutter:
     - assets/icons/app_icon.png
     - assets/icons/google_logo.png
     - assets/images/
-    - assets/templates/attendify_class_import_template.xlsx
-    - assets/templates/attendify_course_import_template.xlsx
-    - assets/templates/attendify_class_with_enrollments_template.xlsx
-    - assets/templates/attendify_user_import_template.xlsx
+    - assets/templates/class_import_template.xlsx
+    - assets/templates/course_import_template.xlsx
+    - assets/templates/user_import_template.xlsx
     
   fonts:
     - family: Mali

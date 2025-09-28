@@ -82,7 +82,7 @@ class AdminService {
   }
 
   /// Tạo một người dùng mới (bao gồm cả Auth và Firestore)
-  Future<void> createNewUser({
+  Future<String> createNewUser({
     required String email,
     required String password,
     required String displayName,
@@ -106,6 +106,7 @@ class AdminService {
         'role': role.toKey(),
         'createdAt': Timestamp.now().toDate(),
       });
+      return uid;
     } on FirebaseAuthException catch (e) {
       // Bắt các lỗi cụ thể từ Firebase Auth để thông báo dễ hiểu hơn
       if (e.code == 'weak-password') {
@@ -211,8 +212,8 @@ class AdminService {
     required String className,
     int minStudents = 10,
     int maxStudents = 50,
-    DateTime? startDate,
-    DateTime? endDate,
+    int? startYear,
+    int? endYear,
     String? description,
     List<String> enrolledStudents = const [],
     bool isArchived = false,
@@ -224,8 +225,8 @@ class AdminService {
           'isArchived': isArchived,
           'minStudents': minStudents,
           'maxStudents': maxStudents,
-          'startDate': startDate != null ? Timestamp.fromDate(startDate) : null,
-          'endDate': endDate != null ? Timestamp.fromDate(endDate) : null,
+          'startYear': startYear ?? 1990,
+          'endYear': endYear ?? 1990,
           'enrolledStudents': enrolledStudents,
           'description': description,
           'createdAt': Timestamp.now(),
@@ -246,8 +247,8 @@ class AdminService {
     bool? isArchived,
     int? minStudents,
     int? maxStudents,
-    DateTime? startDate,
-    DateTime? endDate,
+    int? startYear,
+    int? endYear,
     String? description,
     List<String>? enrolledStudents, // tuỳ nhu cầu cập nhật danh sách
   }) async {
@@ -257,8 +258,8 @@ class AdminService {
       if (isArchived != null) 'isArchived': isArchived,
       if (minStudents != null) 'minStudents': minStudents,
       if (maxStudents != null) 'maxStudents': maxStudents,
-      if (startDate != null) 'startDate': Timestamp.fromDate(startDate),
-      if (endDate != null) 'endDate': Timestamp.fromDate(endDate),
+      if (startYear != null) 'startYear': 1990,
+      if (endYear != null) 'endYear': 1990,
       if (description != null) 'description': description,
       if (enrolledStudents != null) 'enrolledStudents': enrolledStudents,
       'updatedAt': Timestamp.now(),
@@ -357,40 +358,6 @@ class AdminService {
   }
 
   /// Lấy danh sách tất cả môn học cho Admin, đã được "làm giàu" thông tin
-  Stream<List<CourseModel>> getAllCoursesStream() {
-    return _db
-        .collection('courses')
-        .where('isArchived', isEqualTo: false) // Giữ lại logic lọc
-        .snapshots()
-        .asyncMap((snapshot) async {
-          // Chuyển đổi DocumentSnapshot thành List<CourseModel>
-          final courseFutures = snapshot.docs.map((doc) async {
-            final courseModel = CourseModel.fromDoc(doc);
-
-            // Chỉ làm giàu thông tin giảng viên
-            try {
-              final lecturerDoc = await _db
-                  .collection('users')
-                  .doc(courseModel.lecturerId)
-                  .get();
-
-              // Sử dụng copyWith để thêm thông tin giảng viên
-              // return courseModel.copyWith(
-              //   lecturerName: lecturerDoc.data()?['displayName'],
-              // );
-              return courseModel;
-            } catch (e) {
-              // Nếu có lỗi khi lấy thông tin GV, vẫn trả về thông tin môn học gốc
-              return courseModel;
-            }
-          }).toList();
-
-          // Đợi tất cả các future hoàn thành và trả về kết quả
-          return Future.wait(courseFutures);
-        });
-  }
-
-  /// Lấy danh sách tất cả môn học cho Admin, đã được "làm giàu" thông tin
   Stream<List<ClassModel>> getAllClassesStream() {
     return _db
         .collection('classes')
@@ -480,6 +447,73 @@ class AdminService {
       'isArchived': true,
       'updatedAt': Timestamp.now().toDate(),
     });
+  }
+
+  // Trong AdminService
+  Stream<List<CourseModel>> getAllCoursesStream() {
+    return _db
+        .collection('courses')
+        .where('isArchived', isEqualTo: false)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          // Convert documents to CourseModel
+          final courses = snapshot.docs
+              .map((doc) => CourseModel.fromDoc(doc))
+              .toList();
+
+          // Populate lecturer names
+          return await _populateLecturerNames(courses);
+        });
+  }
+
+  // Helper method để populate lecturer names
+  Future<List<CourseModel>> _populateLecturerNames(
+    List<CourseModel> courses,
+  ) async {
+    // Get unique lecturer IDs
+    final lecturerIds = courses
+        .where((c) => c.lecturerId.isNotEmpty)
+        .map((c) => c.lecturerId)
+        .toSet()
+        .toList();
+
+    if (lecturerIds.isEmpty) return courses;
+
+    // Batch get all lecturers
+    final lecturerDocs = await _db
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: lecturerIds)
+        .get();
+
+    // Create lecturer map
+    final lecturerMap = <String, String>{};
+    for (final doc in lecturerDocs.docs) {
+      lecturerMap[doc.id] = doc.data()['displayName'] ?? 'Unknown';
+    }
+
+    // Return courses with updated lecturer names
+    return courses.map((course) {
+      final lecturerName = lecturerMap[course.lecturerId];
+      return CourseModel(
+        id: course.id,
+        courseCode: course.courseCode,
+        courseName: course.courseName,
+        lecturerId: course.lecturerId,
+        lecturerName: lecturerName, // Populate lecturer name
+        minStudents: course.minStudents,
+        maxStudents: course.maxStudents,
+        semester: course.semester,
+        credits: course.credits,
+        maxAbsences: course.maxAbsences,
+        schedules: course.schedules,
+        isArchived: course.isArchived,
+        joinCode: course.joinCode,
+        createdAt: course.createdAt,
+        startDate: course.startDate,
+        endDate: course.endDate,
+        description: course.description,
+      );
+    }).toList();
   }
 
   Future<bool> isCourseDuplicate({

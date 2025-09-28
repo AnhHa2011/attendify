@@ -13,7 +13,7 @@ export 'presentation/pages/class_management/class_bulk_import_page.dart';
 
 // Class Management
 export 'presentation/pages/course_management/course_management_page.dart';
-export 'presentation/pages/course_management/course_enrollments_bulk_import_page.dart';
+export 'presentation/pages/course_management/course_bulk_import_page.dart';
 
 // User Management
 export 'presentation/pages/user_management/user_management_page.dart';
