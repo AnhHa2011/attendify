@@ -11,7 +11,6 @@ import 'app/providers/navigation_provider.dart';
 import 'app/providers/auth_provider.dart';
 import 'features/admin/data/services/admin_service.dart';
 import 'features/auth/data/services/firebase_auth_service.dart';
-import 'features/lecturer/services/lecturer_service.dart';
 import 'features/notifications/local_notification_service.dart';
 import 'core/data/services/schedule_service.dart';
 import 'core/data/services/session_service.dart';

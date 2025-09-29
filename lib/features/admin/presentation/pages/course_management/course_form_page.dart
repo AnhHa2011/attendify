@@ -40,16 +40,9 @@ class _CourseFormPageState extends State<CourseFormPage> {
   bool _lecturersLoading = true;
   String? _lecturersError;
 
-  // ====== Weekday slots (Mon..Sun) with time range ======
-  final List<_WeekdaySlot> _weekdaySlots = List.generate(
-    7,
-    (i) => _WeekdaySlot(weekday: i + 1), // 1=Mon ... 7=Sun
-  );
-
   @override
   void initState() {
     super.initState();
-
     _codeCtrl = TextEditingController(
       text: widget.courseModel?.courseCode ?? '',
     );
@@ -88,12 +81,12 @@ class _CourseFormPageState extends State<CourseFormPage> {
     );
     _startDateCtrl = TextEditingController(
       text: widget.courseModel?.startDate != null
-          ? widget.courseModel!.startDate.toString()
+          ? _dateFormat.format(widget.courseModel!.startDate)
           : '',
     );
     _endDateCtrl = TextEditingController(
       text: widget.courseModel?.endDate != null
-          ? widget.courseModel!.endDate.toString()
+          ? _dateFormat.format(widget.courseModel!.endDate)
           : '',
     );
 
@@ -151,89 +144,89 @@ class _CourseFormPageState extends State<CourseFormPage> {
     super.dispose();
   }
 
-  // ====== Helpers ======
-  String _weekdayLabel(int weekday) {
-    switch (weekday) {
-      case 1:
-        return 'Thứ 2';
-      case 2:
-        return 'Thứ 3';
-      case 3:
-        return 'Thứ 4';
-      case 4:
-        return 'Thứ 5';
-      case 5:
-        return 'Thứ 6';
-      case 6:
-        return 'Thứ 7';
-      case 7:
-        return 'Chủ nhật';
-      default:
-        return 'N/A';
-    }
-  }
+  // // ====== Helpers ======
+  // String _weekdayLabel(int weekday) {
+  //   switch (weekday) {
+  //     case 1:
+  //       return 'Thứ 2';
+  //     case 2:
+  //       return 'Thứ 3';
+  //     case 3:
+  //       return 'Thứ 4';
+  //     case 4:
+  //       return 'Thứ 5';
+  //     case 5:
+  //       return 'Thứ 6';
+  //     case 6:
+  //       return 'Thứ 7';
+  //     case 7:
+  //       return 'Chủ nhật';
+  //     default:
+  //       return 'N/A';
+  //   }
+  // }
 
-  String _formatTime(TimeOfDay? t) {
-    if (t == null) return '--:--';
-    final h = t.hour.toString().padLeft(2, '0');
-    final m = t.minute.toString().padLeft(2, '0');
-    return '$h:$m';
-    // Nếu muốn 12h: DateFormat('hh:mm a').format(...)
-  }
+  // String _formatTime(TimeOfDay? t) {
+  //   if (t == null) return '--:--';
+  //   final h = t.hour.toString().padLeft(2, '0');
+  //   final m = t.minute.toString().padLeft(2, '0');
+  //   return '$h:$m';
+  //   // Nếu muốn 12h: DateFormat('hh:mm a').format(...)
+  // }
 
-  int _toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
+  // int _toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
 
-  Future<void> _pickTime({
-    required _WeekdaySlot slot,
-    required bool isStart,
-  }) async {
-    final initial = isStart
-        ? (slot.start ?? const TimeOfDay(hour: 7, minute: 0))
-        : (slot.end ?? const TimeOfDay(hour: 9, minute: 0));
+  // Future<void> _pickTime({
+  //   required _WeekdaySlot slot,
+  //   required bool isStart,
+  // }) async {
+  //   final initial = isStart
+  //       ? (slot.start ?? const TimeOfDay(hour: 7, minute: 0))
+  //       : (slot.end ?? const TimeOfDay(hour: 9, minute: 0));
 
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initial,
-      helpText: isStart ? 'Chọn giờ bắt đầu' : 'Chọn giờ kết thúc',
-    );
-    if (picked == null) return;
+  //   final picked = await showTimePicker(
+  //     context: context,
+  //     initialTime: initial,
+  //     helpText: isStart ? 'Chọn giờ bắt đầu' : 'Chọn giờ kết thúc',
+  //   );
+  //   if (picked == null) return;
 
-    setState(() {
-      if (isStart) {
-        slot.start = picked;
-      } else {
-        slot.end = picked;
-      }
-    });
-  }
+  //   setState(() {
+  //     if (isStart) {
+  //       slot.start = picked;
+  //     } else {
+  //       slot.end = picked;
+  //     }
+  //   });
+  // }
 
-  // Validate chung cho các slot (nếu bật) thì phải có start < end
-  String? _validateSlots() {
-    for (final s in _weekdaySlots) {
-      if (!s.enabled) continue;
-      if (s.start == null || s.end == null) {
-        return 'Vui lòng chọn giờ cho ${_weekdayLabel(s.weekday)}';
-      }
-      if (_toMinutes(s.end!) <= _toMinutes(s.start!)) {
-        return 'Giờ kết thúc phải sau giờ bắt đầu (${_weekdayLabel(s.weekday)})';
-      }
-    }
-    return null;
-  }
+  // // Validate chung cho các slot (nếu bật) thì phải có start < end
+  // String? _validateSlots() {
+  //   for (final s in _weekdaySlots) {
+  //     if (!s.enabled) continue;
+  //     if (s.start == null || s.end == null) {
+  //       return 'Vui lòng chọn giờ cho ${_weekdayLabel(s.weekday)}';
+  //     }
+  //     if (_toMinutes(s.end!) <= _toMinutes(s.start!)) {
+  //       return 'Giờ kết thúc phải sau giờ bắt đầu (${_weekdayLabel(s.weekday)})';
+  //     }
+  //   }
+  //   return null;
+  // }
 
-  List<Map<String, dynamic>> _collectSchedulePayload() {
-    // Trả list map day/start/end (24h) để lưu backend
-    final out = <Map<String, dynamic>>[];
-    for (final s in _weekdaySlots) {
-      if (!s.enabled || s.start == null || s.end == null) continue;
-      out.add({
-        'weekday': s.weekday, // 1..7
-        'start': _formatTime(s.start), // "HH:mm"
-        'end': _formatTime(s.end),
-      });
-    }
-    return out;
-  }
+  // List<Map<String, dynamic>> _collectSchedulePayload() {
+  //   // Trả list map day/start/end (24h) để lưu backend
+  //   final out = <Map<String, dynamic>>[];
+  //   for (final s in _weekdaySlots) {
+  //     if (!s.enabled || s.start == null || s.end == null) continue;
+  //     out.add({
+  //       'weekday': s.weekday, // 1..7
+  //       'start': _formatTime(s.start), // "HH:mm"
+  //       'end': _formatTime(s.end),
+  //     });
+  //   }
+  //   return out;
+  // }
 
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
@@ -246,14 +239,14 @@ class _CourseFormPageState extends State<CourseFormPage> {
       return;
     }
 
-    // Validate slots (nếu cần bắt buộc có ít nhất 1 buổi thì kiểm tra ở đây)
-    final slotError = _validateSlots();
-    if (slotError != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(slotError)));
-      return;
-    }
+    // // Validate slots (nếu cần bắt buộc có ít nhất 1 buổi thì kiểm tra ở đây)
+    // final slotError = _validateSlots();
+    // if (slotError != null) {
+    //   ScaffoldMessenger.of(
+    //     context,
+    //   ).showSnackBar(SnackBar(content: Text(slotError)));
+    //   return;
+    // }
 
     setState(() => _isLoading = true);
 
@@ -267,8 +260,8 @@ class _CourseFormPageState extends State<CourseFormPage> {
     final semester = _semesterCtrl.text.trim();
     final joinCode = _joinCodeCtrl.text.trim();
     final description = _descriptionCtrl.text.trim();
-    final startDate = DateFormat('dd/MM/yyyy').parseStrict(_startDateCtrl.text);
-    final endDate = DateFormat('dd/MM/yyyy').parseStrict(_endDateCtrl.text);
+    final startDate = _dateFormat.parseStrict(_startDateCtrl.text);
+    final endDate = _dateFormat.parseStrict(_endDateCtrl.text);
     try {
       // Kiểm tra trùng mã môn học
       final isTaken = await adminService.isCourseCodeTaken(
@@ -541,6 +534,7 @@ class _CourseFormPageState extends State<CourseFormPage> {
                   border: OutlineInputBorder(),
                   suffixIcon: Icon(Icons.calendar_today),
                 ),
+                inputFormatters: [],
                 validator: (value) => (value == null || value.isEmpty)
                     ? 'Vui lòng chọn ngày'
                     : null,
@@ -581,64 +575,64 @@ class _CourseFormPageState extends State<CourseFormPage> {
                   }
                 },
               ),
-              const SizedBox(height: 8),
 
-              ..._weekdaySlots.map((slot) {
-                final label = _weekdayLabel(slot.weekday);
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Column(
-                      children: [
-                        SwitchListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(label),
-                          value: slot.enabled,
-                          onChanged: (v) => setState(() {
-                            slot.enabled = v;
-                            if (!v) {
-                              slot.start = null;
-                              slot.end = null;
-                            }
-                          }),
-                        ),
-                        if (slot.enabled)
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  icon: const Icon(Icons.schedule, size: 18),
-                                  onPressed: () =>
-                                      _pickTime(slot: slot, isStart: true),
-                                  label: Text(
-                                    'Bắt đầu: ${_formatTime(slot.start)}',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  icon: const Icon(Icons.schedule, size: 18),
-                                  onPressed: () =>
-                                      _pickTime(slot: slot, isStart: false),
-                                  label: Text(
-                                    'Kết thúc: ${_formatTime(slot.end)}',
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
+              // const SizedBox(height: 8),
 
+              // ..._weekdaySlots.map((slot) {
+              //   final label = _weekdayLabel(slot.weekday);
+              //   return Card(
+              //     margin: const EdgeInsets.symmetric(vertical: 6),
+              //     child: Padding(
+              //       padding: const EdgeInsets.symmetric(
+              //         horizontal: 12,
+              //         vertical: 8,
+              //       ),
+              //       child: Column(
+              //         children: [
+              //           SwitchListTile(
+              //             dense: true,
+              //             contentPadding: EdgeInsets.zero,
+              //             title: Text(label),
+              //             value: slot.enabled,
+              //             onChanged: (v) => setState(() {
+              //               slot.enabled = v;
+              //               if (!v) {
+              //                 slot.start = null;
+              //                 slot.end = null;
+              //               }
+              //             }),
+              //           ),
+              //           if (slot.enabled)
+              //             Row(
+              //               children: [
+              //                 Expanded(
+              //                   child: OutlinedButton.icon(
+              //                     icon: const Icon(Icons.schedule, size: 18),
+              //                     onPressed: () =>
+              //                         _pickTime(slot: slot, isStart: true),
+              //                     label: Text(
+              //                       'Bắt đầu: ${_formatTime(slot.start)}',
+              //                     ),
+              //                   ),
+              //                 ),
+              //                 const SizedBox(width: 8),
+              //                 Expanded(
+              //                   child: OutlinedButton.icon(
+              //                     icon: const Icon(Icons.schedule, size: 18),
+              //                     onPressed: () =>
+              //                         _pickTime(slot: slot, isStart: false),
+              //                     label: Text(
+              //                       'Kết thúc: ${_formatTime(slot.end)}',
+              //                     ),
+              //                   ),
+              //                 ),
+              //               ],
+              //             ),
+              //         ],
+              //       ),
+              //     ),
+              //   );
+              // }).toList(),
               const SizedBox(height: 28),
 
               FilledButton.icon(

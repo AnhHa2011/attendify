@@ -110,7 +110,7 @@ class FirebaseAuthService {
     // Đã có doc → nếu thiếu role hoặc role unknown thì yêu cầu chọn
     final data = snap.data()!;
     final currentRole = UserRoleX.fromKey(data['role'] as String?);
-    if (currentRole == UserRole.unknown) {
+    if (currentRole == UserRole.student) {
       final picked = (await pickRole()) ?? UserRole.student;
       await ref.update({'role': picked.toKey()});
     }
@@ -119,7 +119,7 @@ class FirebaseAuthService {
   // ===================== COMMON =====================
   Future<UserRole?> getUserRole(String uid) async {
     final doc = await _db.collection('users').doc(uid).get();
-    if (!doc.exists) return UserRole.unknown;
+    if (!doc.exists) return UserRole.student;
     return UserRoleX.fromKey(doc.data()!['role'] as String?);
   }
 

@@ -3,7 +3,6 @@
 // =================== THAY THẾ TOÀN BỘ PHẦN IMPORT BẰNG ĐOẠN NÀY ===================
 
 import 'package:attendify/features/auth/presentation/pages/reset_password_page.dart';
-import 'package:go_router/go_router.dart';
 
 // Import file tổng hợp. Nó đã chứa Material, Provider, FirebaseAuthException, và AuthProvider của bạn.
 import '../../../../app_imports.dart';
@@ -40,9 +39,21 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _submitting = true);
     // Provider và AuthProvider đã có sẵn từ app_imports.dart
     final auth = context.read<AuthProvider>();
-
+    // final adminSvc = context.read<AdminService>();
+    final String errorMessage;
     try {
+      // final UserModel user = await adminSvc.getUserByEmail(
+      //   _emailCtrl.text.trim(),
+      // );
+      // if (user == UserModel.empty()) {
+      //   errorMessage = 'Tài khoản không tồn tại.';
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+      //   );
+      //   return;
+      // } else {
       await auth.login(_emailCtrl.text.trim(), _passCtrl.text);
+      // }
       if (!mounted) return;
       // GoRouter sẽ tự redirect khi đăng nhập thành công
     } on FirebaseAuthException catch (e) {

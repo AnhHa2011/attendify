@@ -215,7 +215,7 @@ class _ClassEnrollmentsBulkImportPageState
             uid: '',
             email: '',
             displayName: '',
-            role: UserRole.unknown,
+            role: UserRole.student,
           ),
         );
         if (lecturer.uid.isNotEmpty) {

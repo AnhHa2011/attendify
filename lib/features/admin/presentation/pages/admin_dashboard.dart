@@ -283,16 +283,6 @@ class _AdminDashboardState extends State<AdminDashboard>
                   builder: (context, constraints) {
                     // Tính toán responsive dựa trên chiều rộng màn hình
                     final screenWidth = MediaQuery.of(context).size.width;
-                    double aspectRatio;
-                    if (screenWidth < 350) {
-                      aspectRatio = 3.6;
-                    } else if (screenWidth < 400) {
-                      aspectRatio = 1.8;
-                    } else if (screenWidth < 500) {
-                      aspectRatio = 1.4;
-                    } else {
-                      aspectRatio = 3.5;
-                    }
                     final isSmallScreen = screenWidth < 400;
 
                     return Column(
@@ -310,7 +300,6 @@ class _AdminDashboardState extends State<AdminDashboard>
                           crossAxisCount: 2,
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
-                          childAspectRatio: aspectRatio,
                           children: [
                             _buildGlassCard(
                               title: 'Giảng viên',
@@ -400,9 +389,6 @@ class _AdminDashboardState extends State<AdminDashboard>
               child: InkWell(
                 onTap: onTap,
                 child: Container(
-                  height: isSmallScreen
-                      ? 50
-                      : null, // ✅ Chiều cao cố định cho small screen
                   decoration: BoxDecoration(
                     gradient: gradient,
                     borderRadius: BorderRadius.circular(
@@ -474,9 +460,6 @@ class _AdminDashboardState extends State<AdminDashboard>
               child: GestureDetector(
                 onTap: onTap,
                 child: Container(
-                  height: isSmallScreen
-                      ? 50
-                      : null, // ✅ Chiều cao cố định cho small screen
                   decoration: BoxDecoration(
                     gradient: gradient,
                     borderRadius: BorderRadius.circular(
@@ -491,6 +474,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                     ],
                   ),
                   child: Container(
+                    height: 50,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(
                         isSmallScreen ? 12 : 20,
@@ -542,16 +526,6 @@ class _AdminDashboardState extends State<AdminDashboard>
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final screenWidth = MediaQuery.of(context).size.width;
-                  double aspectRatio;
-                  if (screenWidth < 350) {
-                    aspectRatio = 3.6;
-                  } else if (screenWidth < 400) {
-                    aspectRatio = 1.8;
-                  } else if (screenWidth < 500) {
-                    aspectRatio = 1.4;
-                  } else {
-                    aspectRatio = 3.5;
-                  }
                   final isSmallScreen = screenWidth < 400;
 
                   return Column(
@@ -570,7 +544,6 @@ class _AdminDashboardState extends State<AdminDashboard>
                         crossAxisCount: 2,
                         mainAxisSpacing: 16,
                         crossAxisSpacing: 16,
-                        childAspectRatio: aspectRatio,
                         children: [
                           _buildActionCard(
                             title: 'Tạo tài khoản',

@@ -3,7 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Các role trong hệ thống
-enum UserRole { admin, lecture, student, unknown }
+enum UserRole { admin, lecture, student }
 
 extension UserRoleX on UserRole {
   /// Key chuẩn để lưu Firestore
@@ -19,9 +19,8 @@ extension UserRoleX on UserRole {
       case 'lecture':
         return UserRole.lecture;
       case 'student':
-        return UserRole.student;
       default:
-        return UserRole.unknown;
+        return UserRole.student;
     }
   }
 
@@ -34,8 +33,6 @@ extension UserRoleX on UserRole {
         return 'Giảng viên';
       case UserRole.student:
         return 'Sinh viên';
-      case UserRole.unknown:
-        return 'Chưa xác định';
     }
   }
 }

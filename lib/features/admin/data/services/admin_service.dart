@@ -1,12 +1,7 @@
 import '../../../../app_imports.dart';
 import '../../../../core/data/models/attendance_model.dart';
-import '../../../../core/data/models/class_model.dart';
-import '../../../../core/data/models/course_model.dart';
 import '../../../../core/data/models/course_schedule_model.dart';
 import '../../../../core/data/models/enrollment_mdel.dart';
-import '../../../../core/data/models/lecturer_lite.dart';
-import '../../../../core/data/models/session_model.dart';
-import '../../../../core/data/models/user_model.dart';
 
 class AdminService {
   final _db = FirebaseFirestore.instance;
@@ -152,51 +147,51 @@ class AdminService {
   }
   // === QUẢN LÝ lớp HỌC (COURSES) ===
 
-  /// Tạo lịch học hàng loạt cho nhiều tuần liên tiếp
-  Future<void> createRecurringSessions({
-    required String courseCode,
-    required String location,
-    required int durationInMinutes,
-    required int numberOfWeeks,
-    required List<CourseSchedule> weeklySchedules,
-    required DateTime semesterStartDate,
-  }) async {
-    final batch = _db.batch();
+  // /// Tạo lịch học hàng loạt cho nhiều tuần liên tiếp
+  // Future<void> createRecurringSessions({
+  //   required String courseCode,
+  //   required String location,
+  //   required int durationInMinutes,
+  //   required int numberOfWeeks,
+  //   required List<CourseSchedule> weeklySchedules,
+  //   required DateTime semesterStartDate,
+  // }) async {
+  //   final batch = _db.batch();
 
-    for (int week = 0; week < numberOfWeeks; week++) {
-      for (final schedule in weeklySchedules) {
-        DateTime sessionDate = semesterStartDate.add(Duration(days: week * 7));
-        sessionDate = sessionDate.add(
-          Duration(days: schedule.dayOfWeek - sessionDate.weekday),
-        );
+  //   for (int week = 0; week < numberOfWeeks; week++) {
+  //     for (final schedule in weeklySchedules) {
+  //       DateTime sessionDate = semesterStartDate.add(Duration(days: week * 7));
+  //       sessionDate = sessionDate.add(
+  //         Duration(days: schedule.dayOfWeek - sessionDate.weekday),
+  //       );
 
-        final startTime = DateTime(
-          sessionDate.year,
-          sessionDate.month,
-          sessionDate.day,
-          schedule.startTime.hour,
-          schedule.startTime.minute,
-        );
+  //       final startTime = DateTime(
+  //         sessionDate.year,
+  //         sessionDate.month,
+  //         sessionDate.day,
+  //         schedule.startTime.hour,
+  //         schedule.startTime.minute,
+  //       );
 
-        final docRef = _db.collection('sessions').doc();
-        batch.set(docRef, {
-          'courseCode': courseCode,
-          'title':
-              'Buổi ${(week * weeklySchedules.length) + weeklySchedules.indexOf(schedule) + 1}',
-          'startTime': Timestamp.fromDate(startTime),
-          'endTime': Timestamp.fromDate(
-            startTime.add(Duration(minutes: durationInMinutes)),
-          ),
-          'location': location,
-          'status': 'scheduled',
-          'type': 'lecture',
-          'attendanceOpen': false,
-        });
-      }
-    }
+  //       final docRef = _db.collection('sessions').doc();
+  //       batch.set(docRef, {
+  //         'courseCode': courseCode,
+  //         'title':
+  //             'Buổi ${(week * weeklySchedules.length) + weeklySchedules.indexOf(schedule) + 1}',
+  //         'startTime': Timestamp.fromDate(startTime),
+  //         'endTime': Timestamp.fromDate(
+  //           startTime.add(Duration(minutes: durationInMinutes)),
+  //         ),
+  //         'location': location,
+  //         'status': 'scheduled',
+  //         'type': 'lecture',
+  //         'attendanceOpen': false,
+  //       });
+  //     }
+  //   }
 
-    await batch.commit();
-  }
+  //   await batch.commit();
+  // }
 
   // === THÊM HÀM MỚI NÀY VÀO ===
   /// Lấy danh sách thông tin chi tiết của các môn học dựa vào danh sách ID
@@ -865,6 +860,16 @@ class AdminService {
         .get();
     if (snap.docs.isEmpty) return null;
     return snap.docs.first.id; // hoặc 'uid' tuỳ schema; nếu docId==uid thì OK
+  }
+
+  Future<UserModel> getUserByEmail(String email) async {
+    final snap = await _db
+        .collection('users')
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+    if (snap.docs.isEmpty) return UserModel.empty();
+    return UserModel.fromDoc(snap.docs.first);
   }
 
   // === Tạo course và trả về id ===
