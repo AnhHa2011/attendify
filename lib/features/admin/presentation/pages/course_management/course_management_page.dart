@@ -1,13 +1,21 @@
 // lib/features/admin/presentation/pages/course_management_page.dart
 
+import 'dart:typed_data';
+
+import 'package:attendify/core/data/services/session_service.dart';
+import 'package:attendify/features/attendance/export/export_attendance_excel_service.dart';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
 import 'package:provider/provider.dart';
 import '../../../../../core/data/models/course_model.dart';
 import '../../../data/services/admin_service.dart';
+import '../../../domain/repositories/export/export_syllabus_pdf_service.dart';
 import 'course_bulk_import_page.dart';
 import 'course_enrollments_bulk_import_page.dart';
 import 'course_form_page.dart';
 import 'admin_course_detail_page.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:printing/printing.dart';
 
 class CourseManagementPage extends StatefulWidget {
   const CourseManagementPage({super.key});
@@ -32,6 +40,101 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _exportSyllabus(BuildContext context, CourseModel course) async {
+    // Hiển thị loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // 1. Gọi service để lấy dữ liệu bytes của file PDF
+      final Uint8List pdfData = await ExportSyllabusPdfService.export(course);
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Đóng loading
+
+      // 2. Dùng package printing để xử lý file
+      // Trên Web: Sẽ tự động mở tab mới và kích hoạt download
+      // Trên Mobile: Sẽ mở màn hình preview để in hoặc lưu file
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdfData,
+        name:
+            'Syllabus_${course.courseCode}_${course.semester}', // Tên file khi tải về
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Đóng loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Xuất đề cương thất bại: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _exportAttendance(BuildContext context, CourseModel course) async {
+    final adminSvc = context.read<AdminService>();
+    final sessionSvc = context.read<SessionService>();
+
+    // Hiển thị loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // Lấy dữ liệu cần export
+      final users = await adminSvc.getEnrolledStudentsStream(course.id).first;
+      final enrollments = await adminSvc.getEnrollmentsByCourse(course.id);
+      final attendances = await adminSvc.getAttendancesByCourse(course.id);
+      final leaveRequests = await adminSvc.getLeaveRequestsByCourse(course.id);
+      final sessions = await sessionSvc.sessionsOfCourse(course.id).first;
+
+      // Gọi export
+      final savedPath = await ExportAttendanceExcelService.export(
+        course: course,
+        users: users,
+        enrollments: enrollments,
+        attendances: attendances,
+        leaveRequests: leaveRequests,
+        sessions: sessions,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // đóng loading
+
+      // Thông báo
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            savedPath == null
+                ? 'Đã tải báo cáo (xem trong Downloads của trình duyệt)'
+                : 'Đã lưu báo cáo: $savedPath',
+          ),
+        ),
+      );
+
+      // Mở file (mobile/desktop)
+      if (savedPath != null) {
+        // Cần thêm package open_filex để mở file
+        // await OpenFilex.open(savedPath);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // đóng loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Xuất thống kê thất bại: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -194,6 +297,16 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
                                 ),
                               ),
                               tooltip: 'Chỉnh sửa',
+                            ),
+                            // Thêm IconButton để export
+                            IconButton(
+                              icon: const Icon(
+                                Icons.download_outlined,
+                                color: Colors.blue,
+                              ),
+                              onPressed: () =>
+                                  _exportSyllabus(context, courseInfo),
+                              tooltip: 'Xuất Syllabus (PDF)',
                             ),
                             IconButton(
                               icon: const Icon(

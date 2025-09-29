@@ -59,6 +59,8 @@ dependencies:
   firebase_remote_config: ^6.0.2
   file_saver: ^0.2.12
   cloud_functions: ^6.0.2
+  pdf: ^3.11.3
+  printing: ^5.14.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -115,6 +117,10 @@ flutter:
         - asset: assets/fonts/Mali/Mali-ExtraLightItalic.ttf
           weight: 200
           style: italic
+
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto/Roboto-Regular.ttf
 
 flutter_launcher_icons:
   # Dùng chung cho Android + iOS

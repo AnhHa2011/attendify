@@ -13,7 +13,18 @@ class CourseSchedule {
   /// Giờ bắt đầu
   final TimeOfDay startTime;
 
-  const CourseSchedule({required this.dayOfWeek, required this.startTime});
+  /// Giờ kết thúc
+  final TimeOfDay endTime;
+
+  /// Phòng học
+  final String room;
+
+  const CourseSchedule({
+    required this.dayOfWeek,
+    required this.startTime,
+    required this.endTime,
+    required this.room,
+  });
 
   /// Tên ngày trong tuần (tiếng Việt)
   String get dayName {
@@ -37,21 +48,32 @@ class CourseSchedule {
     }
   }
 
-  /// Format thời gian dễ đọc
-  String formatTime() {
-    final hour = startTime.hour.toString().padLeft(2, '0');
-    final minute = startTime.minute.toString().padLeft(2, '0');
+  /// Định dạng giờ
+  String formatTimeOfDay(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
   }
 
-  /// Mô tả đầy đủ
-  String get description => '$dayName, $formatTime()';
+  /// Format giờ học: ví dụ "08:00 - 09:30"
+  String get timeRange =>
+      '${formatTimeOfDay(startTime)} - ${formatTimeOfDay(endTime)}';
+
+  /// Mô tả đầy đủ: "Thứ 2, 08:00 - 09:30, Phòng A101"
+  String get description => '$dayName, $timeRange, $room';
 
   /// Copy with new values
-  CourseSchedule copyWith({int? dayOfWeek, TimeOfDay? startTime}) {
+  CourseSchedule copyWith({
+    int? dayOfWeek,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+    String? room,
+  }) {
     return CourseSchedule(
       dayOfWeek: dayOfWeek ?? this.dayOfWeek,
       startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      room: room ?? this.room,
     );
   }
 
@@ -61,6 +83,9 @@ class CourseSchedule {
       'dayOfWeek': dayOfWeek,
       'startHour': startTime.hour,
       'startMinute': startTime.minute,
+      'endHour': endTime.hour,
+      'endMinute': endTime.minute,
+      'room': room,
     };
   }
 
@@ -72,32 +97,46 @@ class CourseSchedule {
         hour: map['startHour'] ?? 7,
         minute: map['startMinute'] ?? 0,
       ),
+      endTime: TimeOfDay(
+        hour: map['endHour'] ?? 9,
+        minute: map['endMinute'] ?? 0,
+      ),
+      room: map['room'] ?? 'Chưa xác định',
     );
   }
 
   factory CourseSchedule.empty() {
+    final now = Timestamp.now().toDate();
+    final start = TimeOfDay(hour: now.hour, minute: now.minute);
+    final end = TimeOfDay(hour: (now.hour + 1) % 24, minute: now.minute);
     return CourseSchedule(
       dayOfWeek: 1,
-      startTime: TimeOfDay(
-        hour: Timestamp.now().toDate().hour,
-        minute: Timestamp.now().toDate().minute,
-      ),
+      startTime: start,
+      endTime: end,
+      room: 'Chưa có phòng',
     );
   }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is CourseSchedule &&
         other.dayOfWeek == dayOfWeek &&
-        other.startTime == startTime;
+        other.startTime == startTime &&
+        other.endTime == endTime &&
+        other.room == room;
   }
 
   @override
-  int get hashCode => dayOfWeek.hashCode ^ startTime.hashCode;
+  int get hashCode =>
+      dayOfWeek.hashCode ^
+      startTime.hashCode ^
+      endTime.hashCode ^
+      room.hashCode;
 
   @override
   String toString() {
-    return 'CourseSchedule(dayOfWeek: $dayOfWeek, startTime: $startTime)';
+    return 'CourseSchedule(dayOfWeek: $dayOfWeek, startTime: $startTime, endTime: $endTime, room: $room)';
   }
 }
 
@@ -130,8 +169,11 @@ extension CourseScheduleListExtension on List<CourseSchedule> {
           final dayName = CourseSchedule(
             dayOfWeek: entry.key,
             startTime: const TimeOfDay(hour: 0, minute: 0),
+            endTime: const TimeOfDay(hour: 0, minute: 0),
+            room: '',
           ).dayName;
-          final times = entry.value.map((s) => s.formatTime()).join(', ');
+
+          final times = entry.value.map((s) => s.timeRange).join(', ');
           return '$dayName ($times)';
         })
         .join('; ');
