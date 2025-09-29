@@ -2,6 +2,7 @@
 
 // =================== THAY THẾ TOÀN BỘ PHẦN IMPORT BẰNG ĐOẠN NÀY ===================
 
+import 'package:attendify/features/auth/presentation/pages/reset_password_page.dart';
 import 'package:go_router/go_router.dart';
 
 // Import file tổng hợp. Nó đã chứa Material, Provider, FirebaseAuthException, và AuthProvider của bạn.
@@ -196,7 +197,17 @@ class _LoginPageState extends State<LoginPage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: isBusy ? null : () => context.push('/reset'),
+                        onPressed: isBusy
+                            ? null
+                            : () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const ResetPasswordPage(),
+                                  ),
+                                );
+                              },
                         child: const Text('Quên mật khẩu?'),
                       ),
                     ),

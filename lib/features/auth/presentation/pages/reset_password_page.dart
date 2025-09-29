@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../data/services/firebase_auth_service.dart';
 import '../../utils/auth_error.dart';
+import 'login_page.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key});
@@ -141,7 +142,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
                   const SizedBox(height: 24),
                   TextButton(
-                    onPressed: () => context.go('/login'),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginPage(),
+                        ),
+                      );
+                    },
                     child: const Text('Quay lại đăng nhập'),
                   ),
                 ],
