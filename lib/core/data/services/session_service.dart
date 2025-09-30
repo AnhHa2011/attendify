@@ -286,46 +286,125 @@ class SessionService {
     }, SetOptions(merge: true));
   }
 
+  // /// Lấy danh sách TẤT CẢ sinh viên trong lớp với trạng thái điểm danh
+  // Stream<List<Map<String, dynamic>>> getFullStudentListWithStatus({
+  //   required String sessionId,
+  //   required String courseCode,
+  // }) {
+  //   // Lắng nghe attendance records
+  //   final attendeesStream = _db
+  //       .collection('attendances')
+  //       .where('sessionId', isEqualTo: sessionId)
+  //       .snapshots();
+
+  //   // Lấy danh sách sinh viên trong lớp
+  //   final allStudentsFuture = _db
+  //       .collection('enrollments')
+  //       .where('courseCode', isEqualTo: courseCode)
+  //       .get()
+  //       .then((snapshot) async {
+  //         if (snapshot.docs.isEmpty) {
+  //           // Fallback to courseCode
+  //           final fallbackSnapshot = await _db
+  //               .collection('enrollments')
+  //               .where('courseCode', isEqualTo: courseCode)
+  //               .get();
+  //           snapshot = fallbackSnapshot;
+  //         }
+
+  //         if (snapshot.docs.isEmpty) return <UserModel>[];
+
+  //         final studentIds = snapshot.docs
+  //             .map(
+  //               (doc) =>
+  //                   doc.data()['studentId'] as String? ??
+  //                   doc.data()['studentId'] as String? ??
+  //                   '',
+  //             )
+  //             .where((id) => id.isNotEmpty)
+  //             .toList();
+
+  //         if (studentIds.isEmpty) return <UserModel>[];
+
+  //         final studentsSnapshot = await _db
+  //             .collection('users')
+  //             .where(FieldPath.documentId, whereIn: studentIds)
+  //             .get();
+
+  //         return studentsSnapshot.docs
+  //             .map((doc) => UserModel.fromDoc(doc))
+  //             .toList();
+  //       });
+
+  //   // Kết hợp dữ liệu
+  //   return attendeesStream.asyncMap((attendeesSnapshot) async {
+  //     final allStudents = await allStudentsFuture;
+  //     final attendedMap = <String, Map<String, dynamic>>{};
+
+  //     for (var doc in attendeesSnapshot.docs) {
+  //       final data = doc.data();
+  //       final studentId = data['studentId'] as String;
+  //       attendedMap[studentId] = data;
+  //     }
+
+  //     final fullList = allStudents.map((student) {
+  //       final attendanceData = attendedMap[student.uid];
+  //       return {
+  //         'uid': student.uid,
+  //         'displayName': student.displayName,
+  //         'email': student.email,
+  //         'status': attendanceData?['status'] ?? 'absent',
+  //         'timestamp': attendanceData?['timestamp'],
+  //         'method': attendanceData?['method'],
+  //       };
+  //     }).toList();
+
+  //     // Sắp xếp: có mặt trước, tên theo thứ tự
+  //     fullList.sort((a, b) {
+  //       if (a['status'] != 'absent' && b['status'] == 'absent') return -1;
+  //       if (a['status'] == 'absent' && b['status'] != 'absent') return 1;
+  //       return (a['displayName'] as String).compareTo(
+  //         b['displayName'] as String,
+  //       );
+  //     });
+
+  //     return fullList;
+  //   });
+  // }
+
   /// Lấy danh sách TẤT CẢ sinh viên trong lớp với trạng thái điểm danh
   Stream<List<Map<String, dynamic>>> getFullStudentListWithStatus({
     required String sessionId,
     required String courseCode,
   }) {
-    // Lắng nghe attendance records
+    // SỬA LỖI 1: Đổi tên collection từ 'attendances' thành 'attendance' cho đúng
     final attendeesStream = _db
-        .collection('attendances')
+        .collection('attendance')
         .where('sessionId', isEqualTo: sessionId)
         .snapshots();
 
-    // Lấy danh sách sinh viên trong lớp
-    final allStudentsFuture = _db
+    // Tối ưu: Lấy danh sách sinh viên của lớp một lần duy nhất
+    final Future<List<UserModel>> allStudentsFuture = _db
         .collection('enrollments')
         .where('courseCode', isEqualTo: courseCode)
         .get()
-        .then((snapshot) async {
-          if (snapshot.docs.isEmpty) {
-            // Fallback to courseCode
-            final fallbackSnapshot = await _db
-                .collection('enrollments')
-                .where('courseCode', isEqualTo: courseCode)
-                .get();
-            snapshot = fallbackSnapshot;
+        .then((enrollmentSnapshot) async {
+          if (enrollmentSnapshot.docs.isEmpty) {
+            return <UserModel>[]; // Không có sinh viên nào đăng ký
           }
 
-          if (snapshot.docs.isEmpty) return <UserModel>[];
-
-          final studentIds = snapshot.docs
-              .map(
-                (doc) =>
-                    doc.data()['studentId'] as String? ??
-                    doc.data()['studentId'] as String? ??
-                    '',
-              )
-              .where((id) => id.isNotEmpty)
+          // Rút gọn: Lấy danh sách studentId một cách an toàn
+          final studentIds = enrollmentSnapshot.docs
+              .map((doc) => doc.data()['studentId'] as String?)
+              .where((id) => id != null && id.isNotEmpty)
+              .cast<String>()
               .toList();
 
-          if (studentIds.isEmpty) return <UserModel>[];
+          if (studentIds.isEmpty) {
+            return <UserModel>[];
+          }
 
+          // Lấy thông tin user từ danh sách Ids
           final studentsSnapshot = await _db
               .collection('users')
               .where(FieldPath.documentId, whereIn: studentIds)
@@ -336,15 +415,18 @@ class SessionService {
               .toList();
         });
 
-    // Kết hợp dữ liệu
+    // Kết hợp dữ liệu: Giữ nguyên logic kết hợp và sắp xếp của bạn vì nó đã tốt
     return attendeesStream.asyncMap((attendeesSnapshot) async {
       final allStudents = await allStudentsFuture;
+      if (allStudents.isEmpty) return [];
+
       final attendedMap = <String, Map<String, dynamic>>{};
 
       for (var doc in attendeesSnapshot.docs) {
         final data = doc.data();
-        final studentId = data['studentId'] as String;
-        attendedMap[studentId] = data;
+        if (data['studentId'] is String) {
+          attendedMap[data['studentId']] = data;
+        }
       }
 
       final fullList = allStudents.map((student) {
@@ -359,13 +441,16 @@ class SessionService {
         };
       }).toList();
 
-      // Sắp xếp: có mặt trước, tên theo thứ tự
+      // Giữ nguyên logic sắp xếp của bạn
       fullList.sort((a, b) {
-        if (a['status'] != 'absent' && b['status'] == 'absent') return -1;
-        if (a['status'] == 'absent' && b['status'] != 'absent') return 1;
-        return (a['displayName'] as String).compareTo(
-          b['displayName'] as String,
-        );
+        final statusA = a['status'] as String;
+        final statusB = b['status'] as String;
+        final displayNameA = a['displayName'] as String;
+        final displayNameB = b['displayName'] as String;
+
+        if (statusA != 'absent' && statusB == 'absent') return -1;
+        if (statusA == 'absent' && statusB != 'absent') return 1;
+        return displayNameA.compareTo(displayNameB);
       });
 
       return fullList;
