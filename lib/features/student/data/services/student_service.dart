@@ -11,42 +11,75 @@ class StudentService {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Lấy thống kê điểm danh tổng quan của sinh viên
+  /// [VIẾT LẠI] Lấy thống kê điểm danh tổng quan của sinh viên một cách chính xác
   Future<StudentAttendanceStats> getAttendanceStats(String studentId) async {
     try {
-      // Lấy tất cả các session mà sinh viên đã tham gia
-      final attendanceQuery = await _firestore
-          .collection('attendances')
+      // B1: Lấy tất cả các courseCode mà sinh viên đã đăng ký
+      final enrollmentsQuery = await _firestore
+          .collection('enrollments')
           .where('studentId', isEqualTo: studentId)
           .get();
 
+      if (enrollmentsQuery.docs.isEmpty) {
+        return StudentAttendanceStats.empty(); // Sinh viên chưa đăng ký môn nào
+      }
+
+      final courseCodes = enrollmentsQuery.docs
+          .map((doc) => doc.data()['courseCode'] as String)
+          .toList();
+
+      // B2: Lấy tất cả các buổi học đã diễn ra của các môn học đó
+      // Điều này cho chúng ta con số "Tổng số buổi" chính xác
+      final sessionsQuery = await _firestore
+          .collection('sessions')
+          .where('courseCode', whereIn: courseCodes)
+          .where(
+            'startTime',
+            isLessThanOrEqualTo: DateTime.now(),
+          ) // Chỉ tính các buổi đã qua
+          .get();
+
+      final int totalSessions = sessionsQuery.docs.length;
+      if (totalSessions == 0) {
+        return StudentAttendanceStats.empty(); // Chưa có buổi học nào diễn ra
+      }
+
+      final sessionIds = sessionsQuery.docs.map((doc) => doc.id).toSet();
+
+      // B3: Lấy tất cả các bản ghi điểm danh của sinh viên
+      // cho các buổi học đã được xác định ở trên
+      final attendanceQuery = await _firestore
+          .collection('attendance') // <-- SỬA TÊN COLLECTION CHO ĐÚNG
+          .where('studentId', isEqualTo: studentId)
+          .where('sessionId', whereIn: sessionIds.toList())
+          .get();
+
+      // B4: Đếm số lượng có mặt và nghỉ phép từ các bản ghi điểm danh
       int presentCount = 0;
-      int absentCount = 0;
       int leaveRequestCount = 0;
 
       for (var doc in attendanceQuery.docs) {
-        final data = doc.data();
-        final status = data['status'] as String? ?? 'absent';
-
+        final status = doc.data()['status'] as String?;
         switch (status) {
           case 'present':
+          case 'late': // Giả sử đi muộn vẫn được tính là có mặt
             presentCount++;
             break;
-          case 'absent':
-            absentCount++;
-            break;
+          case 'excused': // Giả sử 'excused' là nghỉ có phép
           case 'leave_approved':
             leaveRequestCount++;
             break;
         }
       }
 
-      final totalSessions = presentCount + absentCount + leaveRequestCount;
+      // B5: Tính toán số buổi vắng
+      // Vắng = Tổng số buổi - (Số buổi có mặt + Số buổi nghỉ phép)
+      final int absentCount = totalSessions - presentCount - leaveRequestCount;
 
       return StudentAttendanceStats.calculate(
         totalSessions: totalSessions,
         presentCount: presentCount,
-        absentCount: absentCount,
+        absentCount: absentCount < 0 ? 0 : absentCount, // Đảm bảo không âm
         leaveRequestCount: leaveRequestCount,
       );
     } catch (e) {
