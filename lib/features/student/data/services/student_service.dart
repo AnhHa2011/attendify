@@ -345,14 +345,14 @@ class StudentService {
 
       final sessionData = sessionDoc.data()!;
       final isOpen = sessionData['isOpen'] ?? false;
-      final classCode = sessionData['classCode'] as String? ?? '';
+      final courseCode = sessionData['courseCode'] as String? ?? '';
 
       if (!isOpen) return false;
 
       // Kiểm tra sinh viên có trong lớp không
       final enrollmentQuery = await _firestore
           .collection('enrollments')
-          .where('classCode', isEqualTo: classCode)
+          .where('courseCode', isEqualTo: courseCode)
           .where('studentId', isEqualTo: studentId)
           .limit(1)
           .get();
@@ -387,23 +387,23 @@ class StudentService {
         throw Exception('Không có lớp học nào để xuất lịch');
       }
 
-      final classCodes = enrollmentsQuery.docs
-          .map((doc) => doc.data()['classCode'] as String)
+      final courseCodes = enrollmentsQuery.docs
+          .map((doc) => doc.data()['courseCode'] as String)
           .toList();
 
       // Lấy tất cả sessions của các lớp này
       final List<Map<String, dynamic>> allSessions = [];
 
-      for (String classCode in classCodes) {
+      for (String courseCode in courseCodes) {
         final sessionsQuery = await _firestore
             .collection('sessions')
-            .where('classCode', isEqualTo: classCode)
+            .where('courseCode', isEqualTo: courseCode)
             .get();
 
         for (var sessionDoc in sessionsQuery.docs) {
           final sessionData = sessionDoc.data();
           sessionData['sessionId'] = sessionDoc.id;
-          sessionData['classCode'] = classCode;
+          sessionData['courseCode'] = courseCode;
           allSessions.add(sessionData);
         }
       }
@@ -418,20 +418,20 @@ class StudentService {
       for (var session in allSessions) {
         final startTime = (session['startTime'] as Timestamp?)?.toDate();
         final endTime = (session['endTime'] as Timestamp?)?.toDate();
-        final classCode = session['classCode'] as String;
+        final courseCode = session['courseCode'] as String;
 
         if (startTime == null || endTime == null) continue;
 
         // Lấy thông tin lớp học
-        final classDoc = await _firestore
-            .collection('classes')
-            .doc(classCode)
+        final courseDoc = await _firestore
+            .collection('coursees')
+            .doc(courseCode)
             .get();
 
-        if (!classDoc.exists) continue;
+        if (!courseDoc.exists) continue;
 
-        final classData = classDoc.data()!;
-        final className = classData['className'] ?? '';
+        final courseData = courseDoc.data()!;
+        final courseName = courseData['courseName'] ?? '';
         final room = session['room'] ?? '';
 
         // Format datetime for ICS
@@ -450,11 +450,11 @@ class StudentService {
         buffer.writeln('DTSTAMP:${formatDateTime(DateTime.now())}');
         buffer.writeln('DTSTART:${formatDateTime(startTime)}');
         buffer.writeln('DTEND:${formatDateTime(endTime)}');
-        buffer.writeln('SUMMARY:$classCode - $className');
+        buffer.writeln('SUMMARY:$courseCode - $courseName');
         if (room.isNotEmpty) {
           buffer.writeln('LOCATION:$room');
         }
-        buffer.writeln('DESCRIPTION:Buổi học lớp $className');
+        buffer.writeln('DESCRIPTION:Buổi học lớp $courseName');
         buffer.writeln('END:VEVENT');
       }
 

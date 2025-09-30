@@ -9,7 +9,6 @@ class SessionService {
   // Tạo buổi học mới - Updated to match exact SessionModel requirements
   Future<String> createSession({
     required String courseCode,
-    String? classCode,
     String? courseName,
     String? lecturerId,
     String? lecturerName,
@@ -24,8 +23,6 @@ class SessionService {
 
     final ref = await _db.collection('sessions').add({
       'courseCode': courseCode,
-      'classCode':
-          classCode ?? courseCode, // Default to courseCode if not provided
       'courseName': courseName ?? '',
       'lecturerId': lecturerId ?? '',
       'lecturerName': lecturerName ?? '',
@@ -303,7 +300,7 @@ class SessionService {
     // Lấy danh sách sinh viên trong lớp
     final allStudentsFuture = _db
         .collection('enrollments')
-        .where('classCode', isEqualTo: courseCode)
+        .where('courseCode', isEqualTo: courseCode)
         .get()
         .then((snapshot) async {
           if (snapshot.docs.isEmpty) {
@@ -474,21 +471,16 @@ class SessionService {
           if (enrollmentSnapshot.docs.isEmpty) return <SessionModel>[];
 
           final courseCodes = enrollmentSnapshot.docs
-              .map(
-                (doc) =>
-                    doc.data()['classCode'] as String? ??
-                    doc.data()['courseCode'] as String? ??
-                    '',
-              )
+              .map((doc) => doc.data()['courseCode'] as String? ?? '')
               .where((code) => code.isNotEmpty)
               .toList();
 
           if (courseCodes.isEmpty) return <SessionModel>[];
 
-          // Query sessions using classCode field
+          // Query sessions using courseCode field
           final sessionSnapshot = await _db
               .collection('sessions')
-              .where('classCode', whereIn: courseCodes)
+              .where('courseCode', whereIn: courseCodes)
               .orderBy('startTime', descending: false)
               .get();
 
@@ -529,12 +521,7 @@ class SessionService {
       }
 
       final courseCodes = enrollmentSnapshot.docs
-          .map(
-            (doc) =>
-                doc.data()['classCode'] as String? ??
-                doc.data()['courseCode'] as String? ??
-                '',
-          )
+          .map((doc) => doc.data()['courseCode'] as String? ?? '')
           .where((code) => code.isNotEmpty)
           .toList();
 
@@ -542,7 +529,7 @@ class SessionService {
 
       query = _db
           .collection('sessions')
-          .where('classCode', whereIn: courseCodes)
+          .where('courseCode', whereIn: courseCodes)
           .where('startTime', isGreaterThan: Timestamp.fromDate(now))
           .orderBy('startTime', descending: false)
           .limit(1);
@@ -597,12 +584,7 @@ class SessionService {
             if (enrollmentSnapshot.docs.isEmpty) return <SessionModel>[];
 
             final courseCodes = enrollmentSnapshot.docs
-                .map(
-                  (doc) =>
-                      doc.data()['classCode'] as String? ??
-                      doc.data()['courseCode'] as String? ??
-                      '',
-                )
+                .map((doc) => doc.data()['courseCode'] as String? ?? '')
                 .where((code) => code.isNotEmpty)
                 .toList();
 
@@ -610,7 +592,7 @@ class SessionService {
 
             final sessionSnapshot = await _db
                 .collection('sessions')
-                .where('classCode', whereIn: courseCodes)
+                .where('courseCode', whereIn: courseCodes)
                 .where(
                   'startTime',
                   isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
@@ -666,12 +648,7 @@ class SessionService {
             if (enrollmentSnapshot.docs.isEmpty) return <SessionModel>[];
 
             final courseCodes = enrollmentSnapshot.docs
-                .map(
-                  (doc) =>
-                      doc.data()['classCode'] as String? ??
-                      doc.data()['courseCode'] as String? ??
-                      '',
-                )
+                .map((doc) => doc.data()['courseCode'] as String? ?? '')
                 .where((code) => code.isNotEmpty)
                 .toList();
 
@@ -679,7 +656,7 @@ class SessionService {
 
             final sessionSnapshot = await _db
                 .collection('sessions')
-                .where('classCode', whereIn: courseCodes)
+                .where('courseCode', whereIn: courseCodes)
                 .where(
                   'startTime',
                   isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart),

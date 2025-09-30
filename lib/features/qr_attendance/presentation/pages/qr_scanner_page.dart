@@ -131,9 +131,9 @@ class _QrScannerPageState extends State<QrScannerPage>
       }
       final sessionData = sessionDoc.data()!;
       final isOpen = (sessionData['isOpen'] as bool?) ?? false;
-      final classId = sessionData['classId'] as String?;
+      final courseId = sessionData['courseId'] as String?;
 
-      if (classId == null || classId.isEmpty) {
+      if (courseId == null || courseId.isEmpty) {
         throw Exception("Dữ liệu session không hợp lệ.");
       }
       if (!isOpen) {
@@ -143,7 +143,7 @@ class _QrScannerPageState extends State<QrScannerPage>
       // 2) Kiểm tra sinh viên thuộc lớp không
       final enrollmentQuery = await _firestore
           .collection('enrollments')
-          .where('classId', isEqualTo: classId)
+          .where('courseId', isEqualTo: courseId)
           .where('studentId', isEqualTo: studentId)
           .limit(1)
           .get();

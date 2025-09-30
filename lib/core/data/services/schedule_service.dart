@@ -29,20 +29,20 @@ class ScheduleService {
     }).toList();
   }
 
-  Future<List<Map<String, dynamic>>> _fetchByclassCodes({
-    required List<String> classCodes,
+  Future<List<Map<String, dynamic>>> _fetchByCourseCodes({
+    required List<String> courseCodes,
     required DateTime from,
     required DateTime to,
   }) async {
-    if (classCodes.isEmpty) return [];
+    if (courseCodes.isEmpty) return [];
 
     // Firestore whereIn tối đa 10
     final chunks = <List<String>>[];
-    for (var i = 0; i < classCodes.length; i += 10) {
+    for (var i = 0; i < courseCodes.length; i += 10) {
       chunks.add(
-        classCodes.sublist(
+        courseCodes.sublist(
           i,
-          i + 10 > classCodes.length ? classCodes.length : i + 10,
+          i + 10 > courseCodes.length ? courseCodes.length : i + 10,
         ),
       );
     }
@@ -52,7 +52,7 @@ class ScheduleService {
     for (final ids in chunks) {
       final q = _db
           .collection('sessions')
-          .where('classCode', whereIn: ids)
+          .where('courseCode', whereIn: ids)
           .where('startTime', isGreaterThanOrEqualTo: from)
           .where('startTime', isLessThan: to) // < to để không trùng biên
           .orderBy('startTime');
@@ -80,24 +80,24 @@ class ScheduleService {
     return merged;
   }
 
-  // ---- Giảng viên: lấy classCode từ 'classes' rồi query 'sessions' theo classCode ----
+  // ---- Giảng viên: lấy courseCode từ 'coursees' rồi query 'sessions' theo courseCode ----
   Stream<List<Map<String, dynamic>>> lecturerSessions({
     required String lecturerUid,
     required DateTime from,
     required DateTime to,
   }) {
-    final classesQ = _db
-        .collection('classes')
+    final courseesQ = _db
+        .collection('coursees')
         .where('lecturerId', isEqualTo: lecturerUid)
         .where('isArchived', isEqualTo: false);
 
-    return classesQ.snapshots().asyncMap((clsSnap) async {
-      final classCodes = clsSnap.docs.map((e) => e.id).toList();
-      return _fetchByclassCodes(classCodes: classCodes, from: from, to: to);
+    return courseesQ.snapshots().asyncMap((clsSnap) async {
+      final courseCodes = clsSnap.docs.map((e) => e.id).toList();
+      return _fetchByCourseCodes(courseCodes: courseCodes, from: from, to: to);
     });
   }
 
-  // ---- Sinh viên: lấy classCode từ 'enrollments' rồi query 'sessions' theo classCode ----
+  // ---- Sinh viên: lấy courseCode từ 'enrollments' rồi query 'sessions' theo courseCode ----
   Stream<List<Map<String, dynamic>>> studentSessions({
     required String studentId,
     required DateTime from,
@@ -109,12 +109,12 @@ class ScheduleService {
         .limit(200);
 
     return enrollsQ.snapshots().asyncMap((enSnap) async {
-      final classCodes = enSnap.docs
-          .map((e) => (e.data()['classCode'] as String?) ?? '')
+      final courseCodes = enSnap.docs
+          .map((e) => (e.data()['courseCode'] as String?) ?? '')
           .where((id) => id.isNotEmpty)
           .toList();
 
-      return _fetchByclassCodes(classCodes: classCodes, from: from, to: to);
+      return _fetchByCourseCodes(courseCodes: courseCodes, from: from, to: to);
     });
   }
 }

@@ -142,8 +142,8 @@ class _QrScannerPageState extends State<QrScannerPage>
       // Check enrollment
       final enrollmentQuery = await _firestore
           .collection('enrollments')
-          // SỬ DỤNG session.classCode THAY VÌ classId
-          .where('classId', isEqualTo: session.classCode)
+          // SỬ DỤNG session.courseCode THAY VÌ courseId
+          .where('courseId', isEqualTo: session.courseCode)
           .where('studentId', isEqualTo: studentId)
           .limit(1)
           .get();

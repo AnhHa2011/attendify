@@ -13,56 +13,14 @@ class ClassService {
     return List.generate(len, (_) => chars[rnd.nextInt(chars.length)]).join();
   }
 
-  Future<void> enrollStudent({
-    required String joinCode,
-    required String studentId,
-    required String studentName,
-    required String studentEmail,
-  }) async {
-    // 1. Tìm lớp học có mã tham gia tương ứng
-    final classQuery = await _db
-        .collection('classes')
-        .where('joinCode', isEqualTo: joinCode.trim())
-        .limit(1)
-        .get();
-
-    if (classQuery.docs.isEmpty) {
-      throw Exception('Mã tham gia không hợp lệ hoặc lớp học không tồn tại.');
-    }
-
-    final classDoc = classQuery.docs.first;
-    final classId = classDoc.id;
-
-    final existingEnrollmentQuery = await _db
-        .collection('enrollments')
-        .where('classId', isEqualTo: classId)
-        .where('studentId', isEqualTo: studentId)
-        .limit(1)
-        .get();
-
-    // Nếu đã tìm thấy bản ghi enrollment, nghĩa là sinh viên đã ở trong lớp
-    if (existingEnrollmentQuery.docs.isNotEmpty) {
-      throw Exception('Bạn đã tham gia lớp học này rồi.');
-    }
-    // =================================================================
-
-    // 2. Nếu chưa tham gia, tạo một bản ghi mới trong collection 'enrollments'
-    await _db.collection('enrollments').add({
-      'classId': classId,
-      'className': classDoc.data()['className'],
-      'studentId': studentId,
-      'studentName': studentName,
-      'studentEmail': studentEmail,
-      'joinDate': FieldValue.serverTimestamp(),
-    });
-  }
-
   /// Lấy danh sách sinh viên đã ghi danh vào lớp, bao gồm cả thông tin chi tiết.
-  Future<List<Map<String, dynamic>>> getEnrolledStudents(String classId) async {
+  Future<List<Map<String, dynamic>>> getEnrolledStudents(
+    String courseCode,
+  ) async {
     // 1. Lấy tất cả các bản ghi enrollment của lớp học
     final enrollmentsQuery = await _db
         .collection('enrollments')
-        .where('classId', isEqualTo: classId)
+        .where('courseCode', isEqualTo: courseCode)
         .get();
 
     if (enrollmentsQuery.docs.isEmpty) {
@@ -114,11 +72,11 @@ class ClassService {
   }
 
   /// Lấy tổng số sinh viên đã tham gia một lớp học
-  Future<int> getEnrolledStudentCount(String classId) async {
+  Future<int> getEnrolledStudentCount(String courseCode) async {
     try {
       final snapshot = await _db
           .collection('enrollments')
-          .where('classId', isEqualTo: classId)
+          .where('courseCode', isEqualTo: courseCode)
           .get();
       return snapshot.docs.length;
     } catch (e) {
@@ -128,9 +86,9 @@ class ClassService {
   }
 
   // /// Lắng nghe MỘT lớp học và "làm giàu" nó với thông tin môn học + giảng viên
-  // Stream<ClassModel> getRichClassStream(String classId) {
+  // Stream<ClassModel> getRichClassStream(String classCode) {
   //   // 1. Lắng nghe document class cụ thể
-  //   return _db.collection('classes').doc(classId).snapshots().asyncMap((
+  //   return _db.collection('classes').doc(classCode).snapshots().asyncMap((
   //     classDoc,
   //   ) async {
   //     if (!classDoc.exists) {
@@ -161,7 +119,7 @@ class ClassService {
   //         lecturerName: lecturerData?['displayName'],
   //       );
   //     } catch (e) {
-  //       print('Error enriching class $classId: $e');
+  //       print('Error enriching class $classCode: $e');
   //       // Trả về dữ liệu gốc nếu có lỗi (ví dụ: môn học bị xóa)
   //       return classModel;
   //     }
@@ -169,8 +127,8 @@ class ClassService {
   // }
 
   /// Lắng nghe MỘT lớp học và trả về Stream của RichClassModel
-  Stream<ClassModel> getRichClassStream(String classId) {
-    return _db.collection('classes').doc(classId).snapshots().asyncMap((
+  Stream<ClassModel> getRichClassStream(String classCode) {
+    return _db.collection('classes').doc(classCode).snapshots().asyncMap((
       classDoc,
     ) async {
       if (!classDoc.exists) {
@@ -246,20 +204,20 @@ class ClassService {
   //           return []; // Sinh viên này chưa tham gia lớp nào
   //         }
 
-  //         // 2. Lấy ra danh sách các classId
-  //         final classIds = enrollmentSnapshot.docs
-  //             .map((doc) => doc.data()['classId'] as String)
+  //         // 2. Lấy ra danh sách các classCode
+  //         final classCodes = enrollmentSnapshot.docs
+  //             .map((doc) => doc.data()['classCode'] as String)
   //             .toList();
 
-  //         if (classIds.isEmpty) {
+  //         if (classCodes.isEmpty) {
   //           return [];
   //         }
 
   //         // 3. Lấy thông tin chi tiết cho từng lớp học
-  //         // Chúng ta sẽ lấy dữ liệu từ collection 'classes' nơi mà ID nằm trong danh sách classIds
+  //         // Chúng ta sẽ lấy dữ liệu từ collection 'classes' nơi mà ID nằm trong danh sách classCodes
   //         final classQuery = await _db
   //             .collection('classes')
-  //             .where(FieldPath.documentId, whereIn: classIds)
+  //             .where(FieldPath.documentId, whereIn: classCodes)
   //             .get();
 
   //         final classes = classQuery.docs
@@ -356,7 +314,7 @@ class ClassService {
   }
 
   /// Lấy danh sách các lớp học đã "làm giàu" mà MỘT sinh viên đã tham gia
-  Stream<List<ClassModel>> getRichEnrolledClassesStream(String studentId) {
+  Stream<List<CourseModel>> getRichEnrolledClassesStream(String studentId) {
     return _db
         .collection('enrollments')
         .where('studentId', isEqualTo: studentId)
@@ -364,22 +322,22 @@ class ClassService {
         .asyncMap((enrollmentSnapshot) async {
           if (enrollmentSnapshot.docs.isEmpty) return [];
 
-          final classIds = enrollmentSnapshot.docs
-              .map((doc) => doc.data()['classId'] as String)
+          final courseCodes = enrollmentSnapshot.docs
+              .map((doc) => doc.data()['courseCode'] as String)
               .toSet()
               .toList();
-          if (classIds.isEmpty) return [];
+          if (courseCodes.isEmpty) return [];
 
-          final classQuery = await _db
-              .collection('classes')
-              .where(FieldPath.documentId, whereIn: classIds)
+          final courseQuery = await _db
+              .collection('courses')
+              .where(FieldPath.documentId, whereIn: courseCodes)
               .get();
-          final classModels = classQuery.docs
-              .map((doc) => ClassModel.fromDoc(doc))
+          final courseModels = courseQuery.docs
+              .map((doc) => CourseModel.fromDoc(doc))
               .toList();
 
           // Dùng hàm helper để làm giàu cho mỗi lớp học
-          return classModels.toList();
+          return courseModels.toList();
         });
   }
 
@@ -452,52 +410,52 @@ class ClassService {
   }
 
   /// Student: lấy các lớp mà SV đã enroll (collection 'enrollments')
-  /// enrollments doc: { classId, studentId, joinedAt }
-  Stream<List<ClassModel>> classesOfStudent(String studentId) {
+  /// enrollments doc: { courseId, studentId, joinedAt }
+  Stream<List<CourseModel>> coursesfStudent(String studentId) {
     return _db
         .collection('enrollments')
         .where('studentId', isEqualTo: studentId)
         .snapshots()
         .asyncMap((enrollSnap) async {
           final futures = enrollSnap.docs.map((e) async {
-            final classId = (e.data()['classId'] as String);
-            final cDoc = await _db.collection('classes').doc(classId).get();
+            final courseId = (e.data()['courseCode'] as String);
+            final cDoc = await _db.collection('courses').doc(courseId).get();
             if (!cDoc.exists) return null;
-            return ClassModel.fromDoc(cDoc);
+            return CourseModel.fromDoc(cDoc);
           });
           final list = await Future.wait(futures);
-          return list.whereType<ClassModel>().toList();
+          return list.whereType<CourseModel>().toList();
         });
   }
 
   // Chi tiết lớp & members
-  Stream<ClassModel> classStream(String classId) => _db
+  Stream<ClassModel> classStream(String classCode) => _db
       .collection('classes')
-      .doc(classId)
+      .doc(classCode)
       .snapshots()
       .map(ClassModel.fromDoc);
 
-  Stream<List<Map<String, dynamic>>> membersStream(String classId) {
+  Stream<List<Map<String, dynamic>>> membersStream(String classCode) {
     return _db
         .collection('classes')
-        .doc(classId)
+        .doc(classCode)
         .collection('members')
         // .orderBy('joinedAt')
         .snapshots()
         .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
 
-  Future<void> removeMember(String classId, String uid) async {
+  Future<void> removeMember(String classCode, String uid) async {
     await _db
         .collection('classes')
-        .doc(classId)
+        .doc(classCode)
         .collection('members')
         .doc(uid)
         .delete();
   }
 
-  Future<void> regenerateJoinCode(String classId) async {
-    await _db.collection('classes').doc(classId).update({
+  Future<void> regenerateJoinCode(String classCode) async {
+    await _db.collection('classes').doc(classCode).update({
       'joinCode': _randomCode(),
     });
   }

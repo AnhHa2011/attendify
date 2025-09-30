@@ -152,7 +152,7 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
                       context,
                       MaterialPageRoute(
                         builder: (_) =>
-                            AdminClassDetailPage(classId: classModel.id),
+                            AdminClassDetailPage(classCode: classModel.id),
                       ),
                     );
                   },

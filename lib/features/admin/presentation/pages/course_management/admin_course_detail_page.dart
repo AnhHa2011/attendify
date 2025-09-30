@@ -635,9 +635,6 @@ class AdminCourseDetailPage extends StatelessWidget {
                     try {
                       await sessionService.createSession(
                         courseCode: courseCode,
-                        classCode: classCodeCtrl.text.trim().isEmpty
-                            ? null
-                            : classCodeCtrl.text.trim(),
                         courseName: courseName,
                         lecturerId: lecturer?.uid,
                         lecturerName: lecturer?.displayName,

@@ -8,15 +8,15 @@ import '../../../../../core/data/services/class_service.dart';
 import '../../../data/services/admin_service.dart';
 
 class AdminClassDetailPage extends StatelessWidget {
-  final String classId;
-  const AdminClassDetailPage({super.key, required this.classId});
+  final String classCode;
+  const AdminClassDetailPage({super.key, required this.classCode});
 
   @override
   Widget build(BuildContext context) {
     final classService = context.read<ClassService>();
 
     return StreamBuilder<ClassModel>(
-      stream: classService.getRichClassStream(classId),
+      stream: classService.getRichClassStream(classCode),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
