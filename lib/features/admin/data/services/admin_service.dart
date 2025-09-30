@@ -2,10 +2,12 @@ import '../../../../app_imports.dart';
 import '../../../../core/data/models/attendance_model.dart';
 import '../../../../core/data/models/course_schedule_model.dart';
 import '../../../../core/data/models/enrollment_mdel.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 class AdminService {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
+  final _functions = FirebaseFunctions.instanceFor(region: 'asisa-southeast1');
 
   // ───────────────────────────
   // QUẢN LÝ NGƯỜI DÙNG (USERS)
@@ -123,6 +125,35 @@ class AdminService {
       throw Exception('Lỗi tạo tài khoản: ${e.message}');
     } catch (e) {
       throw Exception('Đã xảy ra lỗi không xác định.');
+    }
+  }
+
+  /// TẠO HÀM MỚI: Gọi Cloud Function để tạo người dùng
+  /// Hàm này AN TOÀN cho Admin sử dụng mà không bị đăng xuất.
+  Future<void> createUserAsAdmin({
+    required String email,
+    required String password,
+    required String displayName,
+    required UserRole role,
+  }) async {
+    try {
+      // Chuẩn bị callable function trỏ tới function 'createUserByAdmin' trên cloud
+      final callable = _functions.httpsCallable('createUserByAdmin');
+
+      // Gửi dữ liệu lên Cloud Function
+      await callable.call<Map<String, dynamic>>({
+        'email': email,
+        'password': password,
+        'displayName': displayName,
+        'role': role.toKey(), // Gửi key của role, ví dụ: 'student'
+      });
+    } on FirebaseFunctionsException catch (e) {
+      // Bắt lỗi từ Cloud Functions và hiển thị thông báo thân thiện hơn
+      print('Lỗi từ Cloud Function: ${e.code} - ${e.message}');
+      throw Exception(e.message ?? 'Đã xảy ra lỗi không xác định.');
+    } catch (e) {
+      print('Lỗi không xác định khi gọi Cloud Function: $e');
+      throw Exception('Lỗi tạo người dùng: $e');
     }
   }
 
@@ -943,7 +974,7 @@ class AdminService {
     String courseCode,
   ) async {
     final snap = await _db
-        .collection('attendance')
+        .collection('attendances')
         .where('courseCode', isEqualTo: courseCode)
         .get();
 

@@ -4,30 +4,16 @@ module.exports = {
     es6: true,
     node: true,
   },
-  extends: [
-    "eslint:recommended",
-    "plugin:import/errors",
-    "plugin:import/warnings",
-    "plugin:import/typescript",
-    "google",
-    "plugin:@typescript-eslint/recommended",
-  ],
-  parser: "@typescript-eslint/parser",
-  parserOptions: {
-    project: ["tsconfig.json", "tsconfig.dev.json"],
-    sourceType: "module",
-  },
-  ignorePatterns: [
-    "/lib/**/*", // Ignore built files.
-    "/generated/**/*", // Ignore generated files.
-  ],
-  plugins: [
-    "@typescript-eslint",
-    "import",
-  ],
+  extends: ["eslint:recommended"],
   rules: {
-    "quotes": ["error", "double"],
-    "import/no-unresolved": 0,
-    "indent": ["error", 2],
+    // Tắt các rule gây phiền toái
+    indent: "off", // không check indent
+    "comma-dangle": "off", // không bắt dấu phẩy cuối
+    "object-curly-spacing": "off", // không bắt khoảng trắng trong object
+    "max-len": "off", // cho phép dài quá 80 ký tự
+    quotes: ["error", "double"], // ép dùng dấu nháy kép
+  },
+  parserOptions: {
+    ecmaVersion: 2020,
   },
 };

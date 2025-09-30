@@ -47,26 +47,44 @@ class _JoinCourseScannerPageState extends State<JoinCourseScannerPage>
   }
 
   Future<void> _startCamera() async {
-    try {
-      await controller.start();
-      if (mounted) setState(() => _cameraOn = true);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Không bật được camera: $e')));
-    }
+    // B1: Gọi setState để Flutter bắt đầu build widget MobileScanner
+    if (!mounted) return;
+    setState(() {
+      _cameraOn = true;
+    });
+
+    // B2: Đợi cho frame hiện tại được build xong, sau đó mới thực thi .start()
+    // Đây là cách làm an toàn và đảm bảo widget đã được build.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await controller.start();
+      } catch (e) {
+        if (!mounted) return;
+        // Nếu có lỗi khi start, tắt cờ camera đi
+        setState(() => _cameraOn = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Không bật được camera: $e')));
+      }
+    });
   }
 
   Future<void> _stopCamera() async {
     try {
-      await controller.stop();
-      if (mounted) setState(() => _cameraOn = false);
+      // SỬA LỖI: Chỉ cần kiểm tra biến trạng thái của chính bạn
+      if (_cameraOn) {
+        await controller.stop();
+      }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Không tắt được camera: $e')));
+      // Ghi log lỗi nếu cần, nhưng không cần báo cho người dùng
+      debugPrint('Lỗi khi tắt camera: $e');
+    } finally {
+      // Dù có lỗi hay không, luôn cập nhật UI để ẩn camera đi
+      if (mounted) {
+        setState(() {
+          _cameraOn = false;
+        });
+      }
     }
   }
 

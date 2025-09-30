@@ -9,8 +9,7 @@ export 'package:provider/provider.dart';
 export 'package:flutter/foundation.dart' hide kIsWasm;
 export 'dart:convert';
 
-// Providers <-- BẠN CÓ THỂ THÊM VÀO ĐÂY
-export 'app/providers/auth_provider.dart'; // <--- THÊM DÒNG NÀY
+export 'app/providers/auth_provider.dart';
 
 //Service
 export 'features/admin/data/services/admin_service.dart';

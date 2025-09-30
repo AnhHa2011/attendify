@@ -154,7 +154,7 @@ class _QrScannerPageState extends State<QrScannerPage>
 
       // 3) Kiểm tra đã điểm danh chưa
       final attendanceQuery = await _firestore
-          .collection('attendance')
+          .collection('attendances')
           .where('sessionId', isEqualTo: sessionId)
           .where('studentId', isEqualTo: studentId)
           .limit(1)

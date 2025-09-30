@@ -148,7 +148,7 @@ class SessionService {
 
     // Kiểm tra đã điểm danh chưa
     final attendanceQuery = await _db
-        .collection('attendance')
+        .collection('attendances')
         .where('sessionId', isEqualTo: sessionId)
         .where('studentId', isEqualTo: studentId)
         .limit(1)
@@ -207,7 +207,7 @@ class SessionService {
   /// Lấy danh sách sinh viên đã điểm danh với thông tin đầy đủ
   Stream<List<Map<String, dynamic>>> getRichAttendanceList(String sessionId) {
     return _db
-        .collection('attendance')
+        .collection('attendances')
         .where('sessionId', isEqualTo: sessionId)
         .snapshots()
         .asyncMap((snapshot) async {
@@ -253,7 +253,7 @@ class SessionService {
   }) async {
     // Cập nhật trong collection chính
     final attendanceQuery = await _db
-        .collection('attendance')
+        .collection('attendances')
         .where('sessionId', isEqualTo: sessionId)
         .where('studentId', isEqualTo: studentId)
         .limit(1)
@@ -296,7 +296,7 @@ class SessionService {
   }) {
     // Lắng nghe attendance records
     final attendeesStream = _db
-        .collection('attendance')
+        .collection('attendances')
         .where('sessionId', isEqualTo: sessionId)
         .snapshots();
 
@@ -390,7 +390,7 @@ class SessionService {
   /// Lấy danh sách điểm danh cho buổi học
   Stream<List<Map<String, dynamic>>> getAttendanceList(String sessionId) {
     return _db
-        .collection('attendance')
+        .collection('attendances')
         .where('sessionId', isEqualTo: sessionId)
         .orderBy('timestamp', descending: false)
         .snapshots()
@@ -710,7 +710,7 @@ class SessionService {
   Future<void> deleteSession(String sessionId) async {
     // Xóa attendance records liên quan
     final attendanceSnapshot = await _db
-        .collection('attendance')
+        .collection('attendances')
         .where('sessionId', isEqualTo: sessionId)
         .get();
 

@@ -58,6 +58,14 @@
           }
         },
         {
+          "client_id": "574694385709-udbilsa2jhc7p9ctg7re63ml9rtebs50.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.attendify",
+            "certificate_hash": "a0101e5a9999a325046bb8a9b5f077388ff67054"
+          }
+        },
+        {
           "client_id": "574694385709-161i0mhjo2oe5ha8f38aejofh61f6ao9.apps.googleusercontent.com",
           "client_type": 3
         }

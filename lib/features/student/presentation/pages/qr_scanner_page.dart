@@ -1,5 +1,6 @@
 // lib/features/student/presentation/pages/qr_scanner_page.dart
 
+import 'package:attendify/core/data/models/session_model.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
@@ -127,18 +128,22 @@ class _QrScannerPageState extends State<QrScannerPage>
         throw Exception("Session không tồn tại.");
       }
 
-      final sessionData = sessionDoc.data()!;
-      final isOpen = sessionData['isOpen'] ?? false;
-      final classId = sessionData['classId'] as String;
+      // SỬ DỤNG SessionModel ĐỂ ĐỌC DỮ LIỆU MỘT CÁCH AN TOÀN
+      final session = SessionModel.fromDoc(
+        sessionDoc as DocumentSnapshot<Map<String, dynamic>>,
+      );
 
-      if (!isOpen) {
+      // Bây giờ, truy cập dữ liệu qua đối tượng 'session'
+      if (!session.isOpen) {
+        // Dùng session.isOpen
         throw Exception("Session đã đóng. Không thể điểm danh.");
       }
 
       // Check enrollment
       final enrollmentQuery = await _firestore
           .collection('enrollments')
-          .where('classId', isEqualTo: classId)
+          // SỬ DỤNG session.classCode THAY VÌ classId
+          .where('classId', isEqualTo: session.classCode)
           .where('studentId', isEqualTo: studentId)
           .limit(1)
           .get();
@@ -149,7 +154,7 @@ class _QrScannerPageState extends State<QrScannerPage>
 
       // Check already attended
       final attendanceQuery = await _firestore
-          .collection('attendance')
+          .collection('attendances')
           .where('sessionId', isEqualTo: sessionId)
           .where('studentId', isEqualTo: studentId)
           .limit(1)
