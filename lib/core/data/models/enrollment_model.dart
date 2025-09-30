@@ -1,3 +1,5 @@
+// lib/core/data/models/enrollment_model.dart
+
 import 'package:attendify/app_imports.dart';
 
 class EnrollmentModel {

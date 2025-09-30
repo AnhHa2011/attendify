@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/data/models/attendance_model.dart';
 import '../../../core/data/models/course_model.dart';
-import '../../../core/data/models/enrollment_mdel.dart';
+import '../../../core/data/models/enrollment_model.dart';
 import '../../../core/data/models/leave_request_model.dart';
 import '../models/class_session.dart';
 import '../models/attendance_record.dart';

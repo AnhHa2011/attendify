@@ -4,7 +4,7 @@ import 'package:file_saver/file_saver.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/data/models/attendance_model.dart';
-import '../../../core/data/models/enrollment_mdel.dart';
+import '../../../core/data/models/enrollment_model.dart';
 
 class ExportAttendanceExcelService {
   /// Trả về path đã lưu (nếu nền tảng có path). Web thì thường trả null.

@@ -142,8 +142,8 @@ class _QrScannerPageState extends State<QrScannerPage>
       // Check enrollment
       final enrollmentQuery = await _firestore
           .collection('enrollments')
-          // SỬ DỤNG session.courseCode THAY VÌ courseId
-          .where('courseId', isEqualTo: session.courseCode)
+          // SỬA LỖI: Truy vấn bằng 'courseCode' để khớp với EnrollmentModel
+          .where('courseCode', isEqualTo: session.courseCode)
           .where('studentId', isEqualTo: studentId)
           .limit(1)
           .get();

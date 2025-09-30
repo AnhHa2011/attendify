@@ -2,7 +2,7 @@ name: attendify
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -61,6 +61,7 @@ dependencies:
   cloud_functions: ^6.0.2
   pdf: ^3.11.3
   printing: ^5.14.2
+  rxdart: ^0.28.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -87,7 +88,7 @@ flutter:
     - assets/templates/class_import_template.xlsx
     - assets/templates/course_import_template.xlsx
     - assets/templates/user_import_template.xlsx
-    
+
   fonts:
     - family: Mali
       fonts:
@@ -143,5 +144,5 @@ flutter_launcher_icons:
   web:
     generate: true
     image_path: assets/icons/app_icon.png
-    background_color: "#FFFFFF"   # tuỳ chọn
-    theme_color: "#1976D2"        # tuỳ chọn
+    background_color: "#FFFFFF" # tuỳ chọn
+    theme_color: "#1976D2" # tuỳ chọn

@@ -1,7 +1,7 @@
 import '../../../../app_imports.dart';
 import '../../../../core/data/models/attendance_model.dart';
 import '../../../../core/data/models/course_schedule_model.dart';
-import '../../../../core/data/models/enrollment_mdel.dart';
+import '../../../../core/data/models/enrollment_model.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 class AdminService {

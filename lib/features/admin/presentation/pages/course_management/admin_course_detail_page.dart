@@ -7,7 +7,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../../core/data/models/attendance_model.dart';
-import '../../../../../core/data/models/enrollment_mdel.dart';
+import '../../../../../core/data/models/enrollment_model.dart';
 import '../../../../../core/data/models/leave_request_model.dart';
 import '../../../../../core/data/models/rich_course_model.dart';
 import '../../../../../core/data/models/session_model.dart';
