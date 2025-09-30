@@ -99,13 +99,13 @@ class ScheduleService {
 
   // ---- Sinh viên: lấy classCode từ 'enrollments' rồi query 'sessions' theo classCode ----
   Stream<List<Map<String, dynamic>>> studentSessions({
-    required String studentUid,
+    required String studentId,
     required DateTime from,
     required DateTime to,
   }) {
     final enrollsQ = _db
         .collection('enrollments')
-        .where('studentUid', isEqualTo: studentUid)
+        .where('studentId', isEqualTo: studentId)
         .limit(200);
 
     return enrollsQ.snapshots().asyncMap((enSnap) async {

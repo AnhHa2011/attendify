@@ -15,7 +15,7 @@ class ClassService {
 
   Future<void> enrollStudent({
     required String joinCode,
-    required String studentUid,
+    required String studentId,
     required String studentName,
     required String studentEmail,
   }) async {
@@ -36,7 +36,7 @@ class ClassService {
     final existingEnrollmentQuery = await _db
         .collection('enrollments')
         .where('classId', isEqualTo: classId)
-        .where('studentUid', isEqualTo: studentUid)
+        .where('studentId', isEqualTo: studentId)
         .limit(1)
         .get();
 
@@ -50,7 +50,7 @@ class ClassService {
     await _db.collection('enrollments').add({
       'classId': classId,
       'className': classDoc.data()['className'],
-      'studentUid': studentUid,
+      'studentId': studentId,
       'studentName': studentName,
       'studentEmail': studentEmail,
       'joinDate': FieldValue.serverTimestamp(),
@@ -69,25 +69,25 @@ class ClassService {
       return []; // Trả về danh sách rỗng nếu không có sinh viên nào
     }
 
-    // 2. Lấy ra danh sách các studentUid
-    final studentUids = enrollmentsQuery.docs
-        .map((doc) => doc.data()['studentUid'] as String)
+    // 2. Lấy ra danh sách các studentId
+    final studentIds = enrollmentsQuery.docs
+        .map((doc) => doc.data()['studentId'] as String)
         .toList();
 
     // Lấy ID của bản ghi enrollment để dùng cho việc xoá
     final enrollmentIds = {
-      for (var doc in enrollmentsQuery.docs) doc.data()['studentUid']: doc.id,
+      for (var doc in enrollmentsQuery.docs) doc.data()['studentId']: doc.id,
     };
 
-    if (studentUids.isEmpty) {
+    if (studentIds.isEmpty) {
       return [];
     }
 
-    // 3. Dùng danh sách studentUids để lấy thông tin chi tiết từ collection 'users'
+    // 3. Dùng danh sách studentIds để lấy thông tin chi tiết từ collection 'users'
     // Firestore cho phép query tối đa 30 item trong một lệnh 'whereIn'
     final usersSnapshot = await _db
         .collection('users')
-        .where(FieldPath.documentId, whereIn: studentUids)
+        .where(FieldPath.documentId, whereIn: studentIds)
         .get();
 
     // 4. Chuyển đổi kết quả thành danh sách Map mong muốn
@@ -452,11 +452,11 @@ class ClassService {
   }
 
   /// Student: lấy các lớp mà SV đã enroll (collection 'enrollments')
-  /// enrollments doc: { classId, studentUid, joinedAt }
-  Stream<List<ClassModel>> classesOfStudent(String studentUid) {
+  /// enrollments doc: { classId, studentId, joinedAt }
+  Stream<List<ClassModel>> classesOfStudent(String studentId) {
     return _db
         .collection('enrollments')
-        .where('studentUid', isEqualTo: studentUid)
+        .where('studentId', isEqualTo: studentId)
         .snapshots()
         .asyncMap((enrollSnap) async {
           final futures = enrollSnap.docs.map((e) async {

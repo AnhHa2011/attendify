@@ -25,7 +25,7 @@ class _JoinCoursePageState extends State<JoinCoursePage> {
 
       await courseService.enrollStudent(
         joinCode: joinCode,
-        studentUid: user.uid,
+        studentId: user.uid,
         studentName: user.displayName ?? 'N/A',
         studentEmail: user.email ?? 'N/A',
       );

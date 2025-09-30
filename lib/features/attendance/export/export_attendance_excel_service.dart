@@ -78,11 +78,11 @@ class ExportAttendanceExcelService {
 
     for (int i = 0; i < enrollments.length; i++) {
       final e = enrollments[i];
-      final studentId = e.studentUid;
+      final studentId = e.studentId;
       final user = userById[studentId];
 
       final row = <CellValue>[
-        TextCellValue(e.studentUid),
+        TextCellValue(e.studentId),
         TextCellValue(user?.displayName ?? ''),
         TextCellValue(user?.email ?? ''),
         TextCellValue(course.courseCode),

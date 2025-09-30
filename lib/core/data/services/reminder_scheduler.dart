@@ -22,7 +22,7 @@ class ReminderScheduler {
               .lecturerSessions(lecturerUid: uid, from: now, to: to)
               .first
         : await scheduleService
-              .studentSessions(studentUid: uid, from: now, to: to)
+              .studentSessions(studentId: uid, from: now, to: to)
               .first;
 
     for (final s in sessions) {

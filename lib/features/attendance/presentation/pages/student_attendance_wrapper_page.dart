@@ -17,7 +17,7 @@ class StudentAttendanceWrapperPage extends StatelessWidget {
     // Lấy danh sách enrollments để biết lớp sinh viên đã tham gia
     final enrollments = FirebaseFirestore.instance
         .collection('enrollments')
-        .where('studentUid', isEqualTo: uid)
+        .where('studentId', isEqualTo: uid)
         .snapshots();
 
     return Scaffold(

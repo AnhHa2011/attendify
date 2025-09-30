@@ -321,7 +321,7 @@ class SessionService {
               .map(
                 (doc) =>
                     doc.data()['studentId'] as String? ??
-                    doc.data()['studentUid'] as String? ??
+                    doc.data()['studentId'] as String? ??
                     '',
               )
               .where((id) => id.isNotEmpty)
@@ -456,17 +456,17 @@ class SessionService {
   }
 
   // Lấy buổi học của sinh viên
-  Stream<List<SessionModel>> sessionsOfStudent(String studentUid) {
+  Stream<List<SessionModel>> sessionsOfStudent(String studentId) {
     return _db
         .collection('enrollments')
-        .where('studentId', isEqualTo: studentUid)
+        .where('studentId', isEqualTo: studentId)
         .snapshots()
         .asyncMap((enrollmentSnapshot) async {
           if (enrollmentSnapshot.docs.isEmpty) {
-            // Fallback to studentUid
+            // Fallback to studentId
             final fallbackSnapshot = await _db
                 .collection('enrollments')
-                .where('studentUid', isEqualTo: studentUid)
+                .where('studentId', isEqualTo: studentId)
                 .get();
             enrollmentSnapshot = fallbackSnapshot;
           }
@@ -522,7 +522,7 @@ class SessionService {
       if (enrollmentSnapshot.docs.isEmpty) {
         final fallbackSnapshot = await _db
             .collection('enrollments')
-            .where('studentUid', isEqualTo: userId)
+            .where('studentId', isEqualTo: userId)
             .get();
 
         if (fallbackSnapshot.docs.isEmpty) return null;
@@ -589,7 +589,7 @@ class SessionService {
             if (enrollmentSnapshot.docs.isEmpty) {
               final fallbackSnapshot = await _db
                   .collection('enrollments')
-                  .where('studentUid', isEqualTo: userId)
+                  .where('studentId', isEqualTo: userId)
                   .get();
               enrollmentSnapshot = fallbackSnapshot;
             }
@@ -658,7 +658,7 @@ class SessionService {
             if (enrollmentSnapshot.docs.isEmpty) {
               final fallbackSnapshot = await _db
                   .collection('enrollments')
-                  .where('studentUid', isEqualTo: userId)
+                  .where('studentId', isEqualTo: userId)
                   .get();
               enrollmentSnapshot = fallbackSnapshot;
             }

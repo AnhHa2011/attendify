@@ -45,7 +45,7 @@ class _SchedulePageState extends State<SchedulePage> {
             to: range.end,
           )
         : schedule.studentSessions(
-            studentUid: widget.currentUid,
+            studentId: widget.currentUid,
             from: range.start,
             to: range.end,
           );

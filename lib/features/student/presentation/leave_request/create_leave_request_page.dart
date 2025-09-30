@@ -52,7 +52,7 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
     // Lấy các enrollments theo sinh viên
     final enrollSnap = await firestore
         .collection(FirestoreCollections.enrollments)
-        .where('studentUid', isEqualTo: uid)
+        .where('studentId', isEqualTo: uid)
         .get();
 
     final courseCodes = enrollSnap.docs

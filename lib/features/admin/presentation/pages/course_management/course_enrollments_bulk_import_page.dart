@@ -309,7 +309,7 @@ class _CourseEnrollmentsBulkImportPageState
             if (studentId != null) {
               await admin.addEnrollment(
                 courseCode: row.courseCode!,
-                studentUid: studentId,
+                studentId: studentId,
               );
               enrollmentsCreated++;
             }

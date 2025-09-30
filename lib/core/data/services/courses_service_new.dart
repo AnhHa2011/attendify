@@ -65,9 +65,9 @@ class CoursesService {
   // // }
 
   // // /// Stream các môn SV đã ghi danh (đã enrich)
-  // // Stream<List<RichCourseModel>> watchRichEnrolledCourses(String studentUid) {
+  // // Stream<List<RichCourseModel>> watchRichEnrolledCourses(String studentId) {
   // //   // yêu cầu CourseRepository có watchByStudent (hoặc bạn map từ enrollments repo)
-  // //   return courseRepo.watchByStudent(studentUid).asyncMap(_enrichMany);
+  // //   return courseRepo.watchByStudent(studentId).asyncMap(_enrichMany);
   // // }
 
   // // ---------------- Commands (mutations) ----------------

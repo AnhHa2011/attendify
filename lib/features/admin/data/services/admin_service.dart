@@ -679,7 +679,7 @@ class AdminService {
         .asyncMap((snapshot) async {
           if (snapshot.docs.isEmpty) return [];
           final studentIds = snapshot.docs
-              .map((doc) => doc['studentUid'] as String)
+              .map((doc) => doc['studentId'] as String)
               .toList();
           final studentsSnapshot = await _db
               .collection('users')
@@ -692,12 +692,12 @@ class AdminService {
   }
 
   /// Ghi danh MỘT sinh viên vào môn học
-  Future<void> enrollSingleStudent(String courseCode, String studentUid) async {
+  Future<void> enrollSingleStudent(String courseCode, String studentId) async {
     // Kiểm tra xem sinh viên đã có trong môn chưa để tránh trùng lặp
     final existing = await _db
         .collection('enrollments')
         .where('courseCode', isEqualTo: courseCode)
-        .where('studentUid', isEqualTo: studentUid)
+        .where('studentId', isEqualTo: studentId)
         .limit(1)
         .get();
 
@@ -707,17 +707,17 @@ class AdminService {
 
     await _db.collection('enrollments').add({
       'courseCode': courseCode,
-      'studentUid': studentUid,
+      'studentId': studentId,
       'joinDate': Timestamp.now().toDate(),
     });
   }
 
   /// Hủy ghi danh MỘT sinh viên khỏi môn học
-  Future<void> unenrollStudent(String courseCode, String studentUid) async {
+  Future<void> unenrollStudent(String courseCode, String studentId) async {
     final snapshot = await _db
         .collection('enrollments')
         .where('courseCode', isEqualTo: courseCode)
-        .where('studentUid', isEqualTo: studentUid)
+        .where('studentId', isEqualTo: studentId)
         .limit(1)
         .get();
 
@@ -746,13 +746,13 @@ class AdminService {
     };
 
     for (final email in emails) {
-      final studentUid = studentMap[email];
-      if (studentUid != null) {
+      final studentId = studentMap[email];
+      if (studentId != null) {
         // Tạo một document mới trong collection 'enrollments'
         final docRef = _db.collection('enrollments').doc();
         batch.set(docRef, {
           'courseCode': courseCode,
-          'studentUid': studentUid,
+          'studentId': studentId,
           'joinDate': Timestamp.now().toDate(),
         });
         successEmails.add(email);
@@ -925,18 +925,18 @@ class AdminService {
   // === Thêm enrollment (bỏ qua nếu đã tồn tại) ===
   Future<void> addEnrollment({
     required String courseCode,
-    required String studentUid,
+    required String studentId,
   }) async {
     final q = await _db
         .collection('enrollments')
         .where('courseCode', isEqualTo: courseCode)
-        .where('studentUid', isEqualTo: studentUid)
+        .where('studentId', isEqualTo: studentId)
         .limit(1)
         .get();
     if (q.docs.isNotEmpty) return;
     await _db.collection('enrollments').add({
       'courseCode': courseCode,
-      'studentUid': studentUid,
+      'studentId': studentId,
       'joinDate': Timestamp.now().toDate(),
     });
   }
