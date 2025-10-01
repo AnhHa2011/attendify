@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/class_session.dart';
 import '../../services/lecturer_service.dart';
-import 'leave_requests_page.dart';
+import 'lecturer_leave_approval_page.dart';
 import 'lecturer_schedule_screen.dart';
 import 'lecturer_courses_page.dart';
 import 'schedule/lecturer_schedule_page.dart';
@@ -338,7 +338,7 @@ class _LecturerDashboardState extends State<LecturerDashboard> {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const LeaveRequestsPage(),
+                  builder: (context) => const LecturerLeaveApprovalPage(),
                 ),
               ),
             ),

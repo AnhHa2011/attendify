@@ -1,13 +1,12 @@
 // lib/features/lecturer/presentation/pages/lecturer_layout.dart
 import 'package:attendify/features/lecturer/lecturer_module.dart';
-import 'package:attendify/features/lecturer/presentation/pages/course_page.dart';
-import 'package:attendify/features/lecturer/presentation/pages/leave_requests_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/providers/auth_provider.dart';
 import '../../../../core/presentation/layouts/role_layout.dart';
 import '../../../courses/presentation/pages/course_list_page.dart';
+import 'lecturer_leave_approval_page.dart';
 
 class LecturerLayout extends StatelessWidget {
   const LecturerLayout({super.key});
@@ -52,7 +51,7 @@ class LecturerLayout extends StatelessWidget {
     final pages = const [
       LecturerDashboard(),
       CourseListPage(),
-      LeaveRequestsPage(),
+      LecturerLeaveApprovalPage(),
       LecturerProfilePage(),
     ];
 
