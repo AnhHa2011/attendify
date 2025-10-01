@@ -1,14 +1,12 @@
 // lib/features/admin/presentation/pages/admin_course_detail_page.dart
 import 'package:attendify/core/data/models/course_model.dart';
+import 'package:attendify/features/admin/presentation/pages/course_management/enrollment_bulk_import_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../../core/data/models/attendance_model.dart';
-import '../../../../../core/data/models/enrollment_model.dart';
-import '../../../../../core/data/models/leave_request_model.dart';
 import '../../../../../core/data/models/rich_course_model.dart';
 import '../../../../../core/data/models/session_model.dart';
 import '../../../../../core/data/models/user_model.dart';
@@ -289,6 +287,15 @@ class AdminCourseDetailPage extends StatelessWidget {
                             innerContext,
                             adminSvc,
                             courseInfo.id,
+                          );
+                        }
+                        if (value == 'import_file') {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => CourseEnrollmentBulkImportPage(
+                                course: courseInfo,
+                              ),
+                            ),
                           );
                         }
                       },

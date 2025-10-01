@@ -6,6 +6,7 @@ import '../../../../../core/data/models/class_model.dart';
 import '../../../../../core/data/models/user_model.dart';
 import '../../../../../core/data/services/class_service.dart';
 import '../../../data/services/admin_service.dart';
+import 'enrollment_bulk_import_page.dart';
 
 class AdminClassDetailPage extends StatelessWidget {
   final String classCode;
@@ -83,11 +84,20 @@ class AdminClassDetailPage extends StatelessWidget {
                   if (value == 'add_single') {
                     _showAddStudentDialog(context, adminSvc, classInfo.id);
                   }
+                  if (value == 'import_file') {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ClassEnrollmentBulkImportPage(
+                          classModel: classInfo,
+                        ),
+                      ),
+                    );
+                  }
                 },
               ),
               const SizedBox(height: 8),
               StreamBuilder<List<UserModel>>(
-                stream: adminSvc.getEnrolledStudentsStream(classInfo.id),
+                stream: adminSvc.getClassEnrolledStudentsStream(classInfo.id),
                 builder: (context, studentSnap) {
                   if (studentSnap.connectionState == ConnectionState.waiting) {
                     return const Center(child: LinearProgressIndicator());
@@ -127,8 +137,11 @@ class AdminClassDetailPage extends StatelessWidget {
                               Icons.person_remove_outlined,
                               color: Colors.redAccent,
                             ),
-                            onPressed: () async => await adminSvc
-                                .unenrollStudent(classInfo.id, student.uid),
+                            onPressed: () async =>
+                                await adminSvc.unenrollClassStudent(
+                                  classInfo.id,
+                                  student.uid,
+                                ),
                             tooltip: 'Xoá khỏi lớp',
                           ),
                         );
@@ -213,7 +226,7 @@ class AdminClassDetailPage extends StatelessWidget {
     try {
       final allStudents = await adminSvc.getAllStudentsStream().first;
       final enrolledStudents = await adminSvc
-          .getEnrolledStudentsStream(classCode)
+          .getClassEnrolledStudentsStream(classCode)
           .first;
       final enrolledStudentIds = enrolledStudents.map((s) => s.uid).toSet();
       final availableStudents = allStudents
@@ -259,7 +272,7 @@ class AdminClassDetailPage extends StatelessWidget {
                     : () async {
                         if (selectedStudentId != null) {
                           try {
-                            await adminSvc.enrollSingleStudent(
+                            await adminSvc.enrollClassSingleStudent(
                               classCode,
                               selectedStudentId!,
                             );

@@ -1,30 +1,28 @@
-// lib/core/data/models/enrollment_model.dart
-
 import 'package:attendify/app_imports.dart';
 
-class EnrollmentModel {
+class ClassEnrollmentModel {
   final String studentId;
   final DateTime joinDate;
-  final String courseCode;
+  final String classCode;
 
-  EnrollmentModel({
+  ClassEnrollmentModel({
     required this.studentId,
     required this.joinDate,
-    required this.courseCode,
+    required this.classCode,
   });
 
-  factory EnrollmentModel.fromMap(Map<String, dynamic> map) {
-    return EnrollmentModel(
+  factory ClassEnrollmentModel.fromMap(Map<String, dynamic> map) {
+    return ClassEnrollmentModel(
       studentId: map['studentId'],
       joinDate: map['joinDate'],
-      courseCode: map['courseCode'],
+      classCode: map['classCode'],
     );
   }
-  factory EnrollmentModel.fromDoc(DocumentSnapshot doc) {
+  factory ClassEnrollmentModel.fromDoc(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    return EnrollmentModel(
+    return ClassEnrollmentModel(
       studentId: data['studentId'] ?? '',
-      courseCode: data['courseCode'] ?? '',
+      classCode: data['classCode'] ?? '',
       joinDate: (data['joinDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }

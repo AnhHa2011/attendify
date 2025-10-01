@@ -264,6 +264,52 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
+  Widget _buildStatCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const Spacer(),
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatsGrid() {
     return StreamBuilder<List<UserModel>>(
       stream: context.read<AdminService>().getAllLecturersStream(),
@@ -281,77 +327,57 @@ class _AdminDashboardState extends State<AdminDashboard>
                 // Responsive layout
                 return LayoutBuilder(
                   builder: (context, constraints) {
-                    // Tính toán responsive dựa trên chiều rộng màn hình
-                    final screenWidth = MediaQuery.of(context).size.width;
-                    final isSmallScreen = screenWidth < 400;
-
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Tổng quan',
-                          style: Theme.of(context).textTheme.titleLarge
+                          'Thống kê tổng quan',
+                          style: Theme.of(context).textTheme.headlineSmall
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
-                        GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
+                        Row(
                           children: [
-                            _buildGlassCard(
-                              title: 'Giảng viên',
-                              value: '${lecturers.length}',
-                              icon: Icons.person_outline_rounded,
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.blue.shade400,
-                                  Colors.blue.shade600,
-                                ],
+                            Expanded(
+                              child: _buildStatCard(
+                                title: 'Tổng giảng viên',
+                                value: lecturers.length.toString(),
+                                icon: Icons.person_outline_rounded,
+                                color: Colors.blue,
                               ),
-                              delay: const Duration(milliseconds: 100),
-                              isSmallScreen: isSmallScreen,
                             ),
-                            _buildGlassCard(
-                              title: 'Sinh viên',
-                              value: '${students.length}',
-                              icon: Icons.groups_rounded,
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.green.shade400,
-                                  Colors.green.shade600,
-                                ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildStatCard(
+                                title: 'Tổng sinh viên',
+                                value: students.length.toString(),
+                                icon: Icons.people,
+                                color: Colors.green,
                               ),
-                              delay: const Duration(milliseconds: 200),
-                              isSmallScreen: isSmallScreen,
                             ),
-                            _buildGlassCard(
-                              title: 'Môn học',
-                              value: '${courses.length}',
-                              icon: Icons.school_rounded,
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.orange.shade400,
-                                  Colors.orange.shade600,
-                                ],
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildStatCard(
+                                title: 'Môn học',
+                                value: courses.length.toString(),
+                                icon: Icons.school_rounded,
+                                color: Colors.orange,
                               ),
-                              delay: const Duration(milliseconds: 300),
-                              isSmallScreen: isSmallScreen,
                             ),
-                            _buildGlassCard(
-                              title: 'Hoạt động',
-                              value: '${(courses.length * 0.85).round()}%',
-                              icon: Icons.trending_up_rounded,
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.purple.shade400,
-                                  Colors.purple.shade600,
-                                ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildStatCard(
+                                title: 'Hoạt động',
+                                value: (courses.length * 0.85)
+                                    .round()
+                                    .toString(),
+                                icon: Icons.schedule,
+                                color: Colors.purple,
                               ),
-                              delay: const Duration(milliseconds: 400),
-                              isSmallScreen: isSmallScreen,
                             ),
                           ],
                         ),
@@ -367,254 +393,117 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
+  Widget _buildQuickActions() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Thao tác nhanh',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              children: [
+                _buildActionCard(
+                  title: 'Tạo tài khoản',
+                  icon: Icons.person_add_rounded,
+                  color: Colors.blue,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const UserFormPage(),
+                    ),
+                  ),
+                ),
+                _buildActionCard(
+                  title: 'Tạo môn học',
+                  icon: Icons.menu_book_rounded,
+                  color: Colors.green,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CourseFormPage(),
+                    ),
+                  ),
+                ),
+                _buildActionCard(
+                  title: 'Tạo lớp học',
+                  icon: Icons.school_rounded,
+                  color: Colors.orange,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ClassFormPage(),
+                    ),
+                  ),
+                ),
+                _buildActionCard(
+                  title: 'Import môn học',
+                  icon: Icons.upload_file_rounded,
+                  color: Colors.purple,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CourseImportPage(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildActionCard({
     required String title,
-    required String subTitle,
     required IconData icon,
-    required LinearGradient gradient,
-    required Duration delay,
-    required bool isSmallScreen,
-    VoidCallback? onTap,
+    required Color color,
+    required VoidCallback onTap,
   }) {
-    return TweenAnimationBuilder(
-      duration: const Duration(milliseconds: 800),
-      tween: Tween<double>(begin: 0, end: 1),
-      builder: (context, double animation, child) {
-        return Transform.translate(
-          offset: Offset(0, 30 * (1 - animation)),
-          child: Transform.scale(
-            scale: 0.8 + (0.2 * animation),
-            child: Opacity(
-              opacity: animation,
-              child: InkWell(
-                onTap: onTap,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: gradient,
-                    borderRadius: BorderRadius.circular(
-                      isSmallScreen ? 12 : 20,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: gradient.colors.first.withOpacity(0.3),
-                        blurRadius: isSmallScreen ? 8 : 15,
-                        offset: Offset(0, isSmallScreen ? 4 : 8),
-                      ),
-                    ],
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(
-                        isSmallScreen ? 12 : 20,
-                      ),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withOpacity(0.1),
-                          Colors.white.withOpacity(0.05),
-                        ],
-                      ),
-                    ),
-                    padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
-                    child: isSmallScreen
-                        ? SmallScreenQuickAction(
-                            icon: icon,
-                            title: title,
-                            subTitle: subTitle,
-                          )
-                        : LargeScreenQuickAction(
-                            icon: icon,
-                            subTitle: subTitle,
-                            title: title,
-                          ),
-                  ),
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min, // ← quan trọng
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: Icon(icon, color: color, size: 32),
               ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildGlassCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required LinearGradient gradient,
-    required Duration delay,
-    required bool isSmallScreen,
-    VoidCallback? onTap,
-  }) {
-    return TweenAnimationBuilder(
-      duration: const Duration(milliseconds: 800),
-      tween: Tween<double>(begin: 0, end: 1),
-      builder: (context, double animation, child) {
-        return Transform.translate(
-          offset: Offset(0, 30 * (1 - animation)),
-          child: Transform.scale(
-            scale: 0.8 + (0.2 * animation),
-            child: Opacity(
-              opacity: animation,
-              child: GestureDetector(
-                onTap: onTap,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: gradient,
-                    borderRadius: BorderRadius.circular(
-                      isSmallScreen ? 12 : 20,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: gradient.colors.first.withOpacity(0.3),
-                        blurRadius: isSmallScreen ? 8 : 15,
-                        offset: Offset(0, isSmallScreen ? 4 : 8),
-                      ),
-                    ],
-                  ),
-                  child: Container(
-                    height: 50,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(
-                        isSmallScreen ? 12 : 20,
-                      ),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withOpacity(0.1),
-                          Colors.white.withOpacity(0.05),
-                        ],
-                      ),
-                    ),
-                    padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
-                    child: isSmallScreen
-                        ? SmallScreenContent(
-                            icon: icon,
-                            value: value,
-                            title: title,
-                            onTap: onTap,
-                          )
-                        : LargeScreenContent(
-                            icon: icon,
-                            value: value,
-                            title: title,
-                            onTap: onTap,
-                          ),
-                  ),
-                ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
               ),
-            ),
+            ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildQuickActions() {
-    return TweenAnimationBuilder(
-      duration: const Duration(milliseconds: 800),
-      tween: Tween<double>(begin: 0, end: 1),
-      builder: (context, double animation, child) {
-        return Transform.translate(
-          offset: Offset(0, 30 * (1 - animation)),
-          child: Transform.scale(
-            scale: 0.8 + (0.2 * animation),
-            child: Opacity(
-              opacity: animation,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final screenWidth = MediaQuery.of(context).size.width;
-                  final isSmallScreen = screenWidth < 400;
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Thao tác nhanh',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        children: [
-                          _buildActionCard(
-                            title: 'Tạo tài khoản',
-                            subTitle: 'Thêm user mới',
-                            icon: Icons.person_add_rounded,
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.blue.shade400,
-                                Colors.blue.shade600,
-                              ],
-                            ),
-                            // ✅ FIX: Navigation function thay vì Widget
-                            onTap: () => _navigateToUserForm(context),
-                            delay: const Duration(milliseconds: 100),
-                            isSmallScreen: isSmallScreen,
-                          ),
-                          _buildActionCard(
-                            title: 'Tạo môn học',
-                            subTitle: 'Thêm 1 môn học',
-                            icon: Icons.menu_book_rounded,
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.green.shade400,
-                                Colors.green.shade600,
-                              ],
-                            ),
-                            // ✅ FIX: Navigation function
-                            onTap: () => _navigateToCourseForm(context),
-                            delay: const Duration(milliseconds: 200),
-                            isSmallScreen: isSmallScreen,
-                          ),
-                          _buildActionCard(
-                            title: 'Tạo lớp học',
-                            subTitle: 'Thêm 1 lớp học',
-                            icon: Icons.school_rounded,
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.orange.shade400,
-                                Colors.orange.shade600,
-                              ],
-                            ),
-                            // ✅ FIX: Navigation function
-                            onTap: () => _navigateToClassForm(context),
-                            delay: const Duration(milliseconds: 300),
-                            isSmallScreen: isSmallScreen,
-                          ),
-                          _buildActionCard(
-                            title: 'Import môn học',
-                            subTitle: 'Từ file EXCEL',
-                            icon: Icons.upload_file_rounded,
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.purple.shade400,
-                                Colors.purple.shade600,
-                              ],
-                            ),
-                            // ✅ FIX: Navigation function
-                            onTap: () => _navigateToCourseImport(context),
-                            delay: const Duration(milliseconds: 400),
-                            isSmallScreen: isSmallScreen,
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -705,12 +594,7 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 }
 
-void _navigateToUserForm(BuildContext context) {
-  Navigator.push(
-    context,
-    MaterialPageRoute(builder: (context) => const UserFormPage()),
-  );
-}
+void _navigateToUserForm(BuildContext context) {}
 
 void _navigateToCourseForm(BuildContext context) {
   Navigator.push(
@@ -727,8 +611,5 @@ void _navigateToClassForm(BuildContext context) {
 }
 
 void _navigateToCourseImport(BuildContext context) {
-  Navigator.push(
-    context,
-    MaterialPageRoute(builder: (context) => const CourseImportPage()),
-  );
+  ;
 }

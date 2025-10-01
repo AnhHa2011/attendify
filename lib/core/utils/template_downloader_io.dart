@@ -9,6 +9,7 @@ const _assetMap = {
   // 'class_enroll':
   //     'assets/templates/attendify_class_with_enrollments_template.xlsx',
   'user': 'assets/templates/user_import_template.xlsx',
+  'enrollment': 'assets/templates/enrollment_import_template.xlsx',
 };
 
 Future<void> download(String kind) async {

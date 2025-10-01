@@ -1,3 +1,5 @@
+import 'package:attendify/core/data/models/class_enrollment_model.dart';
+
 import '../../../../app_imports.dart';
 import '../../../../core/data/models/attendance_model.dart';
 import '../../../../core/data/models/course_schedule_model.dart';
@@ -266,7 +268,7 @@ class AdminService {
   }) async {
     final data =
         <String, dynamic>{
-          'classCode': classCode.trim().toUpperCase(),
+          'classCode': classCode.trim(),
           'className': className.trim(),
           'isArchived': isArchived,
           'minStudents': minStudents,
@@ -299,7 +301,7 @@ class AdminService {
     List<String>? enrolledStudents, // tuỳ nhu cầu cập nhật danh sách
   }) async {
     final data = <String, dynamic>{
-      if (classCode != null) 'classCode': classCode.trim().toUpperCase(),
+      if (classCode != null) 'classCode': classCode.trim(),
       if (className != null) 'className': className.trim(),
       if (isArchived != null) 'isArchived': isArchived,
       if (minStudents != null) 'minStudents': minStudents,
@@ -348,7 +350,7 @@ class AdminService {
   /// việc kiểm tra.
   Future<bool> isClassCodeTaken(String code, {String? currentclassCode}) async {
     // Luôn chuẩn hoá code trước khi query
-    final normalizedCode = code.trim().toUpperCase();
+    final normalizedCode = code.trim();
 
     Query query = _db
         .collection('classes')
@@ -378,7 +380,7 @@ class AdminService {
     String? currentcourseCode,
   }) async {
     // Luôn chuẩn hoá code trước khi query
-    final normalizedCode = code.trim().toUpperCase();
+    final normalizedCode = code.trim();
 
     Query query = _db
         .collection('courses')
@@ -668,6 +670,26 @@ class AdminService {
         );
   }
 
+  /// Lấy danh sách sinh viên ĐÃ CÓ trong một lớp học
+  Stream<List<UserModel>> getEnrolledClassStudentsStream(String classCode) {
+    return _db
+        .collection('class_enrollments')
+        .where('classCode', isEqualTo: classCode)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          if (snapshot.docs.isEmpty) return [];
+          final studentIds = snapshot.docs
+              .map((doc) => doc['studentId'] as String)
+              .toList();
+          final studentsSnapshot = await _db
+              .collection('users')
+              .where(FieldPath.documentId, whereIn: studentIds)
+              .get();
+          return studentsSnapshot.docs
+              .map((doc) => UserModel.fromDoc(doc))
+              .toList();
+        });
+  }
   // === THÊM MỚI: CÁC HÀM QUẢN LÝ VIỆC GHI DANH (ENROLLMENT) ===
 
   /// Lấy danh sách sinh viên ĐÃ CÓ trong một môn học
@@ -689,6 +711,65 @@ class AdminService {
               .map((doc) => UserModel.fromDoc(doc))
               .toList();
         });
+  }
+
+  /// Lấy danh sách sinh viên ĐÃ CÓ trong một lớp học
+  Stream<List<UserModel>> getClassEnrolledStudentsStream(String classCode) {
+    return _db
+        .collection('class_enrollments')
+        .where('classCode', isEqualTo: classCode)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          if (snapshot.docs.isEmpty) return [];
+          final studentIds = snapshot.docs
+              .map((doc) => doc['studentId'] as String)
+              .toList();
+          final studentsSnapshot = await _db
+              .collection('users')
+              .where(FieldPath.documentId, whereIn: studentIds)
+              .get();
+          return studentsSnapshot.docs
+              .map((doc) => UserModel.fromDoc(doc))
+              .toList();
+        });
+  }
+
+  /// Ghi danh MỘT sinh viên vào lớp học
+  Future<void> enrollClassSingleStudent(
+    String classCode,
+    String studentId,
+  ) async {
+    // Kiểm tra xem sinh viên đã có trong lớp chưa để tránh trùng lặp
+    final existing = await _db
+        .collection('class_enrollments')
+        .where('classCode', isEqualTo: classCode)
+        .where('studentId', isEqualTo: studentId)
+        .limit(1)
+        .get();
+
+    if (existing.docs.isNotEmpty) {
+      throw Exception('Sinh viên này đã có trong lớp học.');
+    }
+
+    await _db.collection('class_enrollments').add({
+      'classCode': classCode,
+      'studentId': studentId,
+      'joinDate': Timestamp.now().toDate(),
+    });
+  }
+
+  /// Hủy ghi danh MỘT sinh viên khỏi lớp học
+  Future<void> unenrollClassStudent(String classCode, String studentId) async {
+    final snapshot = await _db
+        .collection('class_enrollments')
+        .where('classCode', isEqualTo: classCode)
+        .where('studentId', isEqualTo: studentId)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isNotEmpty) {
+      await snapshot.docs.first.reference.delete();
+    }
   }
 
   /// Ghi danh MỘT sinh viên vào môn học
@@ -991,5 +1072,42 @@ class AdminService {
         .get();
 
     return snap.docs.map((doc) => LeaveRequestModel.fromDoc(doc)).toList();
+  }
+
+  Stream<List<ClassEnrollmentModel>> getAllClassEnrollmentsStream({
+    String? classCode, // nếu bạn vẫn lưu courseCode trong doc
+    String? studentId,
+  }) {
+    Query<Map<String, dynamic>> q = _db.collectionGroup('class_enrollments');
+
+    if (classCode != null && classCode.isNotEmpty) {
+      q = q.where('classCode', isEqualTo: classCode);
+    }
+    if (studentId != null && studentId.isNotEmpty) {
+      q = q.where('studentId', isEqualTo: studentId);
+    }
+
+    return q.snapshots().map((snap) {
+      return snap.docs.map((doc) => ClassEnrollmentModel.fromDoc(doc)).toList();
+    });
+  }
+
+  Stream<List<EnrollmentModel>> getAllEnrollmentsStream({
+    String? courseCode, // nếu bạn vẫn lưu courseCode trong doc
+    String? studentId,
+    bool orderByJoinDateDesc = true,
+  }) {
+    Query<Map<String, dynamic>> q = _db.collectionGroup('enrollments');
+
+    if (courseCode != null && courseCode.isNotEmpty) {
+      q = q.where('courseCode', isEqualTo: courseCode);
+    }
+    if (studentId != null && studentId.isNotEmpty) {
+      q = q.where('studentId', isEqualTo: studentId);
+    }
+
+    return q.snapshots().map((snap) {
+      return snap.docs.map((doc) => EnrollmentModel.fromDoc(doc)).toList();
+    });
   }
 }

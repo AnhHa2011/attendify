@@ -172,14 +172,15 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const CourseBulkImportPage()),
             );
-          } else if (value == 'bulk_enroll') {
-            // <<< TÍCH HỢP: Xử lý sự kiện cho mục menu mới
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const CourseEnrollmentsBulkImportPage(),
-              ),
-            );
           }
+          //  else if (value == 'bulk_enroll') {
+          //   // <<< TÍCH HỢP: Xử lý sự kiện cho mục menu mới
+          //   Navigator.of(context).push(
+          //     MaterialPageRoute(
+          //       builder: (_) => const CourseEnrollmentsBulkImportPage(),
+          //     ),
+          //   );
+          // }
         },
         itemBuilder: (context) => const [
           PopupMenuItem(

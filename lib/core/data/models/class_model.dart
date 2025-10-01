@@ -31,13 +31,33 @@ class ClassModel {
     this.description,
   });
 
+  /// NEW: Tạo đối tượng rỗng để dùng ở chỗ `firstWhere(..., orElse: () => ClassModel.empty())`
+  factory ClassModel.empty() => ClassModel(
+    id: '',
+    classCode: '',
+    className: '',
+    isArchived: false,
+    startYear: null,
+    endYear: null,
+    minStudents: 10,
+    maxStudents: 50,
+    enrolledStudents: const [],
+    description: null,
+  );
+
+  /// NEW: tiện ích kiểm tra rỗng
+  bool get isEmpty => id.isEmpty && classCode.isEmpty && className.isEmpty;
+
+  /// NEW: đối nghịch với isEmpty
+  bool get isNotEmpty => !isEmpty;
+
   factory ClassModel.fromDoc(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
     return ClassModel(
       id: doc.id,
       classCode: data['classCode'] ?? '',
       className: data['className'] ?? '',
-      isArchived: data['isArchived'] ?? false,
+      isArchived: (data['isArchived'] as bool?) ?? false,
 
       startYear: (data['startYear'] as num?)?.toInt(),
       endYear: (data['endYear'] as num?)?.toInt(),
@@ -45,7 +65,7 @@ class ClassModel {
       minStudents: (data['minStudents'] as num?)?.toInt() ?? 10,
       maxStudents: (data['maxStudents'] as num?)?.toInt() ?? 50,
 
-      enrolledStudents: List<String>.from(data['enrolledStudents'] ?? []),
+      enrolledStudents: List<String>.from(data['enrolledStudents'] ?? const []),
       description: data['description'],
     );
   }
@@ -55,13 +75,10 @@ class ClassModel {
       'classCode': classCode,
       'className': className,
       'isArchived': isArchived,
-
       'startYear': startYear,
       'endYear': endYear,
-
       'minStudents': minStudents,
       'maxStudents': maxStudents,
-
       'enrolledStudents': enrolledStudents,
       'description': description,
     };
@@ -84,10 +101,8 @@ class ClassModel {
       classCode: classCode ?? this.classCode,
       className: className ?? this.className,
       isArchived: isArchived ?? this.isArchived,
-
       startYear: startYear ?? this.startYear,
       endYear: endYear ?? this.endYear,
-
       minStudents: minStudents ?? this.minStudents,
       maxStudents: maxStudents ?? this.maxStudents,
       enrolledStudents: enrolledStudents ?? this.enrolledStudents,
@@ -96,7 +111,6 @@ class ClassModel {
   }
 
   bool get isEnrollmentOpen {
-    // Nếu quản lý theo năm: mở nếu còn slot và năm hiện tại nằm trong [startYear, endYear]
     final year = DateTime.now().year;
     final yearOk = (startYear == null && endYear == null)
         ? true

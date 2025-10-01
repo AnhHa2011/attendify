@@ -1,6 +1,4 @@
 import 'package:attendify/app_imports.dart' hide LeaveRequestStatus;
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/data/models/attendance_model.dart';
 import '../../../core/data/models/course_model.dart';
 import '../../../core/data/models/enrollment_model.dart';
@@ -8,7 +6,6 @@ import '../../../core/data/models/leave_request_model.dart';
 import '../models/class_session.dart';
 import '../models/attendance_record.dart';
 import 'notification_service.dart';
-import 'dart:math';
 
 class LecturerService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
