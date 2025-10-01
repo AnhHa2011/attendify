@@ -35,7 +35,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           content: Text('Đã gửi email đặt lại mật khẩu (nếu email tồn tại).'),
         ),
       );
-      context.go('/login');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
