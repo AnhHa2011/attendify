@@ -1,11 +1,25 @@
-// WIDGET CHO CHỨC NĂNG THAM GIA môn - Tối ưu cho mobile
 import 'package:attendify/features/student/presentation/pages/join_course_scanner_page.dart';
 
 import '../../../../app_imports.dart';
 import '../../../../core/data/services/courses_service.dart';
 
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
+    );
+  }
+}
+
 class JoinCoursePage extends StatefulWidget {
-  const JoinCoursePage();
+  const JoinCoursePage({
+    super.key,
+  }); // Sửa thành super.key cho phiên bản Flutter mới
 
   @override
   State<JoinCoursePage> createState() => _JoinCoursePageState();
@@ -142,6 +156,10 @@ class _JoinCoursePageState extends State<JoinCoursePage> {
                   // Text Field - Responsive
                   TextFormField(
                     controller: _codeController,
+                    // 1. Gợi ý bàn phím ở chế độ viết hoa
+                    textCapitalization: TextCapitalization.characters,
+                    // 2. Bắt buộc chuyển đổi văn bản thành chữ hoa
+                    inputFormatters: [UpperCaseTextFormatter()],
                     decoration: InputDecoration(
                       labelText: 'Mã tham gia',
                       hintText: 'Ví dụ: ABC123',
