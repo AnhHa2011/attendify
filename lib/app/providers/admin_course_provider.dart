@@ -7,8 +7,8 @@ class AdminCourseProvider extends ChangeNotifier {
   final CourseService _svc;
   AdminCourseProvider(this._svc);
 
-  Stream<List<CourseModel>> courseesOfLecturer(String lecturerUid) =>
-      _svc.coursesOfLecturer(lecturerUid);
+  Stream<List<CourseModel>> coursesOfLecturer(String lecturerId) =>
+      _svc.coursesOfLecturer(lecturerId);
 
   Stream<List<Map<String, String>>> lecturers() => _svc.lecturersStream();
 }

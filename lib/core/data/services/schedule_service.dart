@@ -80,18 +80,18 @@ class ScheduleService {
     return merged;
   }
 
-  // ---- Giảng viên: lấy courseCode từ 'coursees' rồi query 'sessions' theo courseCode ----
+  // ---- Giảng viên: lấy courseCode từ 'courses' rồi query 'sessions' theo courseCode ----
   Stream<List<Map<String, dynamic>>> lecturerSessions({
-    required String lecturerUid,
+    required String lecturerId,
     required DateTime from,
     required DateTime to,
   }) {
-    final courseesQ = _db
-        .collection('coursees')
-        .where('lecturerId', isEqualTo: lecturerUid)
+    final coursesQ = _db
+        .collection('courses')
+        .where('lecturerId', isEqualTo: lecturerId)
         .where('isArchived', isEqualTo: false);
 
-    return courseesQ.snapshots().asyncMap((clsSnap) async {
+    return coursesQ.snapshots().asyncMap((clsSnap) async {
       final courseCodes = clsSnap.docs.map((e) => e.id).toList();
       return _fetchByCourseCodes(courseCodes: courseCodes, from: from, to: to);
     });

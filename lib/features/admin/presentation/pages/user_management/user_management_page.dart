@@ -218,7 +218,7 @@ class _UserManagementPageState extends State<UserManagementPage>
         children: [
           _highlightSearchText(user.email),
           Text(
-            user.role.name,
+            user.role == UserRole.lecture ? 'Giảng viên' : 'Sinh viên',
             style: TextStyle(
               color: Theme.of(context).colorScheme.primary,
               fontWeight: FontWeight.w500,

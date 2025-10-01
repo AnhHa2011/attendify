@@ -457,7 +457,7 @@ class StudentService {
 
         // Lấy thông tin lớp học
         final courseDoc = await _firestore
-            .collection('coursees')
+            .collection('courses')
             .doc(courseCode)
             .get();
 

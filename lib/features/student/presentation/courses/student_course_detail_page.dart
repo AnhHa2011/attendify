@@ -1,4 +1,4 @@
-// lib/features/student/presentation/coursees/student_course_detail_page.dart
+// lib/features/student/presentation/courses/student_course_detail_page.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

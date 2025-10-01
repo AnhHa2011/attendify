@@ -78,9 +78,9 @@ class StudentCourseListPage extends StatelessWidget {
             );
           }
 
-          final richCoursees = snap.data ?? [];
+          final richCourses = snap.data ?? [];
 
-          if (richCoursees.isEmpty) {
+          if (richCourses.isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -132,10 +132,10 @@ class StudentCourseListPage extends StatelessWidget {
             },
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
-              itemCount: richCoursees.length,
+              itemCount: richCourses.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, i) {
-                final richCourse = richCoursees[i];
+                final richCourse = richCourses[i];
                 final courseInfo = richCourse.courseInfo;
                 final lecturer = richCourse.lecturer;
 

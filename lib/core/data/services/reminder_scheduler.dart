@@ -19,7 +19,7 @@ class ReminderScheduler {
 
     final sessions = isLecturer
         ? await scheduleService
-              .lecturerSessions(lecturerUid: uid, from: now, to: to)
+              .lecturerSessions(lecturerId: uid, from: now, to: to)
               .first
         : await scheduleService
               .studentSessions(studentId: uid, from: now, to: to)

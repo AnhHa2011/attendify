@@ -1,4 +1,4 @@
-// lib/presentation/pages/coursees/widgets/dynamic_qr_code_dialog.dart
+// lib/presentation/pages/courses/widgets/dynamic_qr_code_dialog.dart
 
 import 'dart:async';
 import 'package:flutter/material.dart';

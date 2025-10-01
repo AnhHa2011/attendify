@@ -40,7 +40,7 @@ class _SchedulePageState extends State<SchedulePage> {
     final range = _rangeFor(_view, _anchor);
     final stream = widget.isLecturer
         ? schedule.lecturerSessions(
-            lecturerUid: widget.currentUid,
+            lecturerId: widget.currentUid,
             from: range.start,
             to: range.end,
           )

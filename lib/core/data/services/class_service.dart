@@ -400,10 +400,10 @@ class ClassService {
         .map((s) => s.docs.map((d) => ClassModel.fromDoc(d)).toList());
   }
 
-  Stream<List<ClassModel>> classesOfLecturer(String lecturerUid) {
+  Stream<List<ClassModel>> classesOfLecturer(String lecturerId) {
     return _db
         .collection('classes')
-        .where('lecturerId', isEqualTo: lecturerUid)
+        .where('lecturerId', isEqualTo: lecturerId)
         // .orderBy('createdAt', descending: true)
         .snapshots()
         .map((s) => s.docs.map((d) => ClassModel.fromDoc(d)).toList());

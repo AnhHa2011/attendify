@@ -1,4 +1,4 @@
-// lib/features/coursees/presentation/pages/course_list_page.dart
+// lib/features/courses/presentation/pages/course_list_page.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -58,8 +58,8 @@ class CourseListPage extends StatelessWidget {
           if (snap.hasError) {
             return Center(child: Text('Đã xảy ra lỗi: ${snap.error}'));
           }
-          final richCoursees = snap.data ?? [];
-          if (richCoursees.isEmpty) {
+          final richCourses = snap.data ?? [];
+          if (richCourses.isEmpty) {
             return const Center(
               child: Text('Bạn chưa được phân công lớp nào.'),
             );
@@ -67,11 +67,11 @@ class CourseListPage extends StatelessWidget {
 
           return ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: richCoursees.length,
+            itemCount: richCourses.length,
             separatorBuilder: (_, __) =>
                 const Divider(height: 1, indent: 16, endIndent: 16),
             itemBuilder: (context, i) {
-              final richCourse = richCoursees[i];
+              final richCourse = richCourses[i];
               // Bóc tách dữ liệu để dễ sử dụng
               final courseInfo = richCourse.courseInfo;
 

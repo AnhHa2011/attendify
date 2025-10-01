@@ -8,7 +8,7 @@ class StudentCourseProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   StudentCourseProvider(this._svc);
 
-  Stream<List<CourseModel>> myEnrolledCoursees() {
+  Stream<List<CourseModel>> myEnrolledCourses() {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return const Stream.empty();
     return _svc.coursesOfStudent(uid);

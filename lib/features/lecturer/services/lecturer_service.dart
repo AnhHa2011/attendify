@@ -356,4 +356,96 @@ class LecturerService {
 
     return snap.docs.map((doc) => LeaveRequestModel.fromDoc(doc)).toList();
   }
+
+  /// Export lịch học sinh viên ra file ICS
+  Future<String> exportScheduleToICS(String studentId) async {
+    try {
+      // Lấy tất cả các lớp mà sinh viên tham gia
+      final enrollmentsQuery = await _firestore
+          .collection('enrollments')
+          .where('studentId', isEqualTo: studentId)
+          .get();
+
+      if (enrollmentsQuery.docs.isEmpty) {
+        throw Exception('Không có lớp học nào để xuất lịch');
+      }
+
+      final courseCodes = enrollmentsQuery.docs
+          .map((doc) => doc.data()['courseCode'] as String)
+          .toList();
+
+      // Lấy tất cả sessions của các lớp này
+      final List<Map<String, dynamic>> allSessions = [];
+
+      for (String courseCode in courseCodes) {
+        final sessionsQuery = await _firestore
+            .collection('sessions')
+            .where('courseCode', isEqualTo: courseCode)
+            .get();
+
+        for (var sessionDoc in sessionsQuery.docs) {
+          final sessionData = sessionDoc.data();
+          sessionData['sessionId'] = sessionDoc.id;
+          sessionData['courseCode'] = courseCode;
+          allSessions.add(sessionData);
+        }
+      }
+
+      // Tạo nội dung ICS
+      final buffer = StringBuffer();
+      buffer.writeln('BEGIN:VCALENDAR');
+      buffer.writeln('VERSION:2.0');
+      buffer.writeln('PRODID:-//Attendify//Student Schedule//EN');
+      buffer.writeln('CALSCALE:GREGORIAN');
+
+      for (var session in allSessions) {
+        final startTime = (session['startTime'] as Timestamp?)?.toDate();
+        final endTime = (session['endTime'] as Timestamp?)?.toDate();
+        final courseCode = session['courseCode'] as String;
+
+        if (startTime == null || endTime == null) continue;
+
+        // Lấy thông tin lớp học
+        final courseDoc = await _firestore
+            .collection('courses')
+            .doc(courseCode)
+            .get();
+
+        if (!courseDoc.exists) continue;
+
+        final courseData = courseDoc.data()!;
+        final courseName = courseData['courseName'] ?? '';
+        final room = session['room'] ?? '';
+
+        // Format datetime for ICS
+        String formatDateTime(DateTime dt) {
+          return dt
+                  .toUtc()
+                  .toIso8601String()
+                  .replaceAll('-', '')
+                  .replaceAll(':', '')
+                  .split('.')[0] +
+              'Z';
+        }
+
+        buffer.writeln('BEGIN:VEVENT');
+        buffer.writeln('UID:${session['sessionId']}@attendify.app');
+        buffer.writeln('DTSTAMP:${formatDateTime(DateTime.now())}');
+        buffer.writeln('DTSTART:${formatDateTime(startTime)}');
+        buffer.writeln('DTEND:${formatDateTime(endTime)}');
+        buffer.writeln('SUMMARY:$courseCode - $courseName');
+        if (room.isNotEmpty) {
+          buffer.writeln('LOCATION:$room');
+        }
+        buffer.writeln('DESCRIPTION:Buổi học lớp $courseName');
+        buffer.writeln('END:VEVENT');
+      }
+
+      buffer.writeln('END:VCALENDAR');
+
+      return buffer.toString();
+    } catch (e) {
+      throw Exception('Không thể xuất lịch học: $e');
+    }
+  }
 }

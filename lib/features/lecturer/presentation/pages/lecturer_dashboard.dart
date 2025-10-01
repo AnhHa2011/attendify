@@ -5,6 +5,7 @@ import '../../services/lecturer_service.dart';
 import 'leave_requests_page.dart';
 import 'lecturer_schedule_screen.dart';
 import 'lecturer_courses_page.dart';
+import 'schedule/lecturer_schedule_page.dart';
 import 'session_management_screen.dart';
 
 class LecturerDashboard extends StatefulWidget {
@@ -165,8 +166,8 @@ class _LecturerDashboardState extends State<LecturerDashboard> {
         const SizedBox(height: 24),
 
         // Upcoming Sessions
-        _buildUpcomingSessionsSection(upcomingSessions),
-        const SizedBox(height: 24),
+        // _buildUpcomingSessionsSection(upcomingSessions),
+        // const SizedBox(height: 24),
 
         // Today's Overview
         _buildTodayOverviewSection(data),
@@ -304,7 +305,7 @@ class _LecturerDashboardState extends State<LecturerDashboard> {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const LecturerScheduleScreen(),
+                  builder: (context) => const LecturerSchedulePage(),
                 ),
               ),
             ),

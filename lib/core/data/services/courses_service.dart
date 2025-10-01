@@ -510,10 +510,10 @@ class CourseService {
         .map((s) => s.docs.map((d) => CourseModel.fromDoc(d)).toList());
   }
 
-  Stream<List<CourseModel>> coursesOfLecturer(String lecturerUid) {
+  Stream<List<CourseModel>> coursesOfLecturer(String lecturerId) {
     return _db
         .collection('courses')
-        .where('lecturerId', isEqualTo: lecturerUid)
+        .where('lecturerId', isEqualTo: lecturerId)
         // .orderBy('createdAt', descending: true)
         .snapshots()
         .map((s) => s.docs.map((d) => CourseModel.fromDoc(d)).toList());

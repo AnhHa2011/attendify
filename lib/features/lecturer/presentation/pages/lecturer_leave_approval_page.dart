@@ -56,7 +56,7 @@ class _LecturerLeaveApprovalPageState extends State<LecturerLeaveApprovalPage> {
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
   // ====== Lấy danh sách lớp của GV (hỗ trợ 2 schema: lecturerId hoặc lecturers[]) ======
-  Stream<QuerySnapshot<Map<String, dynamic>>> _myCoursees() {
+  Stream<QuerySnapshot<Map<String, dynamic>>> _myCourses() {
     final uid = _uid;
     if (uid == null) return const Stream.empty();
 
@@ -108,7 +108,7 @@ class _LecturerLeaveApprovalPageState extends State<LecturerLeaveApprovalPage> {
           children: [
             // ========== Chọn lớp ==========
             StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _myCoursees(),
+              stream: _myCourses(),
               builder: (c, s) {
                 if (s.hasError) {
                   return Text(

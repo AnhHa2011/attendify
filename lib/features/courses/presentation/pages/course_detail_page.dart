@@ -1,4 +1,4 @@
-// lib/features/coursees/presentation/pages/course_detail_page.dart
+// lib/features/courses/presentation/pages/course_detail_page.dart
 import 'package:attendify/app_imports.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:qr_flutter/qr_flutter.dart';
