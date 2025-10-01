@@ -324,7 +324,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
                           leading: const Icon(Icons.event_note),
                           title: Text(session.title),
                           subtitle: Text(
-                            '${DateFormat('dd/MM/yyyy HH:mm').format(session.startTime)} - Trạng thái: ${session.status.name}',
+                            '${DateFormat('dd/MM/yyyy HH:mm').format(session.startTime)} - Trạng thái: ${session.statusDisplayName}',
                           ),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () {

@@ -1055,7 +1055,7 @@ class AdminService {
     String courseCode,
   ) async {
     final snap = await _db
-        .collection('attendances')
+        .collection('attendance')
         .where('courseCode', isEqualTo: courseCode)
         .get();
 

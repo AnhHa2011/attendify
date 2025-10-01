@@ -32,7 +32,7 @@ class LeaveRequestRemoteDataSource {
         .doc(req.courseCode)
         .collection('sessions')
         .doc(req.sessionId)
-        .collection('attendances')
+        .collection('attendance')
         .doc(req.studentId);
 
     if (approve) {

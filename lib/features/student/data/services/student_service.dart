@@ -108,7 +108,7 @@ class StudentService {
 
       // Lấy attendance records của sinh viên cho các session này
       final attendanceQuery = await _firestore
-          .collection('attendances')
+          .collection('attendance')
           .where('studentId', isEqualTo: studentId)
           .where('sessionId', whereIn: sessionIds)
           .get();
@@ -161,7 +161,7 @@ class StudentService {
   /// Lấy chi tiết lịch sử điểm danh của sinh viên
   Stream<List<StudentSessionDetail>> getAttendanceHistory(String studentId) {
     return _firestore
-        .collection('attendances')
+        .collection('attendance')
         .where('studentId', isEqualTo: studentId)
         .orderBy('timestamp', descending: true)
         .snapshots()
@@ -278,7 +278,7 @@ class StudentService {
             try {
               // Lấy thông tin điểm danh của sinh viên cho session này
               final attendanceQuery = await _firestore
-                  .collection('attendances')
+                  .collection('attendance')
                   .where('studentId', isEqualTo: studentId)
                   .where('sessionId', isEqualTo: sessionId)
                   .limit(1)
@@ -394,7 +394,7 @@ class StudentService {
 
       // Kiểm tra đã điểm danh chưa
       final attendanceQuery = await _firestore
-          .collection('attendances')
+          .collection('attendance')
           .where('sessionId', isEqualTo: sessionId)
           .where('studentId', isEqualTo: studentId)
           .limit(1)

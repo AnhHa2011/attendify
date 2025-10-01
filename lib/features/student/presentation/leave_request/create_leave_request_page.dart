@@ -27,6 +27,7 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   String? _sessionId;
   String? _sessionName;
   DateTime? _sessionDate;
+  final _cutoff = DateTime.now().subtract(const Duration(days: 7));
 
   bool _submitting = false;
 
@@ -41,15 +42,66 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   // ------------------------
   // 1) STREAM CÁC MÔN TỪ ENROLLMENTS → COURSES
   // ------------------------
+  // Stream<List<DocumentSnapshot>> _studentCoursesStream() async* {
+  //   final uid = _uid();
+  //   if (uid == null) {
+  //     yield [];
+  //     return;
+  //   }
+  //   final firestore = FirebaseFirestore.instance;
+
+  //   // Lấy các enrollments theo sinh viên
+  //   final enrollSnap = await firestore
+  //       .collection(FirestoreCollections.enrollments)
+  //       .where('studentId', isEqualTo: uid)
+  //       .get();
+
+  //   final courseCodes = enrollSnap.docs
+  //       .map((d) => (d.data()['courseCode'] as String?) ?? '')
+  //       .where((e) => e.isNotEmpty)
+  //       .toList();
+
+  //   if (courseCodes.isEmpty) {
+  //     yield [];
+  //     return;
+  //   }
+
+  //   // Firestore whereIn ≤ 10 → chia mẻ
+  //   final List<DocumentSnapshot> allCourses = [];
+  //   for (var i = 0; i < courseCodes.length; i += 10) {
+  //     final chunk = courseCodes.sublist(
+  //       i,
+  //       i + 10 > courseCodes.length ? courseCodes.length : i + 10,
+  //     );
+  //     final snap = await firestore
+  //         .collection(FirestoreCollections.courses)
+  //         .where(FieldPath.documentId, whereIn: chunk)
+  //         .get();
+  //     allCourses.addAll(snap.docs);
+  //   }
+
+  //   // sort theo tên hiển thị
+  //   allCourses.sort((a, b) {
+  //     final am = (a.data() as Map<String, dynamic>? ?? {});
+  //     final bm = (b.data() as Map<String, dynamic>? ?? {});
+  //     final an = (am['courseName'] ?? a.id).toString();
+  //     final bn = (bm['courseName'] ?? b.id).toString();
+  //     return an.toLowerCase().compareTo(bn.toLowerCase());
+  //   });
+
+  //   yield allCourses;
+  // }
+
   Stream<List<DocumentSnapshot>> _studentCoursesStream() async* {
     final uid = _uid();
     if (uid == null) {
       yield [];
       return;
     }
+
     final firestore = FirebaseFirestore.instance;
 
-    // Lấy các enrollments theo sinh viên
+    // Lấy enrollments theo sinh viên
     final enrollSnap = await firestore
         .collection(FirestoreCollections.enrollments)
         .where('studentId', isEqualTo: uid)
@@ -65,12 +117,12 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
       return;
     }
 
-    // Firestore whereIn ≤ 10 → chia mẻ
+    // Lấy thông tin course theo từng mẻ 10 docId
     final List<DocumentSnapshot> allCourses = [];
     for (var i = 0; i < courseCodes.length; i += 10) {
       final chunk = courseCodes.sublist(
         i,
-        i + 10 > courseCodes.length ? courseCodes.length : i + 10,
+        (i + 10 > courseCodes.length) ? courseCodes.length : i + 10,
       );
       final snap = await firestore
           .collection(FirestoreCollections.courses)
@@ -79,16 +131,49 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
       allCourses.addAll(snap.docs);
     }
 
-    // sort theo tên hiển thị
-    allCourses.sort((a, b) {
+    // Lọc: giữ course có >=1 session có startTime >= now - 7 ngày
+    final cutoffTs = Timestamp.fromDate(_cutoff);
+    final futures = allCourses.map((courseDoc) async {
+      final code = courseDoc.id;
+
+      // Top-level sessions
+      final topLevel = await firestore
+          .collection(FirestoreCollections.sessions)
+          .where('courseCode', isEqualTo: code)
+          .where('startTime', isGreaterThanOrEqualTo: cutoffTs)
+          .orderBy('startTime')
+          .limit(1)
+          .get();
+
+      if (topLevel.docs.isNotEmpty) return courseDoc;
+
+      // Fallback subcollection
+      final sub = await firestore
+          .collection(FirestoreCollections.courses)
+          .doc(code)
+          .collection('sessions')
+          .where('startTime', isGreaterThanOrEqualTo: cutoffTs)
+          .orderBy('startTime')
+          .limit(1)
+          .get();
+
+      return sub.docs.isNotEmpty ? courseDoc : null;
+    }).toList();
+
+    final filtered = (await Future.wait(
+      futures,
+    )).whereType<DocumentSnapshot>().toList();
+
+    // Sort theo tên cho đẹp
+    filtered.sort((a, b) {
       final am = (a.data() as Map<String, dynamic>? ?? {});
       final bm = (b.data() as Map<String, dynamic>? ?? {});
-      final an = (am['courseName'] ?? am['name'] ?? a.id).toString();
-      final bn = (bm['courseName'] ?? bm['name'] ?? b.id).toString();
+      final an = (am['courseName'] ?? a.id).toString();
+      final bn = (bm['courseName'] ?? b.id).toString();
       return an.toLowerCase().compareTo(bn.toLowerCase());
     });
 
-    yield allCourses;
+    yield filtered;
   }
 
   // ------------------------
@@ -172,7 +257,7 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
               );
               final data = (doc.data() as Map<String, dynamic>? ?? {});
               _courseName = data['courseName'].toString();
-              _courseCode = data['courseCode'].toString();
+              // _courseCode = data['courseCode'].toString();
               _lecturerId = data['lecturerId'].toString();
             });
           },

@@ -33,7 +33,7 @@ class AttendanceRemoteDS {
           .doc(classCode)
           .collection('sessions')
           .doc(s.id)
-          .collection('attendances')
+          .collection('attendance')
           .doc(studentId)
           .get();
       final att = AttendanceModel.fromMap(attSnap.data());
@@ -84,7 +84,7 @@ class AttendanceRemoteDS {
             .doc(classCode)
             .collection('sessions')
             .doc(s.id)
-            .collection('attendances')
+            .collection('attendance')
             .doc(studentId)
             .get();
 

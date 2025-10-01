@@ -1,4 +1,8 @@
 // lib/app.dart - Fixed
+import 'package:attendify/features/admin/admin_module.dart';
+import 'package:attendify/features/auth/presentation/pages/login_page.dart';
+import 'package:attendify/features/lecturer/lecturer_feature.dart';
+import 'package:attendify/features/student/presentation/pages/student_main.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -21,7 +25,7 @@ class AttendifyApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: _lightTheme,
             darkTheme: _darkTheme,
-            home: const _LoadingScreen(),
+            home: _getInitHome(auth),
           );
         }
 
@@ -44,6 +48,19 @@ class AttendifyApp extends StatelessWidget {
 
   String _getInitialRoute(AuthProvider auth) {
     return _getRoleMainRoute(auth.role);
+  }
+
+  Widget _getInitHome(AuthProvider auth) {
+    switch (auth.role) {
+      case UserRole.admin:
+        return AdminDashboard();
+      case UserRole.lecture:
+        return LecturerDashboard();
+      case UserRole.student:
+        return StudentMain();
+      default:
+        return LoginPage();
+    }
   }
 
   String _getRoleMainRoute(UserRole? role) {
