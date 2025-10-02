@@ -472,7 +472,6 @@ class AdminCourseDetailPage extends StatelessWidget {
     final locationCtrl = TextEditingController();
     final descriptionCtrl = TextEditingController();
     final durationCtrl = TextEditingController(text: '90');
-    final classCodeCtrl = TextEditingController();
 
     DateTime? selectedDate;
     TimeOfDay? selectedTime;
@@ -624,15 +623,6 @@ class AdminCourseDetailPage extends StatelessWidget {
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: classCodeCtrl,
-                        decoration: InputDecoration(
-                          labelText: 'Mã lớp (tùy chọn)',
-                          hintText: courseCode,
-                          helperText: 'Để trống nếu giống mã môn học',
-                        ),
                       ),
                     ],
                   ),
