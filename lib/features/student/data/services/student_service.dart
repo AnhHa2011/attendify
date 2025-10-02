@@ -91,13 +91,13 @@ class StudentService {
   /// Lấy thống kê điểm danh cho một lớp cụ thể
   Future<StudentAttendanceStats> getCourseAttendanceStats(
     String studentId,
-    String classCode,
+    String courseCode,
   ) async {
     try {
       // Lấy tất cả sessions của lớp
       final sessionsQuery = await _firestore
           .collection('sessions')
-          .where('classCode', isEqualTo: classCode)
+          .where('courseCode', isEqualTo: courseCode)
           .get();
 
       final sessionIds = sessionsQuery.docs.map((doc) => doc.id).toList();
