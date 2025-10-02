@@ -1,6 +1,5 @@
 // lib/features/admin/presentation/pages/admin_course_detail_page.dart
 import 'package:attendify/core/data/models/course_model.dart';
-import 'package:attendify/features/admin/presentation/pages/course_management/import/enrollment_bulk_import_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -14,6 +13,7 @@ import '../../../../../../core/data/services/courses_service.dart';
 import '../../../../../../core/data/services/session_service.dart';
 import '../../../../../attendance/export/export_attendance_excel_service.dart';
 import '../../../../data/services/admin_service.dart';
+import '../import/enrollment_bulk_import_page.dart';
 import '../import/course_sessions_bulk_import_page.dart';
 
 class AdminCourseDetailPage extends StatelessWidget {
@@ -478,6 +478,9 @@ class AdminCourseDetailPage extends StatelessWidget {
     TimeOfDay? selectedTime;
     SessionType selectedSessionType = SessionType.lecture;
 
+    // Biến để lưu trữ thông báo lỗi
+    String? dateOrTimeError;
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -491,7 +494,10 @@ class AdminCourseDetailPage extends StatelessWidget {
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start, // Canh lề cho text lỗi
                     children: [
+                      // ... (Các TextFormField khác giữ nguyên)
                       TextFormField(
                         controller: titleCtrl,
                         decoration: const InputDecoration(
@@ -558,6 +564,19 @@ class AdminCourseDetailPage extends StatelessWidget {
                           return null;
                         },
                       ),
+
+                      // === WIDGET HIỂN THỊ LỖI ===
+                      if (dateOrTimeError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            dateOrTimeError!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -627,53 +646,63 @@ class AdminCourseDetailPage extends StatelessWidget {
               ),
               FilledButton(
                 onPressed: () async {
-                  if (formKey.currentState!.validate() &&
-                      selectedDate != null &&
-                      selectedTime != null) {
-                    final duration = int.parse(durationCtrl.text);
-                    final startTime = DateTime(
-                      selectedDate!.year,
-                      selectedDate!.month,
-                      selectedDate!.day,
-                      selectedTime!.hour,
-                      selectedTime!.minute,
+                  final isFormValid = formKey.currentState!.validate();
+                  final isDateTimeSelected =
+                      selectedDate != null && selectedTime != null;
+
+                  if (!isFormValid || !isDateTimeSelected) {
+                    // Cập nhật state để hiển thị lỗi
+                    setDialogState(() {
+                      if (!isDateTimeSelected) {
+                        dateOrTimeError = 'Vui lòng chọn đầy đủ ngày và giờ.';
+                      }
+                    });
+                    return;
+                  }
+                  // Nếu tất cả đều hợp lệ, tiếp tục xử lý
+                  final duration = int.parse(durationCtrl.text);
+                  final startTime = DateTime(
+                    selectedDate!.year,
+                    selectedDate!.month,
+                    selectedDate!.day,
+                    selectedTime!.hour,
+                    selectedTime!.minute,
+                  );
+                  final endTime = startTime.add(Duration(minutes: duration));
+
+                  try {
+                    await sessionService.createSession(
+                      courseCode: courseCode,
+                      courseName: courseName,
+                      lecturerId: lecturer?.uid,
+                      lecturerName: lecturer?.displayName,
+                      title: titleCtrl.text.trim(),
+                      description: descriptionCtrl.text.trim().isEmpty
+                          ? null
+                          : descriptionCtrl.text.trim(),
+                      startTime: startTime,
+                      endTime: endTime,
+                      location: locationCtrl.text.trim(),
+                      type: selectedSessionType,
                     );
-                    final endTime = startTime.add(Duration(minutes: duration));
 
-                    try {
-                      await sessionService.createSession(
-                        courseCode: courseCode,
-                        courseName: courseName,
-                        lecturerId: lecturer?.uid,
-                        lecturerName: lecturer?.displayName,
-                        title: titleCtrl.text.trim(),
-                        description: descriptionCtrl.text.trim().isEmpty
-                            ? null
-                            : descriptionCtrl.text.trim(),
-                        startTime: startTime,
-                        endTime: endTime,
-                        location: locationCtrl.text.trim(),
-                        type: selectedSessionType,
+                    if (ctx.mounted) {
+                      Navigator.of(ctx).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Đã tạo buổi học thành công'),
+                          backgroundColor: Colors.green,
+                        ),
                       );
-
-                      if (ctx.mounted) {
-                        Navigator.of(ctx).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Đã tạo buổi học thành công'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Lỗi tạo buổi học: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
+                    }
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Lỗi tạo buổi học: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
                     }
                   }
                 },
