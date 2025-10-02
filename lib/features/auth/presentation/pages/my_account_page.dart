@@ -71,7 +71,10 @@ class _MyAccountPageState extends State<MyAccountPage> {
       await _svc.updatePhotoUrl(_photoCtl.text);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã lưu thông tin tài khoản.')),
+          const SnackBar(
+            content: Text('Đã lưu thông tin tài khoản.'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {

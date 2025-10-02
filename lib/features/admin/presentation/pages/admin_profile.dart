@@ -621,6 +621,7 @@ class _AdminProfileState extends State<AdminProfile>
                 const SnackBar(
                   content: Text('Đã lưu cài đặt thông báo'),
                   behavior: SnackBarBehavior.floating,
+                  backgroundColor: Colors.green,
                 ),
               );
             },

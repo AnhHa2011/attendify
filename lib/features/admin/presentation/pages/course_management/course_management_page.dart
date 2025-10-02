@@ -115,6 +115,7 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
                 ? 'Đã tải báo cáo (xem trong Downloads của trình duyệt)'
                 : 'Đã lưu báo cáo tại: $savedPath',
           ),
+          backgroundColor: Colors.green,
         ),
       );
 
