@@ -113,7 +113,7 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
           content: Text(
             savedPath == null
                 ? 'Đã tải báo cáo (xem trong Downloads của trình duyệt)'
-                : 'Đã lưu báo cáo: $savedPath',
+                : 'Đã lưu báo cáo tại: $savedPath',
           ),
         ),
       );
@@ -133,6 +133,23 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
         ),
       );
     }
+  }
+
+  String _normalize(String? s) {
+    if (s == null) return '';
+    final lower = s.toLowerCase();
+
+    // Bỏ dấu tiếng Việt nhanh gọn (không thêm dependency)
+    const viet =
+        'áàảãạăắằẳẵặâấầẩẫậđéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ';
+    const latn =
+        'aaaaaaaaaaaaaaaaadeeeeeeeeeeeiiiiiooooooooooooooouuuuuuuuuuyyyyy';
+    final map = {for (var i = 0; i < viet.length; i++) viet[i]: latn[i]};
+    final sb = StringBuffer();
+    for (final ch in lower.characters) {
+      sb.write(map[ch] ?? ch);
+    }
+    return sb.toString();
   }
 
   @override
@@ -233,6 +250,9 @@ class _CourseManagementPageState extends State<CourseManagementPage> {
                   return c.courseName.toLowerCase().contains(query) ||
                       c.courseCode.toLowerCase().contains(query) ||
                       (c.lecturerId?.toLowerCase() ?? '').contains(query) ||
+                      (c.lecturerDisplayName?.toLowerCase() ?? '').contains(
+                        query,
+                      ) ||
                       (c.semester ?? '').toLowerCase().contains(query);
                 }).toList();
 

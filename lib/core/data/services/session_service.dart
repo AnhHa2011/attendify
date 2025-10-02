@@ -830,4 +830,27 @@ class SessionService {
           .length,
     };
   }
+
+  Future<List<SessionModel>> fetchLecturerSessionsInRange({
+    required String lecturerId,
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    // Nếu bạn index theo lecturerId + startTime, tách query theo ngày/tháng nếu cần.
+    final snap = await _db
+        .collection('sessions')
+        .where('lecturerId', isEqualTo: lecturerId)
+        .where('startTime', isLessThan: end)
+        .get();
+
+    // Lọc tiếp ở client cho điều kiện thời gian (vì Firestore limit where range)
+    final list = snap.docs
+        .map((d) => SessionModel.fromDoc(d))
+        .where(
+          (s) => s.endTime.isAfter(start),
+        ) // overlap condition: start < existing.end && existing.start < end
+        .toList();
+
+    return list;
+  }
 }

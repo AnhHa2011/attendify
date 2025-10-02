@@ -218,6 +218,32 @@ class SessionModel {
       attendanceStatus: attendanceStatus ?? this.attendanceStatus,
     );
   }
+
+  factory SessionModel.empty() {
+    final now = DateTime.now();
+    return SessionModel(
+      id: '',
+      courseCode: '',
+      classCode: '',
+      courseName: '',
+      lecturerId: '',
+      lecturerName: '',
+      title: '',
+      description: null,
+      startTime: now,
+      endTime: now.add(const Duration(hours: 1)),
+      location: '',
+      type: SessionType.lecture,
+      status: SessionStatus.scheduled,
+      createdAt: now,
+      updatedAt: null,
+      totalStudents: 0,
+      attendedStudents: 0,
+      isOpen: false,
+      qrCode: null,
+      attendanceStatus: const {},
+    );
+  }
 }
 
 // ===== UI helpers =====

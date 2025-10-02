@@ -953,7 +953,7 @@ class AdminCourseDetailPage extends StatelessWidget {
           content: Text(
             savedPath == null
                 ? 'Đã tải báo cáo (xem trong thư mục Downloads của trình duyệt)'
-                : 'Đã lưu báo cáo: $savedPath',
+                : 'Đã lưu báo cáo tại: $savedPath',
           ),
         ),
       );

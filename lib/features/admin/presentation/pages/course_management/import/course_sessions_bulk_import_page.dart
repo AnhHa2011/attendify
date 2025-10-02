@@ -255,6 +255,127 @@ class _CourseSessionsBulkImportPageState
     }
   }
 
+  // Parse date+time từ một dòng
+  ({DateTime start, DateTime end}) _parseRowDateTimes(_SessionRowState r) {
+    final parts = r.date.split('/');
+    final d = int.parse(parts[0]);
+    final m = int.parse(parts[1]);
+    final y = int.parse(parts[2]);
+    final s = r.startTime.split(':'), e = r.endTime.split(':');
+    final start = DateTime(y, m, d, int.parse(s[0]), int.parse(s[1]));
+    final end = DateTime(y, m, d, int.parse(e[0]), int.parse(e[1]));
+    return (start: start, end: end);
+  }
+
+  bool _overlaps(
+    DateTime aStart,
+    DateTime aEnd,
+    DateTime bStart,
+    DateTime bEnd,
+  ) {
+    // overlap nếu aStart < bEnd && bStart < aEnd
+    return aStart.isBefore(bEnd) && bStart.isBefore(aEnd);
+  }
+
+  // Lấy min/max thời gian của tất cả dòng hợp lệ (để query 1 phát)
+  ({DateTime minStart, DateTime maxEnd}) _minMaxRangeOfRows() {
+    DateTime? minS, maxE;
+    for (final r in _rows) {
+      try {
+        final dt = _parseRowDateTimes(r);
+        minS = (minS == null || dt.start.isBefore(minS!)) ? dt.start : minS;
+        maxE = (maxE == null || dt.end.isAfter(maxE!)) ? dt.end : maxE;
+      } catch (_) {
+        /* bỏ qua dòng lỗi format, sẽ bị validate chặn sau */
+      }
+    }
+    // fallback để tránh null
+    final now = DateTime.now();
+    return (minStart: minS ?? now, maxEnd: maxE ?? now);
+  }
+
+  // Đánh dấu lỗi trùng lịch cho các dòng (với DB và với nhau)
+  Future<int> _markLecturerConflicts(SessionService sessionService) async {
+    final lecturerId = widget.course.lecturerId;
+    if (lecturerId.isEmpty) {
+      // Không có lecturerId => bỏ qua kiểm tra (hoặc bạn có thể yêu cầu course luôn có lecturerId)
+      return 0;
+    }
+
+    // Chỉ xét các dòng "hợp lệ về format"
+    final candidates =
+        <({int idx, _SessionRowState row, DateTime start, DateTime end})>[];
+    for (var i = 0; i < _rows.length; i++) {
+      final r = _rows[i];
+      final err = _validateRow(r);
+      if (err == null) {
+        final dt = _parseRowDateTimes(r);
+        candidates.add((idx: i, row: r, start: dt.start, end: dt.end));
+      }
+    }
+    if (candidates.isEmpty) return 0;
+
+    final range = _minMaxRangeOfRows();
+
+    // 1) Lấy sessions của GV trong khoảng [minStart, maxEnd]
+    //    → CẦN có hàm trên SessionService, ví dụ: fetchLecturerSessionsInRange
+    final existing = await sessionService.fetchLecturerSessionsInRange(
+      lecturerId: lecturerId,
+      start: range.minStart,
+      end: range.maxEnd,
+    );
+    // existing: List<SessionModel>
+
+    // 2) Check trùng với DB
+    int conflictCount = 0;
+    for (final c in candidates) {
+      // Nếu đã có lỗi khác, không overwrite thông điệp (giữ lỗi đầu tiên)
+      if (c.row.error != null && c.row.status == _RowStatus.error) continue;
+
+      final hit = existing.firstWhere(
+        (ex) => _overlaps(c.start, c.end, ex.startTime, ex.endTime),
+        orElse: () => SessionModel.empty(),
+      );
+
+      if (SessionModel.empty() != hit) {
+        c.row.error =
+            'Trùng lịch GV với: ${hit.title} '
+            '(${_fmtTime(hit.startTime)}–${_fmtTime(hit.endTime)} '
+            '${_fmtDate(hit.startTime)})';
+        c.row.status = _RowStatus.error;
+        conflictCount++;
+      } else {
+        c.row.error = null; // clean nếu trước đó ok
+        c.row.status = _RowStatus.valid;
+      }
+    }
+
+    // 3) Check trùng giữa các dòng trong file
+    //    Dùng danh sách đã hợp lệ (và không trùng DB)
+    final accepted = <({int idx, DateTime start, DateTime end})>[];
+    for (final c in candidates) {
+      if (c.row.status == _RowStatus.error) continue; // đã conflict DB
+      // so với accepted trước đó
+      final selfClash = accepted.any(
+        (a) => _overlaps(c.start, c.end, a.start, a.end),
+      );
+      if (selfClash) {
+        c.row.error = 'Trùng lịch với một buổi khác trong file import';
+        c.row.status = _RowStatus.error;
+        conflictCount++;
+      } else {
+        accepted.add((idx: c.idx, start: c.start, end: c.end));
+      }
+    }
+
+    return conflictCount;
+  }
+
+  String _fmtDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  String _fmtTime(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
   // ---- Submit ----
   Future<void> _submit() async {
     if (_rows.isEmpty) return;
@@ -278,6 +399,27 @@ class _CourseSessionsBulkImportPageState
     });
 
     final sessionService = context.read<SessionService>();
+
+    // ===== NEW: kiểm tra trùng lịch giảng viên =====
+    try {
+      final conflicts = await _markLecturerConflicts(sessionService);
+      if (conflicts > 0) {
+        setState(() {
+          _submitting = false;
+          _message =
+              'Phát hiện $conflicts dòng trùng lịch giảng viên. '
+              'Vui lòng điều chỉnh thời gian rồi nhập lại.';
+        });
+        return;
+      }
+    } catch (e) {
+      setState(() {
+        _submitting = false;
+        _message = 'Lỗi khi kiểm tra trùng lịch giảng viên: $e';
+      });
+      return;
+    }
+    // ==============================================
 
     // Thống nhất khóa course (docId hay code). Đổi duy nhất ở đây:
     final String courseIdOrCode =

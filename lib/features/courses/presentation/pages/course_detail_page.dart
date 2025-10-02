@@ -156,7 +156,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
           content: Text(
             savedPath == null
                 ? 'Đã tải báo cáo (xem trong Downloads của trình duyệt)'
-                : 'Đã lưu báo cáo: $savedPath',
+                : 'Đã lưu báo cáo tại: $savedPath',
           ),
         ),
       );
