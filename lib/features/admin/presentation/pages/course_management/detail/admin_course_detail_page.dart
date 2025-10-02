@@ -1,19 +1,20 @@
 // lib/features/admin/presentation/pages/admin_course_detail_page.dart
 import 'package:attendify/core/data/models/course_model.dart';
-import 'package:attendify/features/admin/presentation/pages/course_management/enrollment_bulk_import_page.dart';
+import 'package:attendify/features/admin/presentation/pages/course_management/import/enrollment_bulk_import_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../../core/data/models/rich_course_model.dart';
-import '../../../../../core/data/models/session_model.dart';
-import '../../../../../core/data/models/user_model.dart';
-import '../../../../../core/data/services/courses_service.dart';
-import '../../../../../core/data/services/session_service.dart';
-import '../../../../attendance/export/export_attendance_excel_service.dart';
-import '../../../data/services/admin_service.dart';
+import '../../../../../../core/data/models/rich_course_model.dart';
+import '../../../../../../core/data/models/session_model.dart';
+import '../../../../../../core/data/models/user_model.dart';
+import '../../../../../../core/data/services/courses_service.dart';
+import '../../../../../../core/data/services/session_service.dart';
+import '../../../../../attendance/export/export_attendance_excel_service.dart';
+import '../../../../data/services/admin_service.dart';
+import '../import/course_sessions_bulk_import_page.dart';
 
 class AdminCourseDetailPage extends StatelessWidget {
   final String courseCode;
@@ -725,11 +726,11 @@ class AdminCourseDetailPage extends StatelessWidget {
           SimpleDialogOption(
             onPressed: () {
               Navigator.of(ctx).pop();
-              _showRecurringSessionForm(
-                context,
-                courseService,
-                courseInfo, // Sử dụng courseInfo đã lấy được
-                lecturer,
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      CourseSessionsBulkImportPage(course: courseInfo),
+                ),
               );
             },
             child: const ListTile(
@@ -738,216 +739,6 @@ class AdminCourseDetailPage extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showRecurringSessionForm(
-    BuildContext context,
-    CourseService courseService,
-    CourseModel courseInfo,
-    UserModel? lecturer,
-  ) {
-    // Kiểm tra điều kiện tiên quyết: Môn học phải có lịch học hàng tuần được định sẵn
-    if (courseInfo.schedules.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Không thể tạo lịch'),
-          content: const Text(
-            'Môn học này chưa có Lịch học hàng tuần (Thứ/Giờ) được thiết lập. '
-            'Vui lòng cập nhật thông tin môn học trước.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Đã hiểu'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    final formKey = GlobalKey<FormState>();
-    final titleCtrl = TextEditingController(text: courseInfo.courseName);
-    final locationCtrl = TextEditingController();
-    final durationCtrl = TextEditingController(text: '90');
-    final weeksCtrl = TextEditingController(
-      text: '15',
-    ); // Giả định 1 học kỳ 15 tuần
-
-    DateTime? semesterStartDate;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: const Text('Thêm lịch học hàng loạt'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Form(
-                key: formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextFormField(
-                        controller: titleCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Tiêu đề cơ bản của buổi học',
-                          hintText: 'Ví dụ: Lý thuyết Lập trình...',
-                        ),
-                        validator: (v) =>
-                            v!.trim().isEmpty ? 'Không được để trống' : null,
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: locationCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Địa điểm chung',
-                          hintText: 'Số phòng hoặc link online',
-                        ),
-                        validator: (v) =>
-                            v!.trim().isEmpty ? 'Không được để trống' : null,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: durationCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Thời lượng',
-                                suffixText: 'phút',
-                              ),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              validator: (v) {
-                                if (v!.trim().isEmpty) return 'Bắt buộc';
-                                if ((int.tryParse(v) ?? 0) <= 0) return '> 0';
-                                return null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextFormField(
-                              controller: weeksCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Số tuần',
-                                suffixText: 'tuần',
-                              ),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              validator: (v) {
-                                if (v!.trim().isEmpty) return 'Bắt buộc';
-                                if ((int.tryParse(v) ?? 0) <= 0) return '> 0';
-                                return null;
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.calendar_today),
-                        label: Text(
-                          semesterStartDate == null
-                              ? 'Chọn ngày bắt đầu học kỳ'
-                              : 'Bắt đầu từ: ${DateFormat('dd/MM/yyyy').format(semesterStartDate!)}',
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 40),
-                        ),
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: DateTime.now(),
-                            firstDate: DateTime(2023),
-                            lastDate: DateTime(2030),
-                          );
-                          if (date != null) {
-                            setDialogState(() => semesterStartDate = date);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Huỷ'),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  if (formKey.currentState!.validate() &&
-                      semesterStartDate != null) {
-                    // Hiển thị loading
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (c) =>
-                          const Center(child: CircularProgressIndicator()),
-                    );
-
-                    try {
-                      await courseService.createRecurringSessions(
-                        courseCode: courseInfo.id,
-                        baseTitle: titleCtrl.text.trim(),
-                        location: locationCtrl.text.trim(),
-                        durationInMinutes: int.parse(durationCtrl.text),
-                        numberOfWeeks: int.parse(weeksCtrl.text),
-                        weeklySchedules: courseInfo.schedules,
-                        semesterStartDate: semesterStartDate!,
-                      );
-
-                      if (context.mounted) {
-                        Navigator.of(context).pop(); // Đóng loading
-                        Navigator.of(ctx).pop(); // Đóng form dialog
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Đã tạo lịch học hàng loạt thành công!',
-                            ),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        Navigator.of(context).pop(); // Đóng loading
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Lỗi tạo lịch: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Vui lòng chọn ngày bắt đầu học kỳ.'),
-                        backgroundColor: Colors.orange,
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Tạo lịch'),
-              ),
-            ],
-          );
-        },
       ),
     );
   }

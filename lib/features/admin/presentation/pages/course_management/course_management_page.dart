@@ -10,10 +10,10 @@ import 'package:provider/provider.dart';
 import '../../../../../core/data/models/course_model.dart';
 import '../../../data/services/admin_service.dart';
 import '../../../domain/repositories/export/export_syllabus_pdf_service.dart';
-import 'course_bulk_import_page.dart';
-import 'course_enrollments_bulk_import_page.dart';
+import 'import/course_bulk_import_page.dart';
+import 'import/course_enrollments_bulk_import_page.dart';
 import 'course_form_page.dart';
-import 'admin_course_detail_page.dart';
+import 'detail/admin_course_detail_page.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:printing/printing.dart';
 

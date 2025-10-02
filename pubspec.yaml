@@ -88,6 +88,7 @@ flutter:
     - assets/templates/class_import_template.xlsx
     - assets/templates/course_import_template.xlsx
     - assets/templates/user_import_template.xlsx
+    - assets/templates/session_import_template.xlsx
 
   fonts:
     - family: Mali
