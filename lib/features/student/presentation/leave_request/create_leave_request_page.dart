@@ -180,10 +180,14 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   // 2) SESSIONS THEO MÔN
   //    Top-level: sessions.where(courseCode == _courseCode).orderBy(date)
   //    Fallback subcollection: courses/{courseCode}/sessions
+  // (Đã cập nhật để chỉ lấy các buổi học trong tương lai)
   // ------------------------
   Stream<QuerySnapshot<Map<String, dynamic>>> _sessionsByCourse(
     String courseCode,
   ) {
+    // Lấy thời gian hiện tại để làm mốc so sánh
+    final now = Timestamp.now();
+
     final col = FirebaseFirestore.instance
         .collection(FirestoreCollections.sessions)
         .withConverter<Map<String, dynamic>>(
@@ -192,6 +196,8 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
         );
     return col
         .where('courseCode', isEqualTo: courseCode)
+        // THÊM DÒNG NÀY: Chỉ lấy session có startTime >= thời gian hiện tại
+        .where('startTime', isGreaterThanOrEqualTo: now)
         .orderBy('startTime', descending: false)
         .snapshots();
   }
@@ -199,10 +205,15 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   Stream<QuerySnapshot<Map<String, dynamic>>> _sessionsSubOfCourse(
     String courseCode,
   ) {
+    // Lấy thời gian hiện tại để làm mốc so sánh
+    final now = Timestamp.now();
+
     return FirebaseFirestore.instance
         .collection(FirestoreCollections.courses)
         .doc(courseCode)
         .collection('sessions')
+        // THÊM DÒNG NÀY: Chỉ lấy session có startTime >= thời gian hiện tại
+        .where('startTime', isGreaterThanOrEqualTo: now)
         .orderBy('startTime', descending: false)
         .snapshots();
   }
