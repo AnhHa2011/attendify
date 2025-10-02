@@ -9,7 +9,6 @@ export 'services/notification_service.dart';
 
 // Screens
 export 'presentation/pages/lecturer_dashboard.dart';
-export 'presentation/pages/lecturer_schedule_screen.dart';
 export 'presentation/pages/lecturer_courses_page.dart';
 export 'presentation/pages/course_detail_page.dart';
 export 'presentation/pages/session_management_screen.dart';

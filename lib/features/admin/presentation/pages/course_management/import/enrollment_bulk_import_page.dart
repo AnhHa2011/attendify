@@ -246,7 +246,9 @@ class _CourseEnrollmentBulkImportPageState
         _fileName = null;
       });
     } catch (e) {
-      setState(() => _message = 'Lỗi: $e');
+      setState(
+        () => _message = 'Lỗi: ${e.toString().replaceFirst("Exception: ", "")}',
+      );
     } finally {
       setState(() => _submitting = false);
     }

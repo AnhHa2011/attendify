@@ -98,7 +98,11 @@ class _UpdateMyPassWordPageState extends State<UpdateMyPassWordPage> {
               children: [
                 const Icon(Icons.error_outline, color: Colors.white),
                 const SizedBox(width: 12),
-                Expanded(child: Text('Lỗi: ${e.toString()}')),
+                Expanded(
+                  child: Text(
+                    'Lỗi: ${e.toString().replaceFirst("Exception: ", "")}',
+                  ),
+                ),
               ],
             ),
             backgroundColor: Colors.red.shade600,

@@ -1,5 +1,6 @@
 // lib/features/lecturer/presentation/pages/lecturer_layout.dart
 import 'package:attendify/features/lecturer/lecturer_module.dart';
+import 'package:attendify/features/lecturer/presentation/pages/schedule/lecturer_schedule_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -17,7 +18,7 @@ class LecturerLayout extends StatelessWidget {
       RoleNavigationItem(
         icon: Icons.dashboard_outlined,
         activeIcon: Icons.dashboard_rounded,
-        label: 'Trang chủ',
+        label: 'Lịch dạy',
         gradient: LinearGradient(
           colors: [Colors.blue.shade400, Colors.blue.shade600],
         ),
@@ -49,7 +50,7 @@ class LecturerLayout extends StatelessWidget {
     ];
 
     final pages = const [
-      LecturerDashboard(),
+      LecturerSchedulePage(),
       CourseListPage(),
       LecturerLeaveApprovalPage(),
       LecturerProfilePage(),

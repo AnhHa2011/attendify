@@ -82,9 +82,13 @@ class _EditAccountPageState extends State<EditAccountPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Lỗi: ${e.toString().replaceFirst("Exception: ", "")}',
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);

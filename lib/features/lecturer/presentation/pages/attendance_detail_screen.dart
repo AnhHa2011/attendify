@@ -47,16 +47,20 @@ class _AttendanceDetailState extends State<AttendanceDetail>
         error = null;
       });
 
-      // Load attendance records and enrolled students in parallel
       final results = await Future.wait([
         _lecturerService.getSessionAttendance(widget.session.id).first,
         _loadEnrolledStudents(),
       ]);
 
-      final attendanceRecords = results[0] as List<AttendanceRecord>;
+      // --- NEW: chuẩn hoá dữ liệu attendance ---
+      final rawAttendance = results[0];
+      final List<AttendanceRecord> attendanceRecords = _normalizeAttendance(
+        rawAttendance,
+      );
+
       final enrolledStudents = results[1] as List<Map<String, dynamic>>;
 
-      // Create present students list
+      // Tạo danh sách có mặt
       final presentStudents = attendanceRecords
           .where((record) => record.isPresent)
           .map(
@@ -71,7 +75,7 @@ class _AttendanceDetailState extends State<AttendanceDetail>
           )
           .toList();
 
-      // Create absent students list (enrolled but not present)
+      // Vắng = ghi danh nhưng không xuất hiện trong present
       final presentStudentIds = presentStudents.map((s) => s['id']).toSet();
       final absentStudents = enrolledStudents
           .where((student) => !presentStudentIds.contains(student['id']))
@@ -94,6 +98,26 @@ class _AttendanceDetailState extends State<AttendanceDetail>
         });
       }
     }
+  }
+
+  /// Chuẩn hoá mọi kiểu trả về về List<AttendanceRecord>
+  List<AttendanceRecord> _normalizeAttendance(dynamic raw) {
+    if (raw is List<AttendanceRecord>) return raw;
+
+    if (raw is List) {
+      final out = <AttendanceRecord>[];
+      for (final e in raw) {
+        if (e is AttendanceRecord) {
+          out.add(e);
+        } else if (e is Map<String, dynamic>) {
+          out.add(AttendanceRecord.fromMap(e));
+        }
+        // kiểu khác thì bỏ qua
+      }
+      return out;
+    }
+
+    return const <AttendanceRecord>[];
   }
 
   Future<List<Map<String, dynamic>>> _loadEnrolledStudents() async {
@@ -221,11 +245,6 @@ class _AttendanceDetailState extends State<AttendanceDetail>
 
           // Statistics Cards
           _buildStatisticsCards(),
-
-          const SizedBox(height: 16),
-
-          // Attendance Rate Chart
-          _buildAttendanceChart(),
 
           const SizedBox(height: 16),
 
@@ -388,106 +407,6 @@ class _AttendanceDetailState extends State<AttendanceDetail>
               ),
             ),
             Text(title, style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAttendanceChart() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Biểu đồ điểm danh',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            // Simple progress bar representation
-            Row(
-              children: [
-                Expanded(
-                  flex: _presentStudents.length,
-                  child: Container(
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${_presentStudents.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (_absentStudents.isNotEmpty) ...[
-                  const SizedBox(width: 4),
-                  Expanded(
-                    flex: _absentStudents.length,
-                    child: Container(
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${_absentStudents.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text('Có mặt (${_presentStudents.length})'),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text('Vắng mặt (${_absentStudents.length})'),
-                  ],
-                ),
-              ],
-            ),
           ],
         ),
       ),

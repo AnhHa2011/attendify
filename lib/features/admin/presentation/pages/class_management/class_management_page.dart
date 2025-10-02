@@ -235,7 +235,12 @@ class _ClassManagementPageState extends State<ClassManagementPage> {
       } catch (e) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(
+              'Lỗi::${e.toString().replaceFirst("Exception: ", "")}',
+            ),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }

@@ -170,7 +170,7 @@ class LecturerService {
   // Get session attendance records
   Stream<List<AttendanceRecord>> getSessionAttendance(String sessionId) {
     return _firestore
-        .collection('attendance')
+        .collection('attendances')
         .where('sessionId', isEqualTo: sessionId)
         .orderBy('checkInTime', descending: true)
         .snapshots()
@@ -338,7 +338,7 @@ class LecturerService {
     String courseCode,
   ) async {
     final snap = await _firestore
-        .collection('attendance')
+        .collection('attendances')
         .where('courseCode', isEqualTo: courseCode)
         .get();
 

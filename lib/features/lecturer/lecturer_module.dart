@@ -14,7 +14,6 @@ export 'presentation/pages/session_management_screen.dart';
 export 'presentation/pages/attendance_detail_screen.dart';
 
 // Schedule & Export
-export 'presentation/pages/lecturer_schedule_screen.dart';
 export 'presentation/pages/attendance_export_screen.dart';
 
 // Leave Requests

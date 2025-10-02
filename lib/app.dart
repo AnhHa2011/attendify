@@ -2,6 +2,7 @@
 import 'package:attendify/features/admin/admin_module.dart';
 import 'package:attendify/features/auth/presentation/pages/login_page.dart';
 import 'package:attendify/features/lecturer/lecturer_feature.dart';
+import 'package:attendify/features/lecturer/lecturer_module.dart';
 import 'package:attendify/features/student/presentation/pages/student_main.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -55,7 +56,7 @@ class AttendifyApp extends StatelessWidget {
       case UserRole.admin:
         return AdminDashboard();
       case UserRole.lecture:
-        return LecturerDashboard();
+        return LecturerLayout();
       case UserRole.student:
         return StudentMain();
       default:
