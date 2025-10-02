@@ -344,9 +344,9 @@ class _CourseSessionsBulkImportPageState
 
       if (hit != null) {
         c.row.error =
-            'Trùng lịch GV với: ${hit.title} '
+            'GGiảng viên đã có lịch dạy lúc: ${hit.title} '
             '(${_fmtTime(hit.startTime)}–${_fmtTime(hit.endTime)} '
-            '${_fmtDate(hit.startTime)})';
+            '${_fmtDate(hit.startTime)}). Vui lòng chọn khoảng thời gian khác!';
         c.row.status = _RowStatus.error;
         conflictCount++;
       } else {
@@ -414,7 +414,7 @@ class _CourseSessionsBulkImportPageState
         setState(() {
           _submitting = false;
           _message =
-              'Lỗi: Phát hiện $conflicts dòng trùng lịch giảng viên. '
+              'Lỗi: Phát hiện $conflicts dòng trùng lịch dạy của giảng viên. '
               'Vui lòng điều chỉnh thời gian rồi nhập lại.';
         });
         return;

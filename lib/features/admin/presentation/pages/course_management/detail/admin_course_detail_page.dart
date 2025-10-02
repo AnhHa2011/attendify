@@ -733,9 +733,9 @@ class AdminCourseDetailPage extends StatelessWidget {
                       if (clash.id.isNotEmpty) {
                         setDialogState(() {
                           dateOrTimeError =
-                              'Trùng lịch giảng viên với: ${clash.title} '
+                              'Giảng viên đã có lịch dạy lúc: ${clash.title} '
                               '(${_fmtTime(clash.startTime)}–${_fmtTime(clash.endTime)} '
-                              '${_fmtDate(clash.startTime)})';
+                              '${_fmtDate(clash.startTime)}). Vui lòng chọn khoảng thời gian khác!';
                         });
                         return;
                       }

@@ -29,6 +29,32 @@ class ScheduleService {
     }).toList();
   }
 
+  Future<Map<String, String>> _getCourseNames(List<String> courseCodes) async {
+    if (courseCodes.isEmpty) return {};
+    // Firestore whereIn tối đa 10
+    final chunks = <List<String>>[];
+    for (var i = 0; i < courseCodes.length; i += 10) {
+      chunks.add(
+        courseCodes.sublist(
+          i,
+          (i + 10 > courseCodes.length) ? courseCodes.length : i + 10,
+        ),
+      );
+    }
+    final names = <String, String>{};
+    for (final ids in chunks) {
+      final snap = await _db
+          .collection('courses')
+          .where(FieldPath.documentId, whereIn: ids)
+          .get();
+      for (final d in snap.docs) {
+        final data = d.data();
+        names[d.id] = (data['courseName'] as String?)?.trim() ?? '';
+      }
+    }
+    return names;
+  }
+
   Future<List<Map<String, dynamic>>> _fetchByCourseCodes({
     required List<String> courseCodes,
     required DateTime from,
@@ -36,13 +62,13 @@ class ScheduleService {
   }) async {
     if (courseCodes.isEmpty) return [];
 
-    // Firestore whereIn tối đa 10
+    // tách whereIn 10 phần tử
     final chunks = <List<String>>[];
     for (var i = 0; i < courseCodes.length; i += 10) {
       chunks.add(
         courseCodes.sublist(
           i,
-          i + 10 > courseCodes.length ? courseCodes.length : i + 10,
+          (i + 10 > courseCodes.length) ? courseCodes.length : i + 10,
         ),
       );
     }
@@ -54,19 +80,19 @@ class ScheduleService {
           .collection('sessions')
           .where('courseCode', whereIn: ids)
           .where('startTime', isGreaterThanOrEqualTo: from)
-          .where('startTime', isLessThan: to) // < to để không trùng biên
+          .where('startTime', isLessThan: to)
           .orderBy('startTime');
 
       final snap = await q.get();
       results.addAll(_snapToList(snap));
     }
 
-    // Loại trùng theo id + sort theo startTime
-    final map = <String, Map<String, dynamic>>{};
+    // gộp tránh trùng
+    final byId = <String, Map<String, dynamic>>{};
     for (final s in results) {
-      map[s['id'] as String] = s;
+      byId[s['id'] as String] = s;
     }
-    final merged = map.values.toList()
+    final merged = byId.values.toList()
       ..sort((a, b) {
         final sa =
             (a['startTime'] as DateTime?) ??
@@ -76,6 +102,24 @@ class ScheduleService {
             DateTime.fromMillisecondsSinceEpoch(0);
         return sa.compareTo(sb);
       });
+
+    // === NEW: bù courseName nếu thiếu ===
+    final needNames = merged.any((m) {
+      final n = (m['courseName'] as String?)?.trim() ?? '';
+      return n.isEmpty;
+    });
+    if (needNames) {
+      final names = await _getCourseNames(courseCodes);
+      for (final m in merged) {
+        final current = (m['courseName'] as String?)?.trim() ?? '';
+        if (current.isEmpty) {
+          final code = (m['courseCode'] as String?) ?? '';
+          m['courseName'] =
+              names[code] ?? current; // nếu không có thì giữ nguyên
+        }
+      }
+    }
+    // ====================================
 
     return merged;
   }

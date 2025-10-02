@@ -23,11 +23,12 @@ class SessionTile extends StatelessWidget {
     final f = DateFormat('HH:mm');
     final subject = (session['title'] ?? 'Buổi học').toString();
     final room = (session['location'] ?? '').toString();
+    final courseName = (session['courseName'] as String?)?.trim();
 
     return ListTile(
       leading: const CircleAvatar(child: Icon(Icons.schedule)),
       title: Text(
-        '$subject • ${f.format(startTime)}–${f.format(endTime)}',
+        '${courseName?.isNotEmpty == true ? '$courseName - ' : ''} $subject • ${f.format(startTime)}–${f.format(endTime)}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
