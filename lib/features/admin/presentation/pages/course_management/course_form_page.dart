@@ -513,17 +513,12 @@ class _CourseFormPageState extends State<CourseFormPage> {
               TextFormField(
                 controller: _descriptionCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Ghi chú',
+                  labelText: 'Ghi chú (không bắt buộc)',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.tag),
-                  helperText: '',
+                  prefixIcon: Icon(Icons.description_outlined),
                 ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.deny(RegExp(r'\s')),
-                  UpperCaseTextFormatter(),
-                ],
-                validator: (v) =>
-                    v!.trim().isEmpty ? 'Không được để trống' : null,
+                maxLines: 3, // Cho phép nhập nhiều dòng
+                // Không cần validator và inputFormatters để cho phép nhập tự do
               ),
               const SizedBox(height: 16),
               TextFormField(
