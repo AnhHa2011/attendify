@@ -40,6 +40,60 @@ class LeaveRequestService {
         );
   }
 
+  /// Tạo đơn xin nghỉ mới (dành cho sinh viên)
+  Future<String> createLeaveRequest({
+    required String studentId,
+    required String studentName,
+    required String studentEmail,
+    String? courseCode,
+    String? courseName,
+    String? classCode,
+    String? className,
+    // sessionId là cần thiết để kiểm tra sự tồn tại của request
+    required String sessionId,
+    required String sessionTitle,
+    required DateTime sessionDate,
+    required String reason,
+    List<String> attachments = const [],
+  }) async {
+    // ---- START: THÊM LOGIC KIỂM TRA ----
+    // 1. Kiểm tra xem sinh viên đã tạo đơn cho buổi học này chưa
+    final bool requestExists = await hasLeaveRequestForSession(
+      studentId: studentId,
+      sessionId: sessionId,
+    );
+
+    // 2. Nếu đã tồn tại, không cho phép tạo mới và báo lỗi
+    if (requestExists) {
+      throw Exception('Bạn đã gửi đơn xin nghỉ cho buổi học này rồi.');
+    }
+    // ---- END: THÊM LOGIC KIỂM TRA ----
+
+    final now = DateTime.now();
+
+    final leaveRequest = {
+      'studentId': studentId,
+      'studentName': studentName,
+      'studentEmail': studentEmail,
+      'courseCode': courseCode,
+      'courseName': courseName,
+      'classCode': classCode,
+      'className': className,
+      'sessionId': sessionId,
+      'sessionTitle': sessionTitle,
+      'sessionDate': Timestamp.fromDate(sessionDate),
+      'reason': reason,
+      'status': LeaveRequestStatus.pending.name,
+      'requestDate': Timestamp.fromDate(now),
+      'attachments': attachments,
+      'createdAt': Timestamp.now().toDate(),
+      'updatedAt': Timestamp.now().toDate(),
+    };
+
+    final docRef = await _db.collection('leave_requests').add(leaveRequest);
+    return docRef.id;
+  }
+
   /// Lấy đơn xin nghỉ theo courseCode
   Stream<List<LeaveRequestModel>> getLeaveRequestsForCourseStream(
     String courseCode,
@@ -184,70 +238,70 @@ class LeaveRequestService {
   // STUDENT FUNCTIONS
   // ===============================
 
-  /// Tạo đơn xin nghỉ mới (dành cho sinh viên)
-  Future<String> createLeaveRequest({
-    required String studentId,
-    required String studentName,
-    required String studentEmail,
-    String? courseCode,
-    String? courseName,
-    String? classCode,
-    String? className,
-    String? sessionId,
-    required String sessionTitle,
-    required DateTime sessionDate,
-    required String reason,
-    List<String> attachments = const [],
-  }) async {
-    final now = DateTime.now();
+  // /// Tạo đơn xin nghỉ mới (dành cho sinh viên)
+  // Future<String> createLeaveRequest({
+  //   required String studentId,
+  //   required String studentName,
+  //   required String studentEmail,
+  //   String? courseCode,
+  //   String? courseName,
+  //   String? classCode,
+  //   String? className,
+  //   String? sessionId,
+  //   required String sessionTitle,
+  //   required DateTime sessionDate,
+  //   required String reason,
+  //   List<String> attachments = const [],
+  // }) async {
+  //   final now = DateTime.now();
 
-    final leaveRequest = {
-      'studentId': studentId,
-      'studentName': studentName,
-      'studentEmail': studentEmail,
-      'courseCode': courseCode,
-      'courseName': courseName,
-      'classCode': classCode,
-      'className': className,
-      'sessionId': sessionId,
-      'sessionTitle': sessionTitle,
-      'sessionDate': Timestamp.fromDate(sessionDate),
-      'reason': reason,
-      'status': LeaveRequestStatus.pending.name,
-      'requestDate': Timestamp.fromDate(now),
-      'attachments': attachments,
-      'createdAt': Timestamp.now().toDate(),
-      'updatedAt': Timestamp.now().toDate(),
-    };
+  //   final leaveRequest = {
+  //     'studentId': studentId,
+  //     'studentName': studentName,
+  //     'studentEmail': studentEmail,
+  //     'courseCode': courseCode,
+  //     'courseName': courseName,
+  //     'classCode': classCode,
+  //     'className': className,
+  //     'sessionId': sessionId,
+  //     'sessionTitle': sessionTitle,
+  //     'sessionDate': Timestamp.fromDate(sessionDate),
+  //     'reason': reason,
+  //     'status': LeaveRequestStatus.pending.name,
+  //     'requestDate': Timestamp.fromDate(now),
+  //     'attachments': attachments,
+  //     'createdAt': Timestamp.now().toDate(),
+  //     'updatedAt': Timestamp.now().toDate(),
+  //   };
 
-    final docRef = await _db.collection('leave_requests').add(leaveRequest);
-    return docRef.id;
-  }
+  //   final docRef = await _db.collection('leave_requests').add(leaveRequest);
+  //   return docRef.id;
+  // }
 
-  /// Cập nhật đơn xin nghỉ (chỉ khi status = pending)
-  Future<void> updateLeaveRequest({
-    required String requestId,
-    String? reason,
-    List<String>? attachments,
-  }) async {
-    // Kiểm tra trạng thái trước khi cập nhật
-    final doc = await _db.collection('leave_requests').doc(requestId).get();
-    if (!doc.exists) {
-      throw Exception('Đơn xin nghỉ không tồn tại');
-    }
+  // /// Cập nhật đơn xin nghỉ (chỉ khi status = pending)
+  // Future<void> updateLeaveRequest({
+  //   required String requestId,
+  //   String? reason,
+  //   List<String>? attachments,
+  // }) async {
+  //   // Kiểm tra trạng thái trước khi cập nhật
+  //   final doc = await _db.collection('leave_requests').doc(requestId).get();
+  //   if (!doc.exists) {
+  //     throw Exception('Đơn xin nghỉ không tồn tại');
+  //   }
 
-    final request = LeaveRequestModel.fromDoc(doc);
-    if (request.status != LeaveRequestStatus.pending) {
-      throw Exception('Chỉ có thể chỉnh sửa đơn xin nghỉ đang chờ duyệt');
-    }
+  //   final request = LeaveRequestModel.fromDoc(doc);
+  //   if (request.status != LeaveRequestStatus.pending) {
+  //     throw Exception('Chỉ có thể chỉnh sửa đơn xin nghỉ đang chờ duyệt');
+  //   }
 
-    final updates = <String, dynamic>{'updatedAt': Timestamp.now().toDate()};
+  //   final updates = <String, dynamic>{'updatedAt': Timestamp.now().toDate()};
 
-    if (reason != null) updates['reason'] = reason;
-    if (attachments != null) updates['attachments'] = attachments;
+  //   if (reason != null) updates['reason'] = reason;
+  //   if (attachments != null) updates['attachments'] = attachments;
 
-    await _db.collection('leave_requests').doc(requestId).update(updates);
-  }
+  //   await _db.collection('leave_requests').doc(requestId).update(updates);
+  // }
 
   /// Hủy đơn xin nghỉ (dành cho sinh viên)
   Future<void> cancelLeaveRequestByStudent(

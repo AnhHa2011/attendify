@@ -1,4 +1,4 @@
-// lib/features/student/presentation/pages/create_leave_request_page.dart
+// lib/features/student/presentation/leave_request/create_leave_request_page.dart
 
 import 'package:attendify/features/student/data/services/student_leave_request_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -340,6 +340,66 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   // ------------------------
   // 4) SUBMIT
   // ------------------------
+  // Future<void> _submit() async {
+  //   final reason = _reasonCtl.text.trim();
+  //   if (_courseCode == null || _sessionId == null || reason.isEmpty) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(
+  //         content: Text('Vui lòng chọn môn học, buổi và nhập lý do'),
+  //       ),
+  //     );
+  //     return;
+  //   }
+
+  //   if (_sessionDate == null) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Buổi học thiếu ngày giờ (sessionDate)')),
+  //     );
+  //     return;
+  //   }
+
+  //   setState(() => _submitting = true);
+
+  //   try {
+  //     final user = FirebaseAuth.instance.currentUser!;
+  //     final req = LeaveRequestModel(
+  //       id: '',
+  //       studentId: user.uid,
+  //       studentName: user.displayName ?? '',
+  //       studentEmail: user.email ?? '',
+  //       courseCode: _courseCode!,
+  //       courseName: _courseName ?? '',
+  //       lecturerId: _lecturerId ?? '',
+  //       sessionId: _sessionId!,
+  //       sessionName: '',
+  //       sessionDate: _sessionDate!,
+  //       reason: reason,
+  //       status: 'pending', // ✅ lưu đúng chuỗi
+  //       createdAt: DateTime.now(),
+  //       updatedAt: DateTime.now(),
+  //       requestDate: DateTime.now(),
+  //     );
+
+  //     // QUAN TRỌNG: ensure create() dùng await và collection đúng
+  //     // Ví dụ trong StudentLeaveRequestService:
+  //     // await FirebaseFirestore.instance.collection(FirestoreCollections.leaveRequests).add(req.toMap());
+  //     await _service.create(req);
+
+  //     if (!mounted) return;
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Đã gửi yêu cầu (đang chờ duyệt)')),
+  //     );
+  //     Navigator.pop(context);
+  //   } catch (e) {
+  //     if (!mounted) return;
+  //     ScaffoldMessenger.of(
+  //       context,
+  //     ).showSnackBar(SnackBar(content: Text('Lỗi khi gửi: $e')));
+  //   } finally {
+  //     if (mounted) setState(() => _submitting = false);
+  //   }
+  // }
+
   Future<void> _submit() async {
     final reason = _reasonCtl.text.trim();
     if (_courseCode == null || _sessionId == null || reason.isEmpty) {
@@ -362,6 +422,29 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
 
     try {
       final user = FirebaseAuth.instance.currentUser!;
+
+      // --- START: THÊM LOGIC KIỂM TRA ---
+      // 1. Kiểm tra xem đã có đơn xin nghỉ cho buổi học này chưa
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection(FirestoreCollections.leaveRequests)
+          .where('studentId', isEqualTo: user.uid)
+          .where('sessionId', isEqualTo: _sessionId!)
+          .limit(1) // Chỉ cần tìm 1 là đủ, không cần lấy hết
+          .get();
+
+      // 2. Nếu có, hiển thị thông báo và dừng lại
+      if (querySnapshot.docs.isNotEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.orange,
+            content: Text('Bạn đã gửi đơn xin nghỉ cho buổi học này rồi.'),
+          ),
+        );
+        return; // Dừng hàm tại đây
+      }
+      // --- END: THÊM LOGIC KIỂM TRA ---
+
       final req = LeaveRequestModel(
         id: '',
         studentId: user.uid,
@@ -374,27 +457,32 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
         sessionName: '',
         sessionDate: _sessionDate!,
         reason: reason,
-        status: 'pending', // ✅ lưu đúng chuỗi
+        status: 'pending',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         requestDate: DateTime.now(),
       );
 
-      // QUAN TRỌNG: ensure create() dùng await và collection đúng
-      // Ví dụ trong StudentLeaveRequestService:
-      // await FirebaseFirestore.instance.collection(FirestoreCollections.leaveRequests).add(req.toMap());
       await _service.create(req);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã gửi yêu cầu (đang chờ duyệt)')),
+        const SnackBar(
+          backgroundColor: Colors.green,
+          content: Text('Đã gửi yêu cầu thành công!'),
+        ),
       );
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Lỗi khi gửi: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Lỗi khi gửi: ${e.toString().replaceFirst("Exception: ", "")}',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
