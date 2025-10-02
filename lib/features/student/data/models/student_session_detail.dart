@@ -2,9 +2,8 @@
 
 class StudentSessionDetail {
   final String sessionId;
-  final String classCode;
-  final String className;
-  final String courseNames;
+  final String sesionName;
+  final String courseName;
   final String lecturerName;
   final DateTime startTime;
   final DateTime endTime;
@@ -15,9 +14,8 @@ class StudentSessionDetail {
 
   const StudentSessionDetail({
     required this.sessionId,
-    required this.classCode,
-    required this.className,
-    required this.courseNames,
+    required this.sesionName,
+    required this.courseName,
     required this.lecturerName,
     required this.startTime,
     required this.endTime,
@@ -47,9 +45,8 @@ class StudentSessionDetail {
   factory StudentSessionDetail.fromMap(Map<String, dynamic> map) {
     return StudentSessionDetail(
       sessionId: map['sessionId'] ?? '',
-      classCode: map['classCode'] ?? '',
-      className: map['className'] ?? '',
-      courseNames: map['courseNames'] ?? '',
+      courseName: map['courseName'] ?? '',
+      sesionName: map['sesionName'] ?? '',
       lecturerName: map['lecturerName'] ?? '',
       startTime: (map['startTime'] as DateTime?) ?? DateTime.now(),
       endTime: (map['endTime'] as DateTime?) ?? DateTime.now(),
@@ -63,9 +60,8 @@ class StudentSessionDetail {
   Map<String, dynamic> toMap() {
     return {
       'sessionId': sessionId,
-      'classCode': classCode,
-      'className': className,
-      'courseNames': courseNames,
+      'courseName': courseName,
+      'sesionName': sesionName,
       'lecturerName': lecturerName,
       'startTime': startTime,
       'endTime': endTime,

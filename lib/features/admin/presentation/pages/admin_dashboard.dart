@@ -557,23 +557,6 @@ class _AdminDashboardState extends State<AdminDashboard>
                   );
                 },
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Nhật ký hoạt động',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tính năng theo dõi hoạt động hệ thống\nsẽ sớm được cập nhật',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withOpacity(0.6),
-                ),
-                textAlign: TextAlign.center,
-              ),
             ],
           ),
         ),

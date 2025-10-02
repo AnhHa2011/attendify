@@ -7,10 +7,7 @@ import '../../data/models/student_session_detail.dart';
 class SessionDetailTile extends StatelessWidget {
   final StudentSessionDetail session;
 
-  const SessionDetailTile({
-    super.key,
-    required this.session,
-  });
+  const SessionDetailTile({super.key, required this.session});
 
   @override
   Widget build(BuildContext context) {
@@ -37,15 +34,11 @@ class SessionDetailTile extends StatelessWidget {
                   color: statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  statusIcon,
-                  color: statusColor,
-                  size: 24,
-                ),
+                child: Icon(statusIcon, color: statusColor, size: 24),
               ),
-              
+
               const SizedBox(width: 12),
-              
+
               // Session Info
               Expanded(
                 child: Column(
@@ -53,27 +46,14 @@ class SessionDetailTile extends StatelessWidget {
                   children: [
                     // Class Info
                     Text(
-                      '${session.classCode} - ${session.className}',
+                      '${session.courseName} - ${session.sesionName}',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    
+
                     const SizedBox(height: 4),
-                    
-                    // Course Names
-                    if (session.courseNames.isNotEmpty)
-                      Text(
-                        session.courseNames,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    
-                    const SizedBox(height: 4),
-                    
+
                     // Time and Room
                     Row(
                       children: [
@@ -105,9 +85,9 @@ class SessionDetailTile extends StatelessWidget {
                         ],
                       ],
                     ),
-                    
+
                     const SizedBox(height: 4),
-                    
+
                     // Lecturer
                     Row(
                       children: [
@@ -126,15 +106,18 @@ class SessionDetailTile extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               const SizedBox(width: 12),
-              
+
               // Status and Time
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -148,7 +131,7 @@ class SessionDetailTile extends StatelessWidget {
                       ),
                     ),
                   ),
-                  
+
                   if (session.attendanceTime != null) ...[
                     const SizedBox(height: 4),
                     Text(
@@ -239,9 +222,9 @@ class _SessionDetailBottomSheet extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Header
             Row(
               children: [
@@ -251,11 +234,7 @@ class _SessionDetailBottomSheet extends StatelessWidget {
                     color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    _getStatusIcon(),
-                    color: statusColor,
-                    size: 32,
-                  ),
+                  child: Icon(_getStatusIcon(), color: statusColor, size: 32),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -263,18 +242,23 @@ class _SessionDetailBottomSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${session.classCode} - ${session.className}',
+                        '${session.courseName} - ${session.sesionName}',
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: statusColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: statusColor.withOpacity(0.3)),
+                          border: Border.all(
+                            color: statusColor.withOpacity(0.3),
+                          ),
                         ),
                         child: Text(
                           session.statusText,
@@ -289,38 +273,31 @@ class _SessionDetailBottomSheet extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Details
-            _buildDetailRow(
-              context,
-              'Môn học',
-              session.courseNames.isNotEmpty ? session.courseNames : 'Chưa có thông tin',
-              Icons.book,
-            ),
-            
             _buildDetailRow(
               context,
               'Giảng viên',
               session.lecturerName,
               Icons.person,
             ),
-            
+
             _buildDetailRow(
               context,
               'Ngày',
               dateFormat.format(session.startTime),
               Icons.calendar_today,
             ),
-            
+
             _buildDetailRow(
               context,
               'Thời gian',
               '${timeFormat.format(session.startTime)} - ${timeFormat.format(session.endTime)}',
               Icons.access_time,
             ),
-            
+
             if (session.room.isNotEmpty)
               _buildDetailRow(
                 context,
@@ -328,7 +305,7 @@ class _SessionDetailBottomSheet extends StatelessWidget {
                 session.room,
                 Icons.location_on,
               ),
-            
+
             if (session.attendanceTime != null)
               _buildDetailRow(
                 context,
@@ -336,7 +313,7 @@ class _SessionDetailBottomSheet extends StatelessWidget {
                 '${dateFormat.format(session.attendanceTime!)} lúc ${timeFormat.format(session.attendanceTime!)}',
                 Icons.schedule,
               ),
-            
+
             if (session.leaveReason != null && session.leaveReason!.isNotEmpty)
               _buildDetailRow(
                 context,
@@ -344,9 +321,9 @@ class _SessionDetailBottomSheet extends StatelessWidget {
                 session.leaveReason!,
                 Icons.event_busy,
               ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Close button
             SizedBox(
               width: double.infinity,
@@ -375,11 +352,7 @@ class _SessionDetailBottomSheet extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: colorScheme.onSurfaceVariant,
-          ),
+          Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -392,10 +365,7 @@ class _SessionDetailBottomSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: theme.textTheme.bodyLarge,
-                ),
+                Text(value, style: theme.textTheme.bodyLarge),
               ],
             ),
           ),
