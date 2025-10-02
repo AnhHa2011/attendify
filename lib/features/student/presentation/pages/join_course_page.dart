@@ -1,3 +1,5 @@
+// lib/features/student/presentation/pages/join_course_page.dart
+
 import 'package:attendify/features/student/presentation/pages/join_course_scanner_page.dart';
 
 import '../../../../app_imports.dart';
@@ -17,9 +19,7 @@ class UpperCaseTextFormatter extends TextInputFormatter {
 }
 
 class JoinCoursePage extends StatefulWidget {
-  const JoinCoursePage({
-    super.key,
-  }); // Sửa thành super.key cho phiên bản Flutter mới
+  const JoinCoursePage({super.key});
 
   @override
   State<JoinCoursePage> createState() => _JoinCoursePageState();

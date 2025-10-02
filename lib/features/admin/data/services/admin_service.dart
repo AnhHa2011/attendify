@@ -5,6 +5,7 @@ import '../../../../core/data/models/attendance_model.dart';
 import '../../../../core/data/models/course_schedule_model.dart';
 import '../../../../core/data/models/enrollment_model.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_core/firebase_core.dart' as firebase_core;
 
 class AdminService {
   final _db = FirebaseFirestore.instance;
@@ -91,31 +92,94 @@ class AdminService {
     return getUsersStreamByRole(UserRole.student);
   }
 
+  // /// Tạo một người dùng mới (bao gồm cả Auth và Firestore)
+  // Future<String> createNewUser({
+  //   required String email,
+  //   required String password,
+  //   required String displayName,
+  //   required UserRole role,
+  // }) async {
+  //   try {
+  //     // B1: Tạo người dùng trong Firebase Authentication
+  //     UserCredential userCredential = await _auth
+  //         .createUserWithEmailAndPassword(email: email, password: password);
+
+  //     // B2: Lấy UID từ người dùng vừa tạo
+  //     String uid = userCredential.user!.uid;
+
+  //     // B3: Cập nhật displayName trong Auth (tùy chọn nhưng nên có)
+  //     await userCredential.user!.updateDisplayName(displayName);
+
+  //     // B4: Tạo document trong collection 'users' của Firestore
+  //     await _db.collection('users').doc(uid).set({
+  //       'displayName': displayName,
+  //       'email': email,
+  //       'role': role.toKey(),
+  //       'createdAt': Timestamp.now().toDate(),
+  //     });
+  //     return uid;
+  //   } on FirebaseAuthException catch (e) {
+  //     // Bắt các lỗi cụ thể từ Firebase Auth để thông báo dễ hiểu hơn
+  //     if (e.code == 'weak-password') {
+  //       throw Exception('Mật khẩu quá yếu.');
+  //     } else if (e.code == 'email-already-in-use') {
+  //       throw Exception('Email này đã được sử dụng bởi một tài khoản khác.');
+  //     }
+  //     throw Exception('Lỗi tạo tài khoản: ${e.message}');
+  //   } catch (e) {
+  //     throw Exception('Đã xảy ra lỗi không xác định.');
+  //   }
+  // }
+
   /// Tạo một người dùng mới (bao gồm cả Auth và Firestore)
+  /// SỬ DỤNG KỸ THUẬT PHIÊN BẢN FIREBASE PHỤ ĐỂ TRÁNH ADMIN BỊ ĐĂNG XUẤT
   Future<String> createNewUser({
     required String email,
     required String password,
     required String displayName,
     required UserRole role,
   }) async {
+    // Tạo một cái tên duy nhất cho phiên bản App tạm thời để tránh xung đột
+    // nếu hàm này được gọi nhiều lần.
+    String tempAppName =
+        'tempAdminUserCreation-${DateTime.now().millisecondsSinceEpoch}';
+    firebase_core.FirebaseApp?
+    tempApp; // Khai báo biến để có thể truy cập trong khối finally
+
     try {
-      // B1: Tạo người dùng trong Firebase Authentication
-      UserCredential userCredential = await _auth
+      // B1: Khởi tạo một phiên bản Firebase App thứ hai, tạm thời.
+      // Nó sử dụng cùng cấu hình với app chính của bạn.
+      tempApp = await firebase_core.Firebase.initializeApp(
+        name: tempAppName,
+        options: firebase_core.Firebase.app().options,
+      );
+
+      // B2: Lấy instance của FirebaseAuth từ phiên bản App tạm thời đó.
+      FirebaseAuth tempAuth = FirebaseAuth.instanceFor(app: tempApp);
+
+      // B3: Tạo người dùng trong Firebase Authentication thông qua instance tạm thời.
+      // Việc đăng nhập sẽ chỉ xảy ra trên instance này, không ảnh hưởng đến app chính.
+      UserCredential userCredential = await tempAuth
           .createUserWithEmailAndPassword(email: email, password: password);
 
-      // B2: Lấy UID từ người dùng vừa tạo
+      // B4: Lấy UID từ người dùng vừa tạo.
       String uid = userCredential.user!.uid;
 
-      // B3: Cập nhật displayName trong Auth (tùy chọn nhưng nên có)
+      // B5: Cập nhật displayName trong Auth.
+      // Chúng ta vẫn có thể dùng userCredential để cập nhật ngay lập tức.
       await userCredential.user!.updateDisplayName(displayName);
 
-      // B4: Tạo document trong collection 'users' của Firestore
+      // B6: Tạo document trong collection 'users' của Firestore.
+      // Firestore không bị ảnh hưởng bởi các instance khác nhau, nên ta có thể dùng _db như bình thường.
       await _db.collection('users').doc(uid).set({
         'displayName': displayName,
         'email': email,
         'role': role.toKey(),
-        'createdAt': Timestamp.now().toDate(),
+        'createdAt':
+            FieldValue.serverTimestamp(), // Dùng server timestamp cho chính xác
       });
+
+      // Sau khi hoàn thành, trả về uid của user mới.
       return uid;
     } on FirebaseAuthException catch (e) {
       // Bắt các lỗi cụ thể từ Firebase Auth để thông báo dễ hiểu hơn
@@ -126,7 +190,15 @@ class AdminService {
       }
       throw Exception('Lỗi tạo tài khoản: ${e.message}');
     } catch (e) {
-      throw Exception('Đã xảy ra lỗi không xác định.');
+      // Bắt các lỗi chung khác
+      throw Exception('Đã xảy ra lỗi không xác định: ${e.toString()}');
+    } finally {
+      // B7: CỰC KỲ QUAN TRỌNG: Dọn dẹp!
+      // Xóa phiên bản App tạm thời đi để giải phóng tài nguyên và tránh lỗi
+      // "app already exists" nếu không có tên duy nhất.
+      if (tempApp != null) {
+        await tempApp.delete();
+      }
     }
   }
 

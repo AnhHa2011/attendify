@@ -88,47 +88,106 @@ class CourseService {
     await batch.commit();
   }
 
+  // Future<void> enrollStudent({
+  //   required String joinCode,
+  //   required String studentId,
+  //   required String studentName,
+  //   required String studentEmail,
+  // }) async {
+  //   // 1. Tìm môn học có mã tham gia tương ứng
+  //   final courseQuery = await _db
+  //       .collection('courses')
+  //       .where('joinCode', isEqualTo: joinCode.trim())
+  //       .limit(1)
+  //       .get();
+
+  //   if (courseQuery.docs.isEmpty) {
+  //     throw Exception('Mã tham gia không hợp lệ hoặc môn học không tồn tại.');
+  //   }
+
+  //   final courseDoc = courseQuery.docs.first;
+  //   final courseCode = courseDoc.id;
+
+  //   final existingEnrollmentQuery = await _db
+  //       .collection('enrollments')
+  //       .where('courseCode', isEqualTo: courseCode)
+  //       .where('studentId', isEqualTo: studentId)
+  //       .limit(1)
+  //       .get();
+
+  //   // Nếu đã tìm thấy bản ghi enrollment, nghĩa là sinh viên đã ở trong môn
+  //   if (existingEnrollmentQuery.docs.isNotEmpty) {
+  //     throw Exception('Bạn đã tham gia môn học này rồi.');
+  //   }
+  //   // =================================================================
+
+  //   // 2. Nếu chưa tham gia, tạo một bản ghi mới trong collection 'enrollments'
+  //   await _db.collection('enrollments').add({
+  //     'courseCode': courseCode,
+  //     'courseName': courseDoc.data()['courseName'],
+  //     'studentId': studentId,
+  //     'studentName': studentName,
+  //     'studentEmail': studentEmail,
+  //     'joinDate': Timestamp.now().toDate(),
+  //   });
+  // }
+  /// Hàm này sẽ kiểm tra xem sinh viên đã tồn tại trong môn học chưa trước khi thêm mới.
   Future<void> enrollStudent({
     required String joinCode,
     required String studentId,
     required String studentName,
     required String studentEmail,
   }) async {
-    // 1. Tìm môn học có mã tham gia tương ứng
+    // BƯỚC 1: Tìm kiếm môn học dựa trên `joinCode`.
+    // Dùng .trim() để loại bỏ các khoảng trắng thừa do người dùng nhập.
     final courseQuery = await _db
         .collection('courses')
         .where('joinCode', isEqualTo: joinCode.trim())
         .limit(1)
         .get();
 
+    // Nếu không tìm thấy môn học nào, ném ra lỗi.
     if (courseQuery.docs.isEmpty) {
       throw Exception('Mã tham gia không hợp lệ hoặc môn học không tồn tại.');
     }
 
+    // Lấy thông tin của môn học tìm được.
     final courseDoc = courseQuery.docs.first;
-    final courseCode = courseDoc.id;
+    final courseId =
+        courseDoc.id; // Lấy ID của document làm mã môn học (courseCode).
+    final courseData = courseDoc.data();
 
+    // BƯỚC 2: Kiểm tra xem sinh viên đã tham gia môn học này từ trước chưa.
+    // Đây là bước quan trọng nhất để giải quyết vấn đề của bạn.
     final existingEnrollmentQuery = await _db
         .collection('enrollments')
-        .where('courseCode', isEqualTo: courseCode)
-        .where('studentId', isEqualTo: studentId)
+        .where('courseCode', isEqualTo: courseId) // Tìm theo ID môn học
+        .where('studentId', isEqualTo: studentId) // và ID sinh viên
         .limit(1)
         .get();
 
-    // Nếu đã tìm thấy bản ghi enrollment, nghĩa là sinh viên đã ở trong môn
+    // Nếu kết quả truy vấn không rỗng, nghĩa là đã có bản ghi -> sinh viên đã tham gia.
     if (existingEnrollmentQuery.docs.isNotEmpty) {
       throw Exception('Bạn đã tham gia môn học này rồi.');
     }
-    // =================================================================
 
-    // 2. Nếu chưa tham gia, tạo một bản ghi mới trong collection 'enrollments'
+    // BƯỚC 3: Nếu sinh viên chưa tham gia, tiến hành tạo bản ghi ghi danh mới.
     await _db.collection('enrollments').add({
-      'courseCode': courseCode,
-      'courseName': courseDoc.data()['courseName'],
+      'courseCode': courseId,
+      'courseName':
+          courseData['courseName'] ?? 'N/A', // Lấy tên môn học từ document
       'studentId': studentId,
       'studentName': studentName,
       'studentEmail': studentEmail,
-      'joinDate': Timestamp.now().toDate(),
+      // Sử dụng FieldValue.serverTimestamp() để đảm bảo thời gian được ghi nhận bởi server
+      // chính xác và nhất quán, không phụ thuộc vào đồng hồ trên thiết bị của người dùng.
+      'joinDate': FieldValue.serverTimestamp(),
+    });
+
+    // BƯỚC 4 (Tùy chọn): Tăng số lượng sinh viên trong document của môn học.
+    // Điều này giúp bạn dễ dàng thống kê mà không cần query collection 'enrollments'.
+    await courseDoc.reference.update({
+      'enrollmentCount': FieldValue.increment(1),
     });
   }
 
