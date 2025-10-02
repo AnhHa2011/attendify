@@ -170,6 +170,26 @@ class _CourseEnrollmentBulkImportPageState
   bool _allValid(List<UserModel> students, List<EnrollmentModel> enrollments) =>
       _rows.isNotEmpty &&
       _rows.every((e) => _validateRow(e, students, enrollments) == null);
+  // Sức chứa còn lại của course (maxStudents - hiện có)
+  int _remainingSeats(List<EnrollmentModel> enrollments) {
+    final max = widget.course.maxStudents;
+    final current = enrollments.length;
+    final remain = max - current;
+    return remain < 0 ? 0 : remain;
+  }
+
+  // Đếm số dòng hợp lệ có thể import (sau khi validate từng dòng)
+  int _countImportable(
+    List<UserModel> students,
+    List<EnrollmentModel> enrollments,
+  ) {
+    int count = 0;
+    for (final r in _rows) {
+      final err = _validateRow(r, students, enrollments);
+      if (err == null) count++;
+    }
+    return count;
+  }
 
   // ---------- Submit ----------
   Future<void> _submit(
@@ -189,6 +209,23 @@ class _CourseEnrollmentBulkImportPageState
       return;
     }
 
+    // ====== NEW: chặn nếu vượt sức chứa course ======
+    final remaining = _remainingSeats(enrollments);
+    final importable = _countImportable(students, enrollments);
+    final inFile = _rows.length;
+
+    if (importable > remaining) {
+      setState(() {
+        _message =
+            'Vượt sức chứa môn học.\n'
+            'Chỗ còn lại: $remaining.\n'
+            'Số sinh viên trong file: $inFile.\n'
+            'Số sinh viên hợp lệ có thể import: $remaining.\n'
+            'Vui lòng bớt số lượng hoặc chia file.';
+      });
+      return;
+    }
+    // ================================================
     setState(() {
       _submitting = true;
       _message = null;
@@ -284,8 +321,13 @@ class _CourseEnrollmentBulkImportPageState
                   }
                 }
 
+                final remaining = _remainingSeats(enrollments);
+                final importable = _countImportable(students, enrollments);
+                final inFile = _rows.length;
+
                 final canSubmit =
                     _allValid(students, enrollments) && !_submitting;
+                _rows.isNotEmpty && importable > 0 && importable <= remaining;
 
                 return Column(
                   children: [
@@ -295,7 +337,13 @@ class _CourseEnrollmentBulkImportPageState
                       isWideScreen,
                       enableSubmit: canSubmit,
                       onSubmit: () => _submit(students, enrollments),
+
+                      // NEW: hiển thị thông tin sức chứa
+                      remaining: remaining,
+                      importable: importable,
+                      inFile: inFile,
                     ),
+
                     // Content
                     Expanded(
                       child: Container(
@@ -329,6 +377,11 @@ class _CourseEnrollmentBulkImportPageState
     bool isWideScreen, {
     bool enableSubmit = false,
     VoidCallback? onSubmit,
+
+    // NEW:
+    int remaining = 0,
+    int importable = 0,
+    int inFile = 0,
   }) {
     return Container(
       width: double.infinity,
@@ -360,6 +413,19 @@ class _CourseEnrollmentBulkImportPageState
               color: colorScheme.onSurface.withOpacity(0.7),
               fontStyle: FontStyle.italic,
             ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.info_outline, size: 16, color: colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                'Chỗ còn lại: $remaining • Hợp lệ để import: $importable • Trong file: $inFile',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Wrap(
