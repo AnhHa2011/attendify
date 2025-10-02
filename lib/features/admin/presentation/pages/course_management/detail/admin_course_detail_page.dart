@@ -479,6 +479,20 @@ class AdminCourseDetailPage extends StatelessWidget {
 
     // Biến để lưu trữ thông báo lỗi
     String? dateOrTimeError;
+    bool _overlaps(
+      DateTime aStart,
+      DateTime aEnd,
+      DateTime bStart,
+      DateTime bEnd,
+    ) {
+      // overlap nếu aStart < bEnd && bStart < aEnd
+      return aStart.isBefore(bEnd) && bStart.isBefore(aEnd);
+    }
+
+    String _fmtDate(DateTime d) =>
+        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    String _fmtTime(DateTime d) =>
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
     showDialog(
       context: context,
@@ -565,18 +579,6 @@ class AdminCourseDetailPage extends StatelessWidget {
                       ),
 
                       // === WIDGET HIỂN THỊ LỖI ===
-                      if (dateOrTimeError != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(
-                            dateOrTimeError!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 16),
                       Row(
                         children: [
                           Expanded(
@@ -624,6 +626,18 @@ class AdminCourseDetailPage extends StatelessWidget {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 16),
+                      if (dateOrTimeError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            dateOrTimeError!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -641,7 +655,6 @@ class AdminCourseDetailPage extends StatelessWidget {
                       selectedDate != null && selectedTime != null;
 
                   if (!isFormValid || !isDateTimeSelected) {
-                    // Cập nhật state để hiển thị lỗi
                     setDialogState(() {
                       if (!isDateTimeSelected) {
                         dateOrTimeError = 'Vui lòng chọn đầy đủ ngày và giờ.';
@@ -649,8 +662,15 @@ class AdminCourseDetailPage extends StatelessWidget {
                     });
                     return;
                   }
-                  // Nếu tất cả đều hợp lệ, tiếp tục xử lý
+
                   final duration = int.parse(durationCtrl.text);
+                  if (duration <= 0) {
+                    setDialogState(() {
+                      dateOrTimeError = 'Thời lượng phải là số dương.';
+                    });
+                    return;
+                  }
+
                   final startTime = DateTime(
                     selectedDate!.year,
                     selectedDate!.month,
@@ -659,6 +679,76 @@ class AdminCourseDetailPage extends StatelessWidget {
                     selectedTime!.minute,
                   );
                   final endTime = startTime.add(Duration(minutes: duration));
+
+                  if (!endTime.isAfter(startTime)) {
+                    setDialogState(() {
+                      dateOrTimeError =
+                          'Giờ kết thúc phải lớn hơn giờ bắt đầu.';
+                    });
+                    return;
+                  }
+
+                  // ===== Kiểm tra TRÙNG LỊCH GIẢNG VIÊN (ngày + giờ) =====
+                  try {
+                    if (lecturer != null && (lecturer.uid).isNotEmpty) {
+                      final dayStart = DateTime(
+                        startTime.year,
+                        startTime.month,
+                        startTime.day,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                      );
+                      final dayEnd = DateTime(
+                        startTime.year,
+                        startTime.month,
+                        startTime.day,
+                        23,
+                        59,
+                        59,
+                        999,
+                        999,
+                      );
+
+                      // Cần hàm trong SessionService: fetchLecturerSessionsInRange(...)
+                      final existing = await sessionService
+                          .fetchLecturerSessionsInRange(
+                            lecturerId: lecturer.uid,
+                            start: dayStart,
+                            end: dayEnd,
+                          );
+
+                      final clash = existing.firstWhere(
+                        (s) => _overlaps(
+                          startTime,
+                          endTime,
+                          s.startTime,
+                          s.endTime,
+                        ),
+                        orElse: () => SessionModel.empty(),
+                      );
+
+                      if (clash.id.isNotEmpty) {
+                        setDialogState(() {
+                          dateOrTimeError =
+                              'Trùng lịch giảng viên với: ${clash.title} '
+                              '(${_fmtTime(clash.startTime)}–${_fmtTime(clash.endTime)} '
+                              '${_fmtDate(clash.startTime)})';
+                        });
+                        return;
+                      }
+                    }
+                  } catch (e) {
+                    // Nếu muốn chặn luôn khi không kiểm tra được lịch thì để lại return
+                    setDialogState(() {
+                      dateOrTimeError =
+                          'Không kiểm tra được lịch giảng viên: $e';
+                    });
+                    return;
+                  }
+                  // =======================================================
 
                   try {
                     await sessionService.createSession(

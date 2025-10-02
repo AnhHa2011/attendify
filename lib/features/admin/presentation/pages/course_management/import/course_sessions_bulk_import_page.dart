@@ -294,6 +294,9 @@ class _CourseSessionsBulkImportPageState
     return (minStart: minS ?? now, maxEnd: maxE ?? now);
   }
 
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
   // Đánh dấu lỗi trùng lịch cho các dòng (với DB và với nhau)
   Future<int> _markLecturerConflicts(SessionService sessionService) async {
     final lecturerId = widget.course.lecturerId;
@@ -325,19 +328,21 @@ class _CourseSessionsBulkImportPageState
       end: range.maxEnd,
     );
     // existing: List<SessionModel>
-
     // 2) Check trùng với DB
     int conflictCount = 0;
     for (final c in candidates) {
-      // Nếu đã có lỗi khác, không overwrite thông điệp (giữ lỗi đầu tiên)
       if (c.row.error != null && c.row.status == _RowStatus.error) continue;
 
-      final hit = existing.firstWhere(
-        (ex) => _overlaps(c.start, c.end, ex.startTime, ex.endTime),
-        orElse: () => SessionModel.empty(),
-      );
+      SessionModel? hit;
+      for (final ex in existing) {
+        if (_isSameDay(c.start, ex.startTime) &&
+            _overlaps(c.start, c.end, ex.startTime, ex.endTime)) {
+          hit = ex;
+          break;
+        }
+      }
 
-      if (SessionModel.empty() != hit) {
+      if (hit != null) {
         c.row.error =
             'Trùng lịch GV với: ${hit.title} '
             '(${_fmtTime(hit.startTime)}–${_fmtTime(hit.endTime)} '
@@ -345,22 +350,24 @@ class _CourseSessionsBulkImportPageState
         c.row.status = _RowStatus.error;
         conflictCount++;
       } else {
-        c.row.error = null; // clean nếu trước đó ok
+        c.row.error = null;
         c.row.status = _RowStatus.valid;
       }
     }
-
-    // 3) Check trùng giữa các dòng trong file
-    //    Dùng danh sách đã hợp lệ (và không trùng DB)
+    // 3) Check trùng giữa các dòng trong file (cùng ngày)
     final accepted = <({int idx, DateTime start, DateTime end})>[];
     for (final c in candidates) {
-      if (c.row.status == _RowStatus.error) continue; // đã conflict DB
-      // so với accepted trước đó
+      if (c.row.status == _RowStatus.error) continue;
+
       final selfClash = accepted.any(
-        (a) => _overlaps(c.start, c.end, a.start, a.end),
+        (a) =>
+            _isSameDay(c.start, a.start) &&
+            _overlaps(c.start, c.end, a.start, a.end),
       );
+
       if (selfClash) {
-        c.row.error = 'Trùng lịch với một buổi khác trong file import';
+        c.row.error =
+            'Trùng lịch với một buổi khác trong file import (cùng ngày)';
         c.row.status = _RowStatus.error;
         conflictCount++;
       } else {
@@ -407,7 +414,7 @@ class _CourseSessionsBulkImportPageState
         setState(() {
           _submitting = false;
           _message =
-              'Phát hiện $conflicts dòng trùng lịch giảng viên. '
+              'Lỗi: Phát hiện $conflicts dòng trùng lịch giảng viên. '
               'Vui lòng điều chỉnh thời gian rồi nhập lại.';
         });
         return;
@@ -469,6 +476,7 @@ class _CourseSessionsBulkImportPageState
 
       setState(() {
         _message = 'Thành công! Đã tạo $created buổi học.';
+        _submitting = _submitting;
         _rows = [];
         _fileName = null;
       });
@@ -557,7 +565,7 @@ class _CourseSessionsBulkImportPageState
               _Btn(
                 icon: Icons.download_outlined,
                 label: 'Tải template',
-                onPressed: () => TemplateDownloader.download('sessions'),
+                onPressed: () => TemplateDownloader.download('session'),
                 variant: _BtnVariant.outlined,
               ),
               _Btn(
@@ -1059,6 +1067,11 @@ class _Status extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
+    final bool isError =
+        (message?.startsWith('Lỗi') ?? false) ||
+        (message?.contains('Có lỗi') ?? false) ||
+        (message?.toLowerCase().contains('không thành công') ?? false);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
