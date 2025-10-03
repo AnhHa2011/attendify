@@ -17,10 +17,7 @@ const _expectedHeaders = <String>['studentEmail'];
 class _EnrollmentRowState {
   final int rowIndex;
 
-  // dữ liệu thô
   String studentEmail;
-
-  // match
   String? studentId; // uid sinh viên
   String? error; // lỗi hiển thị
 
@@ -124,11 +121,9 @@ class _CourseEnrollmentBulkImportPageState
       final studentEmail = _cellStr(row, idxOf('studentEmail')).trim();
 
       if (studentEmail.isEmpty || widget.course.id.isEmpty) {
-        // thiếu dữ liệu cơ bản → bỏ qua dòng
-        continue;
+        continue; // thiếu dữ liệu cơ bản → bỏ qua dòng
       }
 
-      // trùng trong file (so với course cố định)
       final key = '${studentEmail.toLowerCase()}|${widget.course.id}';
       if (seenPairs.contains(key)) {
         throw Exception('(studentEmail) bị trùng trong file ở dòng ${i + 1}');
@@ -147,13 +142,10 @@ class _CourseEnrollmentBulkImportPageState
     List<EnrollmentModel> enrollments,
   ) {
     if (r.studentEmail.trim().isEmpty) return 'Thiếu email sinh viên';
-
-    // bắt buộc chọn student
     if (r.studentId == null || r.studentId!.isEmpty) {
       return 'Chưa chọn sinh viên';
     }
 
-    // trùng với DB (đã ghi danh)
     final isDup = enrollments.any(
       (e) =>
           e.courseCode.toUpperCase().trim() ==
@@ -170,7 +162,7 @@ class _CourseEnrollmentBulkImportPageState
   bool _allValid(List<UserModel> students, List<EnrollmentModel> enrollments) =>
       _rows.isNotEmpty &&
       _rows.every((e) => _validateRow(e, students, enrollments) == null);
-  // Sức chứa còn lại của course (maxStudents - hiện có)
+
   int _remainingSeats(List<EnrollmentModel> enrollments) {
     final max = widget.course.maxStudents;
     final current = enrollments.length;
@@ -178,7 +170,6 @@ class _CourseEnrollmentBulkImportPageState
     return remain < 0 ? 0 : remain;
   }
 
-  // Đếm số dòng hợp lệ có thể import (sau khi validate từng dòng)
   int _countImportable(
     List<UserModel> students,
     List<EnrollmentModel> enrollments,
@@ -209,7 +200,7 @@ class _CourseEnrollmentBulkImportPageState
       return;
     }
 
-    // ====== NEW: chặn nếu vượt sức chứa course ======
+    // chặn nếu vượt sức chứa course
     final remaining = _remainingSeats(enrollments);
     final importable = _countImportable(students, enrollments);
     final inFile = _rows.length;
@@ -225,7 +216,7 @@ class _CourseEnrollmentBulkImportPageState
       });
       return;
     }
-    // ================================================
+
     setState(() {
       _submitting = true;
       _message = null;
@@ -281,31 +272,30 @@ class _CourseEnrollmentBulkImportPageState
             final students = stuSnap.data ?? [];
 
             return StreamBuilder<List<EnrollmentModel>>(
-              // Chỉ theo 1 course cố định để tránh đổi query lúc runtime
               stream: context.read<AdminService>().getAllEnrollmentsStream(
                 courseCode: widget.course.id,
               ),
               builder: (_, enrSnap) {
                 if (enrSnap.hasError) {
-                  // Hiển thị lỗi stream để không crash
-                  return Column(
-                    children: [
-                      _buildHeader(
-                        theme,
-                        colorScheme,
-                        isWideScreen,
-                        enableSubmit: false,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: _StatusCard(
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _buildHeader(
+                          theme,
+                          colorScheme,
+                          isWideScreen,
+                          enableSubmit: false,
+                        ),
+                        const SizedBox(height: 16),
+                        _StatusCard(
                           fileName: _fileName,
                           message:
                               'Lỗi tải enrollments (${widget.course.courseName}): ${enrSnap.error}',
                           colorScheme: colorScheme,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 }
 
@@ -327,42 +317,41 @@ class _CourseEnrollmentBulkImportPageState
                 final importable = _countImportable(students, enrollments);
                 final inFile = _rows.length;
 
+                // chỉ enable khi có data hợp lệ + không vượt sức chứa
                 final canSubmit =
-                    _allValid(students, enrollments) && !_submitting;
-                _rows.isNotEmpty && importable > 0 && importable <= remaining;
+                    _rows.isNotEmpty &&
+                    !_submitting &&
+                    importable > 0 &&
+                    importable <= remaining;
 
-                return Column(
-                  children: [
-                    _buildHeader(
-                      theme,
-                      colorScheme,
-                      isWideScreen,
-                      enableSubmit: canSubmit,
-                      onSubmit: () => _submit(students, enrollments),
-
-                      // NEW: hiển thị thông tin sức chứa
-                      remaining: remaining,
-                      importable: importable,
-                      inFile: inFile,
-                    ),
-
-                    // Content
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(isWideScreen ? 24 : 16),
-                        child: _rows.isEmpty
-                            ? _EmptyState(colorScheme: colorScheme)
-                            : _DataList(
-                                rows: _rows,
-                                allStudents: students,
-                                allEnrollments: enrollments,
-                                isWideScreen: isWideScreen,
-                                onChanged: () => setState(() {}),
-                              ),
+                // croll toàn bộ trang (trừ header)
+                return SingleChildScrollView(
+                  padding: EdgeInsets.all(isWideScreen ? 24 : 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeader(
+                        theme,
+                        colorScheme,
+                        isWideScreen,
+                        enableSubmit: canSubmit,
+                        onSubmit: () => _submit(students, enrollments),
+                        remaining: remaining,
+                        importable: importable,
+                        inFile: inFile,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      _rows.isEmpty
+                          ? _EmptyState(colorScheme: colorScheme)
+                          : _DataList(
+                              rows: _rows,
+                              allStudents: students,
+                              allEnrollments: enrollments,
+                              isWideScreen: isWideScreen,
+                              onChanged: () => setState(() {}),
+                            ),
+                    ],
+                  ),
                 );
               },
             );
@@ -372,15 +361,13 @@ class _CourseEnrollmentBulkImportPageState
     );
   }
 
-  // Header rút gọn thành 1 hàm để tái dùng khi stream error
+  // Header rút gọn để tái dùng
   Widget _buildHeader(
     ThemeData theme,
     ColorScheme colorScheme,
     bool isWideScreen, {
     bool enableSubmit = false,
     VoidCallback? onSubmit,
-
-    // NEW:
     int remaining = 0,
     int importable = 0,
     int inFile = 0,
@@ -682,35 +669,36 @@ class _DataList extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        Expanded(
-          child: ListView.separated(
-            itemCount: rows.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, index) {
-              return _EnrollmentRowCard(
-                row: rows[index],
-                allStudents: allStudents,
-                allEnrollments: allEnrollments,
-                isWideScreen: isWideScreen,
-                onChanged: () {
-                  // Clear error + re-validate tức thì
-                  rows[index].error = null;
-                  final parent = context
-                      .findAncestorStateOfType<
-                        _CourseEnrollmentBulkImportPageState
-                      >();
-                  if (parent != null) {
-                    rows[index].error = parent._validateRow(
-                      rows[index],
-                      allStudents,
-                      allEnrollments,
-                    );
-                  }
-                  onChanged();
-                },
-              );
-            },
-          ),
+        // ❌ Không dùng Expanded để tránh cuộn lồng
+        // ✅ ListView render trong SingleChildScrollView bên ngoài
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: rows.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (_, index) {
+            return _EnrollmentRowCard(
+              row: rows[index],
+              allStudents: allStudents,
+              allEnrollments: allEnrollments,
+              isWideScreen: isWideScreen,
+              onChanged: () {
+                rows[index].error = null;
+                final parent = context
+                    .findAncestorStateOfType<
+                      _CourseEnrollmentBulkImportPageState
+                    >();
+                if (parent != null) {
+                  rows[index].error = parent._validateRow(
+                    rows[index],
+                    allStudents,
+                    allEnrollments,
+                  );
+                }
+                onChanged();
+              },
+            );
+          },
         ),
       ],
     );
@@ -876,19 +864,24 @@ class _EnrollmentRowCard extends StatelessWidget {
   Widget _buildFormGrid(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth > 900
+        final w = constraints.maxWidth;
+        // ✅ 1 cột cho màn nhỏ
+        final crossAxisCount = w >= 900
             ? 4
-            : constraints.maxWidth > 600
+            : w >= 600
             ? 3
-            : 2;
+            : 1;
+        final ratio = crossAxisCount >= 3
+            ? 5.0
+            : (crossAxisCount == 2 ? 5.6 : 3.0);
 
         return GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: crossAxisCount,
           crossAxisSpacing: 16,
-          mainAxisSpacing: 4,
-          childAspectRatio: crossAxisCount == 4 ? 5 : 6,
+          mainAxisSpacing: 8,
+          childAspectRatio: ratio,
           children: [
             _FormField(
               label: 'Email sinh viên',
@@ -1018,7 +1011,6 @@ class _StudentDropdownField extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    // Sort theo displayName (fallback email)
     final sorted = [...students]
       ..sort((a, b) {
         final ka =

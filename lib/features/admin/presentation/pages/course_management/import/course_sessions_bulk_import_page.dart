@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+
 import 'package:attendify/core/data/models/course_model.dart';
 import 'package:attendify/core/utils/template_downloader.dart';
 import 'package:excel/excel.dart' hide Border;
@@ -50,261 +51,6 @@ class _SessionRowState {
   });
 }
 
-// Nhận diện ISO 8601 (yyyy-MM-dd...)
-bool _looksIso(String s) => RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(s);
-
-// "2025-01-10T00:00:00.000Z" -> "10/01/2025"
-String _normalizeDate(dynamic v) {
-  try {
-    if (v is DateTime) {
-      return DateFormat('dd/MM/yyyy').format(v.toLocal());
-    }
-    final s = v?.toString().trim() ?? '';
-    if (s.isEmpty) return '';
-    if (_looksIso(s)) {
-      final dt = DateTime.parse(s);
-      return DateFormat('dd/MM/yyyy').format(dt.toLocal());
-    }
-    // giữ nguyên nếu đã là dd/MM/yyyy
-    return s;
-  } catch (_) {
-    return v?.toString() ?? '';
-  }
-}
-
-// "08:00:00" hoặc ISO -> "08:00"
-String _normalizeTime(dynamic v) {
-  try {
-    if (v is DateTime) {
-      return '${v.hour.toString().padLeft(2, '0')}:${v.minute.toString().padLeft(2, '0')}';
-    }
-    final s = v?.toString().trim() ?? '';
-    if (s.isEmpty) return '';
-
-    // 1) HH:mm:ss | HH:mm -> lấy HH:mm
-    final mm = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
-    if (mm != null) {
-      return '${mm.group(1)!.padLeft(2, '0')}:${mm.group(2)}';
-    }
-    // 2) ISO
-    if (_looksIso(s)) {
-      final dt = DateTime.parse(s);
-      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    }
-    return s;
-  } catch (_) {
-    return v?.toString() ?? '';
-  }
-}
-
-class _TimeField extends StatelessWidget {
-  final String label;
-  final String value; // HH:mm
-  final IconData icon;
-  final ValueChanged<String> onChanged;
-
-  const _TimeField({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.onChanged,
-  });
-
-  TimeOfDay _parse(String v) {
-    try {
-      final p = v.split(':');
-      if (p.length != 2) throw Exception();
-      final h = int.parse(p[0]);
-      final m = int.parse(p[1]);
-      return TimeOfDay(hour: h, minute: m);
-    } catch (_) {
-      return const TimeOfDay(hour: 8, minute: 0); // mặc định 08:00
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final controller = TextEditingController(text: value);
-
-    Future<void> _pick() async {
-      final initial = _parse(value);
-      final picked = await showTimePicker(
-        context: context,
-        initialTime: initial,
-        helpText: 'Chọn giờ (HH:mm)',
-        cancelText: 'Hủy',
-        confirmText: 'Chọn',
-        builder: (context, child) {
-          // Bật 24h nếu thiết bị đang 12h
-          final media = MediaQuery.of(context);
-          return MediaQuery(
-            data: media.copyWith(alwaysUse24HourFormat: true),
-            child: child!,
-          );
-        },
-      );
-      if (picked != null) {
-        final h = picked.hour.toString().padLeft(2, '0');
-        final m = picked.minute.toString().padLeft(2, '0');
-        final s = '$h:$m';
-        controller.text = s;
-        onChanged(s);
-      }
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 16, color: cs.primary),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-                color: cs.onSurface.withOpacity(0.8),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          readOnly: true,
-          onTap: _pick,
-          decoration: InputDecoration(
-            hintText: 'HH:mm',
-            prefixIcon: const Icon(Icons.schedule, size: 18),
-            filled: true,
-            fillColor: cs.surfaceVariant.withOpacity(0.3),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: cs.primary, width: 2),
-            ),
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 12,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DateField extends StatelessWidget {
-  final String label;
-  final String value; // dd/MM/yyyy
-  final IconData icon;
-  final ValueChanged<String> onChanged;
-
-  const _DateField({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final controller = TextEditingController(text: value);
-
-    Future<void> _pick() async {
-      // Parse giá trị hiện tại (nếu có) để show mặc định
-      DateTime? initial;
-      try {
-        if (value.trim().isNotEmpty) {
-          final p = value.split('/');
-          initial = DateTime(int.parse(p[2]), int.parse(p[1]), int.parse(p[0]));
-        }
-      } catch (_) {}
-
-      final now = DateTime.now();
-      final DateTime? picked = await showDatePicker(
-        context: context,
-        initialDate: initial ?? now,
-        firstDate: DateTime(now.year - 5),
-        lastDate: DateTime(now.year + 5),
-        helpText: 'Chọn ngày (dd/MM/yyyy)',
-        cancelText: 'Hủy',
-        confirmText: 'Chọn',
-        errorInvalidText: 'Ngày không hợp lệ',
-        builder: (context, child) {
-          // Optional: match theme
-          return Theme(
-            data: Theme.of(context).copyWith(
-              colorScheme: Theme.of(context).colorScheme.copyWith(
-                primary: cs.primary,
-                onPrimary: cs.onPrimary,
-              ),
-            ),
-            child: child!,
-          );
-        },
-      );
-
-      if (picked != null) {
-        final f = DateFormat('dd/MM/yyyy');
-        final s = f.format(picked);
-        controller.text = s;
-        onChanged(s);
-      }
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 16, color: cs.primary),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-                color: cs.onSurface.withOpacity(0.8),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          readOnly: true,
-          onTap: _pick,
-          decoration: InputDecoration(
-            hintText: 'dd/MM/yyyy',
-            prefixIcon: const Icon(Icons.calendar_today, size: 18),
-            filled: true,
-            fillColor: cs.surfaceVariant.withOpacity(0.3),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: cs.primary, width: 2),
-            ),
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 12,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class CourseSessionsBulkImportPage extends StatefulWidget {
   final CourseModel course;
   const CourseSessionsBulkImportPage({super.key, required this.course});
@@ -328,6 +74,48 @@ class _CourseSessionsBulkImportPageState
     return v == null ? '' : v.toString();
   }
 
+  bool _looksIso(String s) => RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(s);
+
+  // ISO/DateTime -> dd/MM/yyyy
+  String _normalizeDate(dynamic v) {
+    try {
+      if (v is DateTime) {
+        return DateFormat('dd/MM/yyyy').format(v.toLocal());
+      }
+      final s = v?.toString().trim() ?? '';
+      if (s.isEmpty) return '';
+      if (_looksIso(s)) {
+        final dt = DateTime.parse(s);
+        return DateFormat('dd/MM/yyyy').format(dt.toLocal());
+      }
+      return s;
+    } catch (_) {
+      return v?.toString() ?? '';
+    }
+  }
+
+  // ISO/HH:mm:ss -> HH:mm
+  String _normalizeTime(dynamic v) {
+    try {
+      if (v is DateTime) {
+        return '${v.hour.toString().padLeft(2, '0')}:${v.minute.toString().padLeft(2, '0')}';
+      }
+      final s = v?.toString().trim() ?? '';
+      if (s.isEmpty) return '';
+      final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
+      if (m != null) {
+        return '${m.group(1)!.padLeft(2, '0')}:${m.group(2)}';
+      }
+      if (_looksIso(s)) {
+        final dt = DateTime.parse(s);
+        return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      }
+      return s;
+    } catch (_) {
+      return v?.toString() ?? '';
+    }
+  }
+
   // ---- Pick + parse ----
   Future<void> _pickFile() async {
     setState(() {
@@ -341,17 +129,19 @@ class _CourseSessionsBulkImportPageState
       allowedExtensions: ['xlsx'],
       withData: true,
     );
-    if (res == null || res.files.isEmpty || res.files.single.bytes == null)
+    if (res == null || res.files.isEmpty || res.files.single.bytes == null) {
       return;
+    }
 
     try {
-      final rows = await _parseSessionsXlsx(
-        res.files.single.bytes!,
-      ); // Gán error/status để UI thấy lỗi ngay
+      final rows = await _parseSessionsXlsx(res.files.single.bytes!);
+
+      // set error/status ngay để UI hiển thị
       for (final r in rows) {
         r.error = _validateRow(r);
         r.status = r.error == null ? _RowStatus.valid : _RowStatus.error;
       }
+
       setState(() {
         _rows = rows;
         _fileName = res.files.single.name;
@@ -386,8 +176,7 @@ class _CourseSessionsBulkImportPageState
 
     for (final h in _sessionHeaders) {
       if (!headerLower.contains(h)) {
-        // description là optional -> chỉ warn, không throw
-        if (h == 'description') continue;
+        if (h == 'description') continue; // optional
         throw Exception('Thiếu cột bắt buộc: $h');
       }
     }
@@ -405,9 +194,9 @@ class _CourseSessionsBulkImportPageState
       if (valuesEmpty) continue;
 
       final title = _cellStr(row, idxOf('title')).trim();
-      final date = _normalizeDate(row[idxOf('date')]?.value);
-      final startTime = _normalizeTime(row[idxOf('starttime')]?.value);
-      final endTime = _normalizeTime(row[idxOf('endtime')]?.value);
+      final date = _normalizeDate(tb.rows[i][idxOf('date')]?.value);
+      final startTime = _normalizeTime(tb.rows[i][idxOf('starttime')]?.value);
+      final endTime = _normalizeTime(tb.rows[i][idxOf('endtime')]?.value);
       final location = _cellStr(row, idxOf('location')).trim();
       final type = _cellStr(row, idxOf('type')).trim();
       final description = idxOf('description') >= 0
@@ -563,11 +352,9 @@ class _CourseSessionsBulkImportPageState
   Future<int> _markLecturerConflicts(SessionService sessionService) async {
     final lecturerId = widget.course.lecturerId;
     if (lecturerId.isEmpty) {
-      // Không có lecturerId => bỏ qua kiểm tra (hoặc bạn có thể yêu cầu course luôn có lecturerId)
       return 0;
     }
 
-    // Chỉ xét các dòng "hợp lệ về format"
     final candidates =
         <({int idx, _SessionRowState row, DateTime start, DateTime end})>[];
     for (var i = 0; i < _rows.length; i++) {
@@ -582,15 +369,12 @@ class _CourseSessionsBulkImportPageState
 
     final range = _minMaxRangeOfRows();
 
-    // 1) Lấy sessions của GV trong khoảng [minStart, maxEnd]
-    //    → CẦN có hàm trên SessionService, ví dụ: fetchLecturerSessionsInRange
     final existing = await sessionService.fetchLecturerSessionsInRange(
       lecturerId: lecturerId,
       start: range.minStart,
       end: range.maxEnd,
     );
-    // existing: List<SessionModel>
-    // 2) Check trùng với DB
+
     int conflictCount = 0;
     for (final c in candidates) {
       if (c.row.error != null && c.row.status == _RowStatus.error) continue;
@@ -606,9 +390,8 @@ class _CourseSessionsBulkImportPageState
 
       if (hit != null) {
         c.row.error =
-            'GGiảng viên đã có lịch dạy lúc: ${hit.title} '
-            '(${_fmtTime(hit.startTime)}–${_fmtTime(hit.endTime)} '
-            '${_fmtDate(hit.startTime)}). Vui lòng chọn khoảng thời gian khác!';
+            'Giảng viên đã có lịch dạy: ${hit.title} '
+            '(${_fmtTime(hit.startTime)}–${_fmtTime(hit.endTime)} ${_fmtDate(hit.startTime)}).';
         c.row.status = _RowStatus.error;
         conflictCount++;
       } else {
@@ -616,7 +399,7 @@ class _CourseSessionsBulkImportPageState
         c.row.status = _RowStatus.valid;
       }
     }
-    // 3) Check trùng giữa các dòng trong file (cùng ngày)
+
     final accepted = <({int idx, DateTime start, DateTime end})>[];
     for (final c in candidates) {
       if (c.row.status == _RowStatus.error) continue;
@@ -628,8 +411,7 @@ class _CourseSessionsBulkImportPageState
       );
 
       if (selfClash) {
-        c.row.error =
-            'Trùng lịch với một buổi khác trong file import (cùng ngày)';
+        c.row.error = 'Trùng lịch với một buổi khác trong file (cùng ngày)';
         c.row.status = _RowStatus.error;
         conflictCount++;
       } else {
@@ -649,7 +431,6 @@ class _CourseSessionsBulkImportPageState
   Future<void> _submit() async {
     if (_rows.isEmpty) return;
 
-    // validate again
     bool hasError = false;
     for (final r in _rows) {
       r.error = _validateRow(r);
@@ -669,14 +450,13 @@ class _CourseSessionsBulkImportPageState
 
     final sessionService = context.read<SessionService>();
 
-    // ===== NEW: kiểm tra trùng lịch giảng viên =====
     try {
       final conflicts = await _markLecturerConflicts(sessionService);
       if (conflicts > 0) {
         setState(() {
           _submitting = false;
           _message =
-              'Lỗi: Phát hiện $conflicts dòng trùng lịch dạy của giảng viên. '
+              'Lỗi: Phát hiện $conflicts dòng trùng lịch giảng viên. '
               'Vui lòng điều chỉnh thời gian rồi nhập lại.';
         });
         return;
@@ -688,13 +468,9 @@ class _CourseSessionsBulkImportPageState
       });
       return;
     }
-    // ==============================================
 
-    // Thống nhất khóa course (docId hay code). Đổi duy nhất ở đây:
-    final String courseIdOrCode =
-        widget.course.id; // hoặc widget.course.courseCode nếu bạn dùng code
+    final String courseIdOrCode = widget.course.id;
 
-    // Lấy giảng viên từ CourseModel
     final String? lecturerId = widget.course.lecturerId.isNotEmpty
         ? widget.course.lecturerId
         : null;
@@ -706,18 +482,16 @@ class _CourseSessionsBulkImportPageState
     try {
       int created = 0;
       for (final r in _rows) {
-        // parse time
         final parts = r.date.split('/');
         final d = int.parse(parts[0]);
         final m = int.parse(parts[1]);
         final y = int.parse(parts[2]);
-        final s = r.startTime.split(':');
-        final e = r.endTime.split(':');
+        final s = r.startTime.split(':'), e = r.endTime.split(':');
         final start = DateTime(y, m, d, int.parse(s[0]), int.parse(s[1]));
         final end = DateTime(y, m, d, int.parse(e[0]), int.parse(e[1]));
 
         await sessionService.createSession(
-          courseCode: courseIdOrCode, // hoặc courseId
+          courseCode: courseIdOrCode,
           courseName: widget.course.courseName,
           lecturerId: lecturerId,
           lecturerName: lecturerName,
@@ -727,8 +501,6 @@ class _CourseSessionsBulkImportPageState
           endTime: end,
           location: r.location,
           type: _parseType(r.type),
-          // Nếu service có tham số classCode, bật dòng dưới:
-          // classCode: courseIdOrCode,
         );
 
         r.status = _RowStatus.created;
@@ -738,7 +510,6 @@ class _CourseSessionsBulkImportPageState
 
       setState(() {
         _message = 'Thành công! Đã tạo $created buổi học.';
-        _submitting = _submitting;
         _rows = [];
         _fileName = null;
       });
@@ -767,12 +538,11 @@ class _CourseSessionsBulkImportPageState
         foregroundColor: cs.onSurface,
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            _header(theme, cs, isWide),
-            Expanded(
-              child: Container(
-                width: double.infinity,
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              _header(theme, cs, isWide),
+              Padding(
                 padding: EdgeInsets.all(isWide ? 24 : 16),
                 child: _rows.isEmpty
                     ? _empty(cs)
@@ -782,8 +552,8 @@ class _CourseSessionsBulkImportPageState
                         onChanged: () => setState(() {}),
                       ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -815,7 +585,8 @@ class _CourseSessionsBulkImportPageState
           ),
           const SizedBox(height: 8),
           Text(
-            'Yêu cầu cột: title, date(dd/MM/yyyy), startTime(HH:mm), endTime(HH:mm), location, type [lecture|practice|exam|review], description(optional).',
+            'Yêu cầu cột: title, date(dd/MM/yyyy), startTime(HH:mm), endTime(HH:mm), '
+            'location, type [lecture|practice|exam|review], description(optional).',
             style: theme.textTheme.bodySmall?.copyWith(
               color: cs.onSurface.withOpacity(0.7),
               fontStyle: FontStyle.italic,
@@ -883,7 +654,7 @@ class _CourseSessionsBulkImportPageState
   }
 }
 
-// ====== UI bits reused (không còn lecturer picker) ======
+// ====== UI bits ======
 
 class _List extends StatelessWidget {
   final List<_SessionRowState> rows;
@@ -914,13 +685,83 @@ class _List extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        Expanded(
-          child: ListView.separated(
-            itemCount: rows.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, i) =>
-                _RowCard(row: rows[i], isWide: isWide, onChanged: onChanged),
+        ListView.separated(
+          itemCount: rows.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (_, i) =>
+              _RowCard(row: rows[i], isWide: isWide, onChanged: onChanged),
+          shrinkWrap: true, // quan trọng
+          physics: const NeverScrollableScrollPhysics(), // quan trọng
+        ),
+      ],
+    );
+  }
+}
+
+class _TDropdownField extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final String? value;
+  final List<DropdownMenuItem<String>> items;
+  final ValueChanged<String?> onChanged;
+  final String? hint;
+
+  const _TDropdownField({
+    required this.label,
+    required this.icon,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.hint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: cs.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: cs.onSurface.withOpacity(0.8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: value,
+          isExpanded: true,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: cs.surfaceVariant.withOpacity(0.3),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: cs.primary, width: 2),
+            ),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
           ),
+          hint: hint != null ? Text(hint!) : null,
+          items: items,
+          onChanged: onChanged,
         ),
       ],
     );
@@ -1059,18 +900,24 @@ class _RowCard extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             child: LayoutBuilder(
               builder: (context, c) {
-                final cross = c.maxWidth > 1000
+                final w = c.maxWidth;
+                // Responsive: 1 cột cho mobile hẹp
+                final cross = w >= 1100
                     ? 4
-                    : c.maxWidth > 760
+                    : w >= 900
                     ? 3
-                    : 2;
+                    : w >= 600
+                    ? 2
+                    : 1;
+                final ratio = cross >= 3 ? 5.0 : (cross == 2 ? 5.6 : 3.0);
+
                 return GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisCount: cross,
                   crossAxisSpacing: 16,
-                  mainAxisSpacing: 4,
-                  childAspectRatio: cross == 4 ? 5 : 6,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: ratio,
                   children: [
                     _TField(
                       label: 'Tiêu đề',
@@ -1090,7 +937,6 @@ class _RowCard extends StatelessWidget {
                         _reval(context);
                       },
                     ),
-
                     _TimeField(
                       label: 'Bắt đầu (HH:mm)',
                       value: row.startTime,
@@ -1100,7 +946,6 @@ class _RowCard extends StatelessWidget {
                         _reval(context);
                       },
                     ),
-
                     _TimeField(
                       label: 'Kết thúc (HH:mm)',
                       value: row.endTime,
@@ -1119,36 +964,20 @@ class _RowCard extends StatelessWidget {
                         _reval(context);
                       },
                     ),
-                    // Trường type (dropdown)
-                    DropdownButtonFormField<String>(
+                    _TDropdownField(
+                      label: 'Loại buổi học',
+                      icon: Icons.category_outlined,
                       value:
-                          row.type.isNotEmpty &&
+                          (row.type.isNotEmpty &&
                               [
                                 'lecture',
                                 'practice',
                                 'exam',
                                 'review',
-                              ].contains(row.type.toLowerCase())
+                              ].contains(row.type.toLowerCase()))
                           ? row.type.toLowerCase()
                           : null,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: cs.surfaceVariant.withOpacity(0.3),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: cs.primary, width: 2),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                        isDense: true,
-                      ),
-                      hint: const Text('Chọn loại buổi học'),
+                      hint: 'Chọn loại buổi học',
                       items: const [
                         DropdownMenuItem(
                           value: 'lecture',
@@ -1170,21 +999,12 @@ class _RowCard extends StatelessWidget {
                       onChanged: (v) {
                         if (v != null) {
                           row.type = v;
-                          final parent = context
-                              .findAncestorStateOfType<
-                                _CourseSessionsBulkImportPageState
-                              >();
-                          if (parent != null) {
-                            row.error = parent._validateRow(row);
-                            row.status = row.error == null
-                                ? _RowStatus.valid
-                                : _RowStatus.error;
-                            onChanged();
-                          }
+                          _reval(
+                            context,
+                          ); // giữ nguyên cơ chế re-validate như các field khác
                         }
                       },
                     ),
-
                     _TField(
                       label: 'Mô tả (optional)',
                       value: row.description ?? '',
@@ -1236,11 +1056,14 @@ class _TField extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: cs.primary),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-                color: cs.onSurface.withOpacity(0.8),
+            Expanded(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: cs.onSurface.withOpacity(0.8),
+                ),
               ),
             ),
           ],
@@ -1250,6 +1073,213 @@ class _TField extends StatelessWidget {
           initialValue: value,
           onChanged: onChanged,
           decoration: InputDecoration(
+            filled: true,
+            fillColor: cs.surfaceVariant.withOpacity(0.3),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: cs.primary, width: 2),
+            ),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---- Date & Time pickers ----
+
+class _DateField extends StatelessWidget {
+  final String label;
+  final String value; // dd/MM/yyyy
+  final IconData icon;
+  final ValueChanged<String> onChanged;
+
+  const _DateField({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final controller = TextEditingController(text: value);
+
+    Future<void> _pick() async {
+      DateTime? initial;
+      try {
+        if (value.trim().isNotEmpty) {
+          final p = value.split('/');
+          initial = DateTime(int.parse(p[2]), int.parse(p[1]), int.parse(p[0]));
+        }
+      } catch (_) {}
+      final now = DateTime.now();
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: initial ?? now,
+        firstDate: DateTime(now.year - 5),
+        lastDate: DateTime(now.year + 5),
+        helpText: 'Chọn ngày (dd/MM/yyyy)',
+        cancelText: 'Hủy',
+        confirmText: 'Chọn',
+        errorInvalidText: 'Ngày không hợp lệ',
+        builder: (context, child) => Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: cs.primary,
+              onPrimary: cs.onPrimary,
+            ),
+          ),
+          child: child!,
+        ),
+      );
+      if (picked != null) {
+        final s = DateFormat('dd/MM/yyyy').format(picked);
+        controller.text = s;
+        onChanged(s);
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: cs.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: cs.onSurface.withOpacity(0.8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          readOnly: true,
+          onTap: _pick,
+          decoration: InputDecoration(
+            hintText: 'dd/MM/yyyy',
+            prefixIcon: const Icon(Icons.calendar_today, size: 18),
+            filled: true,
+            fillColor: cs.surfaceVariant.withOpacity(0.3),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: cs.primary, width: 2),
+            ),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TimeField extends StatelessWidget {
+  final String label;
+  final String value; // HH:mm
+  final IconData icon;
+  final ValueChanged<String> onChanged;
+
+  const _TimeField({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onChanged,
+  });
+
+  TimeOfDay _parse(String v) {
+    try {
+      final p = v.split(':');
+      if (p.length != 2) throw Exception();
+      final h = int.parse(p[0]);
+      final m = int.parse(p[1]);
+      return TimeOfDay(hour: h, minute: m);
+    } catch (_) {
+      return const TimeOfDay(hour: 8, minute: 0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final controller = TextEditingController(text: value);
+
+    Future<void> _pick() async {
+      final picked = await showTimePicker(
+        context: context,
+        initialTime: _parse(value),
+        helpText: 'Chọn giờ (HH:mm)',
+        cancelText: 'Hủy',
+        confirmText: 'Chọn',
+        builder: (context, child) {
+          final media = MediaQuery.of(context);
+          return MediaQuery(
+            data: media.copyWith(alwaysUse24HourFormat: true),
+            child: child!,
+          );
+        },
+      );
+      if (picked != null) {
+        final h = picked.hour.toString().padLeft(2, '0');
+        final m = picked.minute.toString().padLeft(2, '0');
+        final s = '$h:$m';
+        controller.text = s;
+        onChanged(s);
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: cs.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: cs.onSurface.withOpacity(0.8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          readOnly: true,
+          onTap: _pick,
+          decoration: InputDecoration(
+            hintText: 'HH:mm',
+            prefixIcon: const Icon(Icons.schedule, size: 18),
             filled: true,
             fillColor: cs.surfaceVariant.withOpacity(0.3),
             border: OutlineInputBorder(
@@ -1369,26 +1399,16 @@ class _Status extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  (message!.startsWith('Lỗi') || message!.contains('Có lỗi'))
-                      ? Icons.error_outline
-                      : Icons.check_circle_outline,
+                  isError ? Icons.error_outline : Icons.check_circle_outline,
                   size: 16,
-                  color:
-                      (message!.startsWith('Lỗi') ||
-                          message!.contains('Có lỗi'))
-                      ? cs.error
-                      : Colors.green,
+                  color: isError ? cs.error : Colors.green,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     message!,
                     style: TextStyle(
-                      color:
-                          (message!.startsWith('Lỗi') ||
-                              message!.contains('Có lỗi'))
-                          ? cs.error
-                          : Colors.green,
+                      color: isError ? cs.error : Colors.green,
                       fontWeight: FontWeight.w500,
                     ),
                   ),

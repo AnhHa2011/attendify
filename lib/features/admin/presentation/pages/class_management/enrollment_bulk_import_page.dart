@@ -269,8 +269,16 @@ class _EnrollmentBulkImportPageState
           stream: context.read<AdminService>().getAllStudentsStream(),
           builder: (_, stuSnap) {
             if (stuSnap.hasError) {
-              return _buildFatalError(
-                'Lỗi tải danh sách sinh viên: ${stuSnap.error}',
+              // lỗi students: vẫn cho cuộn để xem hết thông báo
+              return SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: _StatusCard(
+                    fileName: _fileName,
+                    message: 'Lỗi tải danh sách sinh viên: ${stuSnap.error}',
+                    colorScheme: Theme.of(context).colorScheme,
+                  ),
+                ),
               );
             }
             final students = stuSnap.data ?? [];
@@ -280,26 +288,32 @@ class _EnrollmentBulkImportPageState
                 classCode: widget.classModel.id,
               ),
               builder: (_, enrSnap) {
+                final theme = Theme.of(context);
+                final colorScheme = theme.colorScheme;
+                final isWideScreen = MediaQuery.of(context).size.width > 800;
+
+                // ===== lỗi enrollments: header + status, tất cả trong 1 scroll =====
                 if (enrSnap.hasError) {
-                  // Hiển thị lỗi stream để không crash
-                  return Column(
-                    children: [
-                      _buildHeader(
-                        theme,
-                        colorScheme,
-                        isWideScreen,
-                        enableSubmit: false,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: _StatusCard(
-                          fileName: _fileName,
-                          message:
-                              'Lỗi tải enrollments (${widget.classModel.classCode}): ${enrSnap.error}',
-                          colorScheme: colorScheme,
+                  return SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _buildHeader(
+                          theme,
+                          colorScheme,
+                          isWideScreen,
+                          enableSubmit: false,
                         ),
-                      ),
-                    ],
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: _StatusCard(
+                            fileName: _fileName,
+                            message:
+                                'Lỗi tải enrollments (${widget.classModel.classCode}): ${enrSnap.error}',
+                            colorScheme: colorScheme,
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 }
 
@@ -327,21 +341,21 @@ class _EnrollmentBulkImportPageState
                     importable > 0 &&
                     importable <= remaining;
 
-                return Column(
-                  children: [
-                    _buildHeader(
-                      theme,
-                      colorScheme,
-                      isWideScreen,
-                      enableSubmit: canSubmit,
-                      onSubmit: () => _submit(students, enrollments),
-                      remaining: remaining,
-                      importable: importable,
-                      inFile: inFile,
-                    ),
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
+                // ===== TRANG CUỘN: header + content (không dùng Expanded) =====
+                return SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildHeader(
+                        theme,
+                        colorScheme,
+                        isWideScreen,
+                        enableSubmit: canSubmit,
+                        onSubmit: () => _submit(students, enrollments),
+                        remaining: remaining,
+                        importable: importable,
+                        inFile: inFile,
+                      ),
+                      Padding(
                         padding: EdgeInsets.all(isWideScreen ? 24 : 16),
                         child: _rows.isEmpty
                             ? _EmptyState(colorScheme: colorScheme)
@@ -353,8 +367,8 @@ class _EnrollmentBulkImportPageState
                                 onChanged: () => setState(() {}),
                               ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 );
               },
             );
@@ -671,34 +685,33 @@ class _DataList extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        Expanded(
-          child: ListView.separated(
-            itemCount: rows.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, index) {
-              return _EnrollmentRowCard(
-                row: rows[index],
-                allStudents: allStudents,
-                allEnrollments: allEnrollments,
-                isWideScreen: isWideScreen,
-                onChanged: () {
-                  rows[index].error = null;
-                  final parent = context
-                      .findAncestorStateOfType<
-                        _EnrollmentBulkImportPageState
-                      >();
-                  if (parent != null) {
-                    rows[index].error = parent._validateRow(
-                      rows[index],
-                      allStudents,
-                      allEnrollments,
-                    );
-                  }
-                  onChanged();
-                },
-              );
-            },
-          ),
+        // List không cuộn, để trang mẹ cuộn
+        ListView.separated(
+          itemCount: rows.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (_, index) {
+            return _EnrollmentRowCard(
+              row: rows[index],
+              allStudents: allStudents,
+              allEnrollments: allEnrollments,
+              isWideScreen: isWideScreen,
+              onChanged: () {
+                rows[index].error = null;
+                final parent = context
+                    .findAncestorStateOfType<_EnrollmentBulkImportPageState>();
+                if (parent != null) {
+                  rows[index].error = parent._validateRow(
+                    rows[index],
+                    allStudents,
+                    allEnrollments,
+                  );
+                }
+                onChanged();
+              },
+            );
+          },
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
         ),
       ],
     );
@@ -864,11 +877,18 @@ class _EnrollmentRowCard extends StatelessWidget {
   Widget _buildFormGrid(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth > 900
+        final w = constraints.maxWidth;
+        // 4 / 3 / 2 / 1 cột tùy độ rộng, mobile rất hẹp xuống 1 cột
+        final crossAxisCount = w >= 1100
             ? 4
-            : constraints.maxWidth > 600
+            : w >= 900
             ? 3
-            : 2;
+            : w >= 600
+            ? 2
+            : 1;
+        final ratio = crossAxisCount >= 3
+            ? 5.0
+            : (crossAxisCount == 2 ? 5.6 : 3.0);
 
         return GridView.count(
           shrinkWrap: true,
@@ -876,7 +896,7 @@ class _EnrollmentRowCard extends StatelessWidget {
           crossAxisCount: crossAxisCount,
           crossAxisSpacing: 16,
           mainAxisSpacing: 4,
-          childAspectRatio: crossAxisCount == 4 ? 5 : 6,
+          childAspectRatio: ratio,
           children: [
             _FormField(
               label: 'Email sinh viên',

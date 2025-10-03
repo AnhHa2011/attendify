@@ -267,100 +267,110 @@ class _UserBulkImportPageState extends State<UserBulkImportPage> {
         foregroundColor: colorScheme.onSurface,
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // Header Section with Actions
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(isWideScreen ? 24 : 16),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                boxShadow: [
-                  BoxShadow(
-                    color: colorScheme.shadow.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: SingleChildScrollView(
+          child: Builder(
+            builder: (context) {
+              final theme = Theme.of(context);
+              final colorScheme = theme.colorScheme;
+              final isWideScreen = MediaQuery.of(context).size.width > 800;
+
+              return Column(
                 children: [
-                  Text(
-                    'Tải lên file Excel để nhập hàng loạt',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w500,
+                  // Header Section with Actions (giữ nguyên nội dung cũ)
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(isWideScreen ? 24 : 16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorScheme.shadow.withOpacity(0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Lưu ý: Email không được trùng lặp trong file. Role phải là "student" hoặc "lecturer". Nếu không có password, hệ thống sẽ dùng mật khẩu tạm và gửi email reset.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurface.withOpacity(0.7),
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tải lên file Excel để nhập hàng loạt',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: colorScheme.onSurface,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Lưu ý: Email không được trùng lặp trong file. Role phải là "student" hoặc "lecturer". Nếu không có password, hệ thống sẽ dùng mật khẩu tạm và gửi email reset.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface.withOpacity(0.7),
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
 
-                  // Action Buttons
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      _ActionButton(
-                        icon: Icons.download_outlined,
-                        label: 'Tải template',
-                        onPressed: () => TemplateDownloader.download('user'),
-                        variant: _ButtonVariant.outlined,
-                      ),
-                      _ActionButton(
-                        icon: Icons.upload_file_outlined,
-                        label: 'Chọn file Excel',
-                        onPressed: _pickFile,
-                        variant: _ButtonVariant.filled,
-                      ),
-                      _ActionButton(
-                        icon: _submitting
-                            ? Icons.hourglass_empty
-                            : Icons.cloud_upload_outlined,
-                        label: _submitting ? 'Đang xử lý...' : 'Thực hiện nhập',
-                        onPressed: (_allValid() && !_submitting)
-                            ? _submit
-                            : null,
-                        variant: _ButtonVariant.primary,
-                      ),
-                    ],
+                        // Action Buttons
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            _ActionButton(
+                              icon: Icons.download_outlined,
+                              label: 'Tải template',
+                              onPressed: () =>
+                                  TemplateDownloader.download('user'),
+                              variant: _ButtonVariant.outlined,
+                            ),
+                            _ActionButton(
+                              icon: Icons.upload_file_outlined,
+                              label: 'Chọn file Excel',
+                              onPressed: _pickFile,
+                              variant: _ButtonVariant.filled,
+                            ),
+                            _ActionButton(
+                              icon: _submitting
+                                  ? Icons.hourglass_empty
+                                  : Icons.cloud_upload_outlined,
+                              label: _submitting
+                                  ? 'Đang xử lý...'
+                                  : 'Thực hiện nhập',
+                              onPressed: (_allValid() && !_submitting)
+                                  ? _submit
+                                  : null,
+                              variant: _ButtonVariant.primary,
+                            ),
+                          ],
+                        ),
+
+                        // File and Status Info
+                        if (_fileName != null || _message != null) ...[
+                          const SizedBox(height: 16),
+                          _StatusCard(
+                            fileName: _fileName,
+                            message: _message,
+                            colorScheme: colorScheme,
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
 
-                  // File and Status Info
-                  if (_fileName != null || _message != null) ...[
-                    const SizedBox(height: 16),
-                    _StatusCard(
-                      fileName: _fileName,
-                      message: _message,
-                      colorScheme: colorScheme,
-                    ),
-                  ],
+                  // Content Area (không dùng Expanded; list phía dưới không tự cuộn)
+                  Padding(
+                    padding: EdgeInsets.all(isWideScreen ? 24 : 16),
+                    child: _rows.isEmpty
+                        ? _EmptyState(colorScheme: colorScheme)
+                        : _DataList(
+                            rows: _rows,
+                            isWideScreen: isWideScreen,
+                            onChanged: () => setState(() {}),
+                          ),
+                  ),
                 ],
-              ),
-            ),
-
-            // Content Area
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(isWideScreen ? 24 : 16),
-                child: _rows.isEmpty
-                    ? _EmptyState(colorScheme: colorScheme)
-                    : _DataList(
-                        rows: _rows,
-                        isWideScreen: isWideScreen,
-                        onChanged: () => setState(() {}),
-                      ),
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -568,23 +578,20 @@ class _DataList extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-
-        // List
-        Expanded(
-          child: ListView.separated(
-            itemCount: rows.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, index) {
-              return _UserRowCard(
-                row: rows[index],
-                isWideScreen: isWideScreen,
-                onChanged: () {
-                  rows[index].error = null;
-                  onChanged();
-                },
-              );
+        // Thay phần List trong _DataList:
+        ListView.separated(
+          itemCount: rows.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (_, index) => _UserRowCard(
+            row: rows[index],
+            isWideScreen: isWideScreen,
+            onChanged: () {
+              rows[index].error = null;
+              onChanged();
             },
           ),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
         ),
       ],
     );
@@ -775,52 +782,65 @@ class _UserRowCard extends StatelessWidget {
   Widget _buildFormGrid(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth > 600 ? 2 : 1;
+        // responsive columns giống các page trước
+        final cols = constraints.maxWidth >= 900
+            ? 3
+            : constraints.maxWidth >= 600
+            ? 2
+            : 1;
+        const spacing = 16.0;
+        final tileW = (constraints.maxWidth - spacing * (cols - 1)) / cols;
 
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 4,
-          childAspectRatio: crossAxisCount == 2 ? 7 : 8,
+        Widget cell(Widget child) => SizedBox(width: tileW, child: child);
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: 8,
           children: [
-            _FormField(
-              label: 'Email',
-              value: row.email,
-              icon: Icons.email_outlined,
-              onChanged: (v) {
-                row.email = v.trim().toLowerCase();
-                onChanged();
-              },
+            cell(
+              _FormField(
+                label: 'Email',
+                value: row.email,
+                icon: Icons.email_outlined,
+                onChanged: (v) {
+                  row.email = v.trim().toLowerCase();
+                  onChanged();
+                },
+              ),
             ),
-            _FormField(
-              label: 'Tên hiển thị',
-              value: row.displayName,
-              icon: Icons.person_outline,
-              onChanged: (v) {
-                row.displayName = v.trim();
-                onChanged();
-              },
+            cell(
+              _FormField(
+                label: 'Tên hiển thị',
+                value: row.displayName,
+                icon: Icons.person_outline,
+                onChanged: (v) {
+                  row.displayName = v.trim();
+                  onChanged();
+                },
+              ),
             ),
-            _FormField(
-              label: 'Vai trò (student/lecturer)',
-              value: row.role,
-              icon: Icons.assignment_ind_outlined,
-              onChanged: (v) {
-                row.role = v.trim().toLowerCase();
-                onChanged();
-              },
+            cell(
+              _FormField(
+                label: 'Vai trò (student/lecturer)',
+                value: row.role,
+                icon: Icons.assignment_ind_outlined,
+                onChanged: (v) {
+                  row.role = v.trim().toLowerCase();
+                  onChanged();
+                },
+              ),
             ),
-            _FormField(
-              label: 'Mật khẩu (tùy chọn)',
-              value: row.password ?? '',
-              icon: Icons.lock_outline,
-              obscureText: true,
-              onChanged: (v) {
-                row.password = v.trim().isEmpty ? null : v.trim();
-                onChanged();
-              },
+            cell(
+              _FormField(
+                label: 'Mật khẩu (tùy chọn)',
+                value: row.password ?? '',
+                icon: Icons.lock_outline,
+                obscureText: true,
+                onChanged: (v) {
+                  row.password = v.trim().isEmpty ? null : v.trim();
+                  onChanged();
+                },
+              ),
             ),
           ],
         );

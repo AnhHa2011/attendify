@@ -257,8 +257,8 @@ class _AdminDashboardState extends State<AdminDashboard>
           _buildStatsGrid(),
           const SizedBox(height: 24),
           _buildQuickActions(),
-          const SizedBox(height: 24),
-          _buildRecentActivity(),
+          // const SizedBox(height: 24),
+          // _buildRecentActivity(),
         ],
       ),
     );

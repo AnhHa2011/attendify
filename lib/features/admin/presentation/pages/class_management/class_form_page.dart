@@ -77,7 +77,7 @@ class _ClassFormPageState extends State<ClassFormPage> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Mã môn học "$classCode" đã tồn tại.'),
+                content: Text('Mã lớp học "$classCode" đã tồn tại.'),
                 backgroundColor: Colors.red,
               ),
             );

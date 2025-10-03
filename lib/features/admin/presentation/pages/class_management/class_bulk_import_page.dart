@@ -279,97 +279,92 @@ class _ClassBulkImportPageState extends State<ClassBulkImportPage> {
         foregroundColor: colorScheme.onSurface,
       ),
       body: SafeArea(
-        child: StreamBuilder<List<ClassModel>>(
-          stream: context.read<AdminService>().getAllClassStream(),
-          builder: (context, snapshot) {
-            final all = snapshot.data ?? [];
+        child: SingleChildScrollView(
+          child: StreamBuilder<List<ClassModel>>(
+            stream: context.read<AdminService>().getAllClassStream(),
+            builder: (context, snapshot) {
+              final all = snapshot.data ?? [];
 
-            return Column(
-              children: [
-                // Header Section with Actions
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(isWideScreen ? 24 : 16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.shadow.withOpacity(0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Tải lên file Excel để nhập hàng loạt',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Lưu ý: Mã lớp không được trùng lặp trong file và không được trùng với lớp đã có trong hệ thống',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurface.withOpacity(0.7),
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Action Buttons
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          _ActionButton(
-                            icon: Icons.download_outlined,
-                            label: 'Tải template',
-                            onPressed: () =>
-                                TemplateDownloader.download('class'),
-                            variant: _ButtonVariant.outlined,
-                          ),
-                          _ActionButton(
-                            icon: Icons.upload_file_outlined,
-                            label: 'Chọn file Excel',
-                            onPressed: _pickFile,
-                            variant: _ButtonVariant.filled,
-                          ),
-                          _ActionButton(
-                            icon: _submitting
-                                ? Icons.hourglass_empty
-                                : Icons.cloud_upload_outlined,
-                            label: _submitting
-                                ? 'Đang xử lý...'
-                                : 'Thực hiện nhập',
-                            onPressed: (_allValid(all) && !_submitting)
-                                ? () => _submit(all)
-                                : null,
-                            variant: _ButtonVariant.primary,
-                          ),
-                        ],
-                      ),
-
-                      // File and Status Info
-                      if (_fileName != null || _message != null) ...[
-                        const SizedBox(height: 16),
-                        _StatusCard(
-                          fileName: _fileName,
-                          message: _message,
-                          colorScheme: colorScheme,
+              return Column(
+                children: [
+                  // Header Section with Actions (giữ nguyên)
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(isWideScreen ? 24 : 16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorScheme.shadow.withOpacity(0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
-                    ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tải lên file Excel để nhập hàng loạt',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: colorScheme.onSurface,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Lưu ý: Mã lớp không được trùng lặp trong file và không được trùng với lớp đã có trong hệ thống',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface.withOpacity(0.7),
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            _ActionButton(
+                              icon: Icons.download_outlined,
+                              label: 'Tải template',
+                              onPressed: () =>
+                                  TemplateDownloader.download('class'),
+                              variant: _ButtonVariant.outlined,
+                            ),
+                            _ActionButton(
+                              icon: Icons.upload_file_outlined,
+                              label: 'Chọn file Excel',
+                              onPressed: _pickFile,
+                              variant: _ButtonVariant.filled,
+                            ),
+                            _ActionButton(
+                              icon: _submitting
+                                  ? Icons.hourglass_empty
+                                  : Icons.cloud_upload_outlined,
+                              label: _submitting
+                                  ? 'Đang xử lý...'
+                                  : 'Thực hiện nhập',
+                              onPressed: (_allValid(all) && !_submitting)
+                                  ? () => _submit(all)
+                                  : null,
+                              variant: _ButtonVariant.primary,
+                            ),
+                          ],
+                        ),
+                        if (_fileName != null || _message != null) ...[
+                          const SizedBox(height: 16),
+                          _StatusCard(
+                            fileName: _fileName,
+                            message: _message,
+                            colorScheme: colorScheme,
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
 
-                // Content Area
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
+                  // Content (không dùng Expanded)
+                  Padding(
                     padding: EdgeInsets.all(isWideScreen ? 24 : 16),
                     child: _rows.isEmpty
                         ? _EmptyState(colorScheme: colorScheme)
@@ -380,10 +375,10 @@ class _ClassBulkImportPageState extends State<ClassBulkImportPage> {
                             onChanged: () => setState(() {}),
                           ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -587,24 +582,23 @@ class _DataList extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-
-        // List
-        Expanded(
-          child: ListView.separated(
-            itemCount: rows.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, index) {
-              return _RowCard(
-                row: rows[index],
-                allClasses: allClasses,
-                isWideScreen: isWideScreen,
-                onChanged: () {
-                  rows[index].error = null;
-                  onChanged();
-                },
-              );
-            },
-          ),
+        // List (không cuộn riêng)
+        ListView.separated(
+          itemCount: rows.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (_, index) {
+            return _RowCard(
+              row: rows[index],
+              allClasses: allClasses,
+              isWideScreen: isWideScreen,
+              onChanged: () {
+                rows[index].error = null;
+                onChanged();
+              },
+            );
+          },
+          shrinkWrap: true, // quan trọng
+          physics: const NeverScrollableScrollPhysics(), // quan trọng
         ),
       ],
     );
@@ -781,7 +775,13 @@ class _RowCard extends StatelessWidget {
   Widget _buildFormGrid(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth > 600 ? 3 : 2;
+        final w = constraints.maxWidth;
+        final crossAxisCount = w >= 1000
+            ? 3
+            : w >= 700
+            ? 2
+            : 1;
+        final childRatio = crossAxisCount == 1 ? 3.2 : 6.0;
 
         return GridView.count(
           shrinkWrap: true,
@@ -789,7 +789,7 @@ class _RowCard extends StatelessWidget {
           crossAxisCount: crossAxisCount,
           crossAxisSpacing: 16,
           mainAxisSpacing: 4,
-          childAspectRatio: 6,
+          childAspectRatio: childRatio,
           children: [
             _FormField(
               label: 'Mã lớp',

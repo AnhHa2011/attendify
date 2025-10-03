@@ -118,6 +118,9 @@ class _DatePickerField extends StatelessWidget {
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            constraints: const BoxConstraints(
+              minHeight: 48,
+            ), // <-- thêm dòng này
             decoration: BoxDecoration(
               color: colorScheme.surfaceVariant.withOpacity(0.3),
               borderRadius: BorderRadius.circular(8),
@@ -494,90 +497,94 @@ class _CourseBulkImportPageState extends State<CourseBulkImportPage> {
                   }
                 }
 
-                return Column(
-                  children: [
-                    // Header Section with Actions
-                    Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.all(isWideScreen ? 24 : 16),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surface,
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.shadow.withOpacity(0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Tải lên file Excel để nhập hàng loạt',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: colorScheme.onSurface,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Lưu ý: Mã môn học không được trùng lặp trong file và không được trùng với môn học đã có trong hệ thống. Ngày bắt đầu và kết thúc là bắt buộc. Phải chọn giảng viên từ danh sách có sẵn.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurface.withOpacity(0.7),
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
-                            children: [
-                              _ActionButton(
-                                icon: Icons.download_outlined,
-                                label: 'Tải template',
-                                onPressed: () =>
-                                    TemplateDownloader.download('course'),
-                                variant: _ButtonVariant.outlined,
-                              ),
-                              _ActionButton(
-                                icon: Icons.upload_file_outlined,
-                                label: 'Chọn file Excel',
-                                onPressed: _pickFile,
-                                variant: _ButtonVariant.filled,
-                              ),
-                              _ActionButton(
-                                icon: _submitting
-                                    ? Icons.hourglass_empty
-                                    : Icons.cloud_upload_outlined,
-                                label: _submitting
-                                    ? 'Đang xử lý...'
-                                    : 'Thực hiện nhập',
-                                onPressed:
-                                    (_allValid(courses, lecturers) &&
-                                        !_submitting)
-                                    ? () => _submit(courses, lecturers)
-                                    : null,
-                                variant: _ButtonVariant.primary,
-                              ),
-                            ],
-                          ),
-                          if (_fileName != null || _message != null) ...[
-                            const SizedBox(height: 16),
-                            _StatusCard(
-                              fileName: _fileName,
-                              message: _message,
-                              colorScheme: colorScheme,
+                final theme = Theme.of(context);
+                final colorScheme = theme.colorScheme;
+                final isWideScreen = MediaQuery.of(context).size.width > 800;
+
+                // Toàn bộ trang (trừ AppBar) nằm trong 1 scroll
+                return SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // Header Section with Actions (giữ code cũ)
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(isWideScreen ? 24 : 16),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface,
+                          boxShadow: [
+                            BoxShadow(
+                              color: colorScheme.shadow.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
                           ],
-                        ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tải lên file Excel để nhập hàng loạt',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: colorScheme.onSurface,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Lưu ý: Mã môn học không được trùng lặp trong file và không được trùng với môn học đã có trong hệ thống. Ngày bắt đầu và kết thúc là bắt buộc. Phải chọn giảng viên từ danh sách có sẵn.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurface.withOpacity(0.7),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: [
+                                _ActionButton(
+                                  icon: Icons.download_outlined,
+                                  label: 'Tải template',
+                                  onPressed: () =>
+                                      TemplateDownloader.download('course'),
+                                  variant: _ButtonVariant.outlined,
+                                ),
+                                _ActionButton(
+                                  icon: Icons.upload_file_outlined,
+                                  label: 'Chọn file Excel',
+                                  onPressed: _pickFile,
+                                  variant: _ButtonVariant.filled,
+                                ),
+                                _ActionButton(
+                                  icon: _submitting
+                                      ? Icons.hourglass_empty
+                                      : Icons.cloud_upload_outlined,
+                                  label: _submitting
+                                      ? 'Đang xử lý...'
+                                      : 'Thực hiện nhập',
+                                  onPressed:
+                                      (_allValid(courses, lecturers) &&
+                                          !_submitting)
+                                      ? () => _submit(courses, lecturers)
+                                      : null,
+                                  variant: _ButtonVariant.primary,
+                                ),
+                              ],
+                            ),
+                            if (_fileName != null || _message != null) ...[
+                              const SizedBox(height: 16),
+                              _StatusCard(
+                                fileName: _fileName,
+                                message: _message,
+                                colorScheme: colorScheme,
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
-                    ),
 
-                    // Content Area
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
+                      // Content Area (không dùng Expanded; để trang mẹ cuộn)
+                      Padding(
                         padding: EdgeInsets.all(isWideScreen ? 24 : 16),
                         child: _rows.isEmpty
                             ? _EmptyState(colorScheme: colorScheme)
@@ -589,8 +596,8 @@ class _CourseBulkImportPageState extends State<CourseBulkImportPage> {
                                 onChanged: () => setState(() {}),
                               ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 );
               },
             );
@@ -799,33 +806,33 @@ class _DataList extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        Expanded(
-          child: ListView.separated(
-            itemCount: rows.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, index) {
-              return _CourseRowCard(
-                row: rows[index],
-                allCourses: allCourses,
-                lecturers: lecturers,
-                isWideScreen: isWideScreen,
-                onChanged: () {
-                  // Clear error + re-validate tức thì
-                  rows[index].error = null;
-                  final parent = context
-                      .findAncestorStateOfType<_CourseBulkImportPageState>();
-                  if (parent != null) {
-                    rows[index].error = parent._validateRow(
-                      rows[index],
-                      allCourses,
-                      lecturers,
-                    );
-                  }
-                  onChanged();
-                },
-              );
-            },
-          ),
+        // List không cuộn, để SingleChildScrollView của trang cuộn
+        ListView.separated(
+          itemCount: rows.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (_, index) {
+            return _CourseRowCard(
+              row: rows[index],
+              allCourses: allCourses,
+              lecturers: lecturers,
+              isWideScreen: isWideScreen,
+              onChanged: () {
+                rows[index].error = null;
+                final parent = context
+                    .findAncestorStateOfType<_CourseBulkImportPageState>();
+                if (parent != null) {
+                  rows[index].error = parent._validateRow(
+                    rows[index],
+                    allCourses,
+                    lecturers,
+                  );
+                }
+                onChanged();
+              },
+            );
+          },
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
         ),
       ],
     );
@@ -1002,143 +1009,173 @@ class _CourseRowCard extends StatelessWidget {
   Widget _buildFormGrid(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth > 900
+        final w = constraints.maxWidth;
+
+        // Responsive columns: 4 / 3 / 2 / 1
+        final cols = w >= 1100
             ? 4
-            : constraints.maxWidth > 600
+            : w >= 900
             ? 3
-            : 2;
+            : w >= 600
+            ? 2
+            : 1;
+        const spacing = 16.0;
 
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 4,
-          childAspectRatio: crossAxisCount == 4 ? 5 : 6,
+        // Tính width mỗi “ô”
+        final tileW = (w - spacing * (cols - 1)) / cols;
+
+        // Helper: 1 ô hoặc span nhiều cột
+        Widget cell(Widget child, {int span = 1}) {
+          final width = span >= cols ? w : tileW * span + spacing * (span - 1);
+          return SizedBox(width: width, child: child);
+        }
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: 8,
           children: [
-            _FormField(
-              label: 'Mã môn học',
-              value: row.courseCode,
-              icon: Icons.tag,
-              onChanged: (v) {
-                row.courseCode = v.trim().toUpperCase();
-                row.error = null;
-                onChanged();
-              },
-            ),
-            _FormField(
-              label: 'Tên môn học',
-              value: row.courseName,
-              icon: Icons.book_outlined,
-              onChanged: (v) {
-                row.courseName = v.trim();
-                row.error = null;
-                onChanged();
-              },
-            ),
-            // Dropdown chọn giảng viên (clear lỗi ngay khi chọn)
-            _LecturerDropdownField(
-              label: 'Chọn giảng viên',
-              value: row.lecturerId,
-              lecturers: lecturers,
-              suggestedEmail: row.lecturerEmail,
-              onChanged: (lecturerId) {
-                row.lecturerId = lecturerId;
-                // clear lỗi và re-validate
-                final parent = context
-                    .findAncestorStateOfType<_CourseBulkImportPageState>();
-                if (parent != null) {
-                  row.error = parent._validateRow(row, allCourses, lecturers);
-                } else {
+            cell(
+              _FormField(
+                label: 'Mã môn học',
+                value: row.courseCode,
+                icon: Icons.tag,
+                onChanged: (v) {
+                  row.courseCode = v.trim().toUpperCase();
                   row.error = null;
-                }
-                onChanged();
-              },
+                  onChanged();
+                },
+              ),
+            ),
+            cell(
+              _FormField(
+                label: 'Tên môn học',
+                value: row.courseName,
+                icon: Icons.book_outlined,
+                onChanged: (v) {
+                  row.courseName = v.trim();
+                  row.error = null;
+                  onChanged();
+                },
+              ),
+            ),
+            cell(
+              _LecturerDropdownField(
+                label: 'Chọn giảng viên',
+                value: row.lecturerId,
+                lecturers: lecturers,
+                suggestedEmail: row.lecturerEmail,
+                onChanged: (lecturerId) {
+                  row.lecturerId = lecturerId;
+                  final parent = context
+                      .findAncestorStateOfType<_CourseBulkImportPageState>();
+                  if (parent != null) {
+                    row.error = parent._validateRow(row, allCourses, lecturers);
+                  } else {
+                    row.error = null;
+                  }
+                  onChanged();
+                },
+              ),
             ),
 
-            _FormField(
-              label: 'Học kỳ',
-              value: row.semester,
-              icon: Icons.school_outlined,
-              onChanged: (v) {
-                row.semester = v.trim();
-                row.error = null;
-                onChanged();
-              },
+            cell(
+              _FormField(
+                label: 'Học kỳ',
+                value: row.semester,
+                icon: Icons.school_outlined,
+                onChanged: (v) {
+                  row.semester = v.trim();
+                  row.error = null;
+                  onChanged();
+                },
+              ),
             ),
-            _FormField(
-              label: 'Số tín chỉ',
-              value: '${row.credits}',
-              icon: Icons.grade_outlined,
-              keyboardType: TextInputType.number,
-              onChanged: (v) {
-                row.credits = int.tryParse(v) ?? 0;
-                row.error = null;
-                onChanged();
-              },
+            cell(
+              _FormField(
+                label: 'Số tín chỉ',
+                value: '${row.credits}',
+                icon: Icons.grade_outlined,
+                keyboardType: TextInputType.number,
+                onChanged: (v) {
+                  row.credits = int.tryParse(v) ?? 0;
+                  row.error = null;
+                  onChanged();
+                },
+              ),
             ),
-            _FormField(
-              label: 'Số lượng sinh viên tối thiểu',
-              value: '${row.minStudents}',
-              icon: Icons.people_outline,
-              keyboardType: TextInputType.number,
-              onChanged: (v) {
-                row.minStudents = int.tryParse(v) ?? 0;
-                row.error = null;
-                onChanged();
-              },
+            cell(
+              _FormField(
+                label: 'Số lượng sinh viên tối thiểu',
+                value: '${row.minStudents}',
+                icon: Icons.people_outline,
+                keyboardType: TextInputType.number,
+                onChanged: (v) {
+                  row.minStudents = int.tryParse(v) ?? 0;
+                  row.error = null;
+                  onChanged();
+                },
+              ),
             ),
-            _FormField(
-              label: 'Số lượng sinh viên tối đa',
-              value: '${row.maxStudents}',
-              icon: Icons.people,
-              keyboardType: TextInputType.number,
-              onChanged: (v) {
-                row.maxStudents = int.tryParse(v) ?? 0;
-                row.error = null;
-                onChanged();
-              },
+            cell(
+              _FormField(
+                label: 'Số lượng sinh viên tối đa',
+                value: '${row.maxStudents}',
+                icon: Icons.people,
+                keyboardType: TextInputType.number,
+                onChanged: (v) {
+                  row.maxStudents = int.tryParse(v) ?? 0;
+                  row.error = null;
+                  onChanged();
+                },
+              ),
             ),
-            _FormField(
-              label: 'Số buổi vắng mặt tối đa',
-              value: '${row.maxAbsences}',
-              icon: Icons.event_busy,
-              keyboardType: TextInputType.number,
-              onChanged: (v) {
-                row.maxAbsences = int.tryParse(v) ?? 0;
-                row.error = null;
-                onChanged();
-              },
+            cell(
+              _FormField(
+                label: 'Số buổi vắng mặt tối đa',
+                value: '${row.maxAbsences}',
+                icon: Icons.event_busy,
+                keyboardType: TextInputType.number,
+                onChanged: (v) {
+                  row.maxAbsences = int.tryParse(v) ?? 0;
+                  row.error = null;
+                  onChanged();
+                },
+              ),
             ),
-            // Date pickers — clear lỗi khi chọn
-            _DatePickerField(
-              label: 'Ngày bắt đầu (bắt buộc)',
-              value: row.startDate,
-              onChanged: (date) {
-                row.startDate = date;
-                // Cải tiến UX: Nếu ngày kết thúc không còn hợp lệ, xóa nó đi
-                if (row.endDate != null && date != null) {
-                  if (!row.endDate!.isAfter(date)) {
+
+            // Date pickers
+            cell(
+              _DatePickerField(
+                label: 'Ngày bắt đầu (bắt buộc)',
+                value: row.startDate,
+                onChanged: (date) {
+                  row.startDate = date;
+                  if (row.endDate != null &&
+                      date != null &&
+                      !row.endDate!.isAfter(date)) {
                     row.endDate = null;
                   }
-                }
-                onChanged(); // Gọi onChanged để cập nhật UI và validate lại
-              },
+                  onChanged();
+                },
+              ),
             ),
-            _DatePickerField(
-              label: 'Ngày kết thúc (bắt buộc)',
-              value: row.endDate,
-              // Cải tiến UX: Chặn chọn ngày không hợp lệ
-              firstSelectableDate: row.startDate?.add(const Duration(days: 1)),
-              onChanged: (date) {
-                row.endDate = date;
-                onChanged(); // Gọi onChanged để cập nhật UI và validate lại
-              },
+            cell(
+              _DatePickerField(
+                label: 'Ngày kết thúc (bắt buộc)',
+                value: row.endDate,
+                firstSelectableDate: row.startDate?.add(
+                  const Duration(days: 1),
+                ),
+                onChanged: (date) {
+                  row.endDate = date;
+                  onChanged();
+                },
+              ),
             ),
-            // Description spans full width
-            Container(
-              constraints: BoxConstraints(minWidth: constraints.maxWidth),
-              child: _FormField(
+
+            // Mô tả: full width
+            cell(
+              _FormField(
                 label: 'Mô tả',
                 value: row.description ?? '',
                 icon: Icons.description_outlined,
@@ -1149,6 +1186,7 @@ class _CourseRowCard extends StatelessWidget {
                   onChanged();
                 },
               ),
+              span: cols,
             ),
           ],
         );
