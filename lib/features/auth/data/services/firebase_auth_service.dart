@@ -160,7 +160,6 @@ class FirebaseAuthService {
     if (!isActive) {
       // Nếu không active, đăng xuất khỏi cả Firebase và Google rồi báo lỗi
       await _auth.signOut();
-      await g.GoogleSignIn().signOut();
       throw Exception(
         'Tài khoản của bạn đã bị vô hiệu hoá. Vui lòng liên hệ quản trị viên.',
       );

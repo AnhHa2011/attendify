@@ -4,7 +4,6 @@ import 'package:attendify/core/data/models/class_enrollment_model.dart';
 
 import '../../../../app_imports.dart';
 import '../../../../core/data/models/attendance_model.dart';
-import '../../../../core/data/models/course_schedule_model.dart';
 import '../../../../core/data/models/enrollment_model.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_core/firebase_core.dart' as firebase_core;
