@@ -323,10 +323,9 @@ class _LecturerCoursesScreenState extends State<LecturerCoursesScreen> {
       elevation: 2,
       child: InkWell(
         onTap: () {
-          Navigator.push(
-            context,
+          Navigator.of(context, rootNavigator: true).push(
             MaterialPageRoute(
-              builder: (context) => CourseDetail(courseCode: courseCode),
+              builder: (_) => CourseDetail(courseCode: courseCode),
             ),
           );
         },

@@ -777,7 +777,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
         }
         if (courseSnap.hasError || !courseSnap.hasData) {
           return Scaffold(
-            appBar: AppBar(automaticallyImplyLeading: false),
+            appBar: AppBar(title: Text('Thông tin môn học')),
             body: Center(
               child: Text(courseSnap.error?.toString() ?? 'Không tìm thấy môn'),
             ),
@@ -789,6 +789,11 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
         final lecturer = richCourse.lecturer;
 
         return Scaffold(
+          appBar: AppBar(
+            title: const Text('Thông tin môn học'),
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            foregroundColor: Theme.of(context).colorScheme.onSurface,
+          ),
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           floatingActionButton: SafeArea(
             child: Padding(

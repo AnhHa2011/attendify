@@ -53,7 +53,6 @@ class AdminCourseDetailPage extends StatelessWidget {
           value: richCourse,
           child: Scaffold(
             appBar: AppBar(
-              automaticallyImplyLeading: false,
               title: Text(courseInfo.courseName),
               leading: IconButton(
                 onPressed: () => Navigator.of(context).pop(),

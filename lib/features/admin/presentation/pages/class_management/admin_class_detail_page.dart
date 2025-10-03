@@ -40,7 +40,6 @@ class AdminClassDetailPage extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            automaticallyImplyLeading: false,
             title: Text(classInfo.className),
             leading: IconButton(
               onPressed: () => Navigator.of(context).pop(),

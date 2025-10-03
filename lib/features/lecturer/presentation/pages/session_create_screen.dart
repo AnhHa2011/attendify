@@ -210,7 +210,7 @@ class _SessionCreateState extends State<SessionCreate> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
+        // automaticallyImplyLeading: false,
         title: const Text('Tạo buổi học mới'),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
       ),

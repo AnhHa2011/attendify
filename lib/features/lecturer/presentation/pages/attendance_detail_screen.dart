@@ -142,7 +142,7 @@ class _AttendanceDetailState extends State<AttendanceDetail>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
+        // automaticallyImplyLeading: false,
         title: Text('Điểm danh - ${widget.session.title}'),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         actions: [

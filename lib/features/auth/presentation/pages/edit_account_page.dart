@@ -121,25 +121,22 @@ class _EditAccountPageState extends State<EditAccountPage> {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('Chỉnh sửa tài khoản'),
-      ),
+      appBar: AppBar(title: const Text('Chỉnh sửa tài khoản')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
-            // Avatar
-            Center(child: avatarWidget),
-            const SizedBox(height: 8),
-            Center(
-              child: OutlinedButton.icon(
-                onPressed: _loading ? null : _pickAvatar,
-                icon: const Icon(Icons.upload),
-                label: const Text('Chọn ảnh đại diện'),
-              ),
-            ),
-            const SizedBox(height: 16),
+            // // Avatar
+            // Center(child: avatarWidget),
+            // const SizedBox(height: 8),
+            // Center(
+            //   child: OutlinedButton.icon(
+            //     onPressed: _loading ? null : _pickAvatar,
+            //     icon: const Icon(Icons.upload),
+            //     label: const Text('Chọn ảnh đại diện'),
+            //   ),
+            // ),
+            // const SizedBox(height: 16),
 
             // Tên hiển thị
             TextField(

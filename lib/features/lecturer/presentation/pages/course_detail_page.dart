@@ -116,11 +116,12 @@ class _CourseDetailState extends State<CourseDetail>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Text(courseDetails?['name'] ?? 'Chi tiết môn học'),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        title: Text('Chi tiết môn học'),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
