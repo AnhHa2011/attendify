@@ -66,21 +66,25 @@ class _ClassFormPageState extends State<ClassFormPage> {
     final maxStudents = int.parse(_maxStudentsCtrl.text);
 
     try {
-      // Kiểm tra trùng mã lớp học
-      final isTaken = await adminService.isClassCodeTaken(
-        classCode,
-        currentclassCode: widget.classModel?.id,
-      );
-      if (isTaken) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Mã lớp học "$classCode" đã tồn tại.'),
-              backgroundColor: Colors.red,
-            ),
-          );
+      // Khi ở chế độ chỉnh sửa, không cần kiểm tra mã môn học đã tồn tại hay chưa
+      // vì mã này không thể thay đổi.
+      if (!_isEditMode) {
+        final isTaken = await adminService.isCourseCodeTaken(
+          classCode,
+          currentcourseCode: widget.classModel?.id,
+        );
+        if (isTaken) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Mã môn học "$classCode" đã tồn tại.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          setState(() => _isLoading = false);
+          return;
         }
-        return;
       }
 
       // Tạo/Cập nhật
@@ -141,11 +145,16 @@ class _ClassFormPageState extends State<ClassFormPage> {
               // ====== Class Code ======
               TextFormField(
                 controller: _codeCtrl,
-                decoration: const InputDecoration(
+                // Thêm thuộc tính `enabled`
+                enabled: !_isEditMode,
+                decoration: InputDecoration(
                   labelText: 'Mã lớp học',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.tag),
-                  helperText: 'Ví dụ: IT4440. Sẽ tự động viết hoa.',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.tag),
+                  // Thay đổi helperText để người dùng hiểu rõ hơn
+                  helperText: _isEditMode
+                      ? 'Mã lớp học không thể thay đổi.'
+                      : 'Ví dụ: IT4440. Sẽ tự động viết hoa.',
                 ),
                 inputFormatters: [
                   FilteringTextInputFormatter.deny(RegExp(r'\s')),
