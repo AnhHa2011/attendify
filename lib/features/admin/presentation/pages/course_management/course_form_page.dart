@@ -455,13 +455,24 @@ class _CourseFormPageState extends State<CourseFormPage> {
                   }
                   return DropdownButtonFormField<String>(
                     value: _selectedLecturerId,
+                    // THÊM DÒNG NÀY: Cho phép dropdown chiếm hết chiều rộng
+                    isExpanded: true,
                     items: _lecturers
                         .map(
                           (l) => DropdownMenuItem<String>(
                             value: l.uid.toString(),
-                            child: Text(
-                              '${l.displayName}( ${l.email})',
-                              overflow: TextOverflow.ellipsis,
+                            // SỬA ĐỔI CHILD: Bọc Text trong Row > Expanded
+                            // để đảm bảo ellipsis hoạt động đúng cách.
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${l.displayName} (${l.email})',
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1, // Đảm bảo chỉ có 1 dòng
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         )
