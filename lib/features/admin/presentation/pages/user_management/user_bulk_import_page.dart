@@ -220,7 +220,7 @@ class _UserBulkImportPageState extends State<UserBulkImportPage> {
         await FirebaseFirestore.instance.collection('users').doc(uid).set({
           'email': email,
           'displayName': displayName,
-          'role': role,
+          'role': role == 'lecturer' ? 'lecture' : role,
           'createdAt': Timestamp.now(),
           'updatedAt': Timestamp.now(),
           'isActive': true,
@@ -607,10 +607,12 @@ class _UserRowCard extends StatelessWidget {
     if (r.email.trim().isEmpty) return 'Thiếu email';
     if (!r.email.contains('@')) return 'Email không hợp lệ';
     if (r.displayName.trim().isEmpty) return 'Thiếu tên hiển thị';
-    if (r.role != 'student' && r.role != 'lecturer')
+    if (r.role != 'student' && (r.role != 'lecturer')) {
       return 'Role phải là "student" hoặc "lecturer"';
-    if (r.password != null && r.password!.length < 6)
+    }
+    if (r.password != null && r.password!.length < 6) {
       return 'Mật khẩu phải ≥ 6 ký tự';
+    }
     return null;
   }
 

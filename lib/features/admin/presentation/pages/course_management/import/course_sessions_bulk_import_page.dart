@@ -4,6 +4,7 @@ import 'package:attendify/core/utils/template_downloader.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../../../core/data/models/session_model.dart';
@@ -49,6 +50,261 @@ class _SessionRowState {
   });
 }
 
+// Nhận diện ISO 8601 (yyyy-MM-dd...)
+bool _looksIso(String s) => RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(s);
+
+// "2025-01-10T00:00:00.000Z" -> "10/01/2025"
+String _normalizeDate(dynamic v) {
+  try {
+    if (v is DateTime) {
+      return DateFormat('dd/MM/yyyy').format(v.toLocal());
+    }
+    final s = v?.toString().trim() ?? '';
+    if (s.isEmpty) return '';
+    if (_looksIso(s)) {
+      final dt = DateTime.parse(s);
+      return DateFormat('dd/MM/yyyy').format(dt.toLocal());
+    }
+    // giữ nguyên nếu đã là dd/MM/yyyy
+    return s;
+  } catch (_) {
+    return v?.toString() ?? '';
+  }
+}
+
+// "08:00:00" hoặc ISO -> "08:00"
+String _normalizeTime(dynamic v) {
+  try {
+    if (v is DateTime) {
+      return '${v.hour.toString().padLeft(2, '0')}:${v.minute.toString().padLeft(2, '0')}';
+    }
+    final s = v?.toString().trim() ?? '';
+    if (s.isEmpty) return '';
+
+    // 1) HH:mm:ss | HH:mm -> lấy HH:mm
+    final mm = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
+    if (mm != null) {
+      return '${mm.group(1)!.padLeft(2, '0')}:${mm.group(2)}';
+    }
+    // 2) ISO
+    if (_looksIso(s)) {
+      final dt = DateTime.parse(s);
+      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
+    return s;
+  } catch (_) {
+    return v?.toString() ?? '';
+  }
+}
+
+class _TimeField extends StatelessWidget {
+  final String label;
+  final String value; // HH:mm
+  final IconData icon;
+  final ValueChanged<String> onChanged;
+
+  const _TimeField({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onChanged,
+  });
+
+  TimeOfDay _parse(String v) {
+    try {
+      final p = v.split(':');
+      if (p.length != 2) throw Exception();
+      final h = int.parse(p[0]);
+      final m = int.parse(p[1]);
+      return TimeOfDay(hour: h, minute: m);
+    } catch (_) {
+      return const TimeOfDay(hour: 8, minute: 0); // mặc định 08:00
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final controller = TextEditingController(text: value);
+
+    Future<void> _pick() async {
+      final initial = _parse(value);
+      final picked = await showTimePicker(
+        context: context,
+        initialTime: initial,
+        helpText: 'Chọn giờ (HH:mm)',
+        cancelText: 'Hủy',
+        confirmText: 'Chọn',
+        builder: (context, child) {
+          // Bật 24h nếu thiết bị đang 12h
+          final media = MediaQuery.of(context);
+          return MediaQuery(
+            data: media.copyWith(alwaysUse24HourFormat: true),
+            child: child!,
+          );
+        },
+      );
+      if (picked != null) {
+        final h = picked.hour.toString().padLeft(2, '0');
+        final m = picked.minute.toString().padLeft(2, '0');
+        final s = '$h:$m';
+        controller.text = s;
+        onChanged(s);
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: cs.primary),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+                color: cs.onSurface.withOpacity(0.8),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          readOnly: true,
+          onTap: _pick,
+          decoration: InputDecoration(
+            hintText: 'HH:mm',
+            prefixIcon: const Icon(Icons.schedule, size: 18),
+            filled: true,
+            fillColor: cs.surfaceVariant.withOpacity(0.3),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: cs.primary, width: 2),
+            ),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DateField extends StatelessWidget {
+  final String label;
+  final String value; // dd/MM/yyyy
+  final IconData icon;
+  final ValueChanged<String> onChanged;
+
+  const _DateField({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final controller = TextEditingController(text: value);
+
+    Future<void> _pick() async {
+      // Parse giá trị hiện tại (nếu có) để show mặc định
+      DateTime? initial;
+      try {
+        if (value.trim().isNotEmpty) {
+          final p = value.split('/');
+          initial = DateTime(int.parse(p[2]), int.parse(p[1]), int.parse(p[0]));
+        }
+      } catch (_) {}
+
+      final now = DateTime.now();
+      final DateTime? picked = await showDatePicker(
+        context: context,
+        initialDate: initial ?? now,
+        firstDate: DateTime(now.year - 5),
+        lastDate: DateTime(now.year + 5),
+        helpText: 'Chọn ngày (dd/MM/yyyy)',
+        cancelText: 'Hủy',
+        confirmText: 'Chọn',
+        errorInvalidText: 'Ngày không hợp lệ',
+        builder: (context, child) {
+          // Optional: match theme
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: Theme.of(context).colorScheme.copyWith(
+                primary: cs.primary,
+                onPrimary: cs.onPrimary,
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+
+      if (picked != null) {
+        final f = DateFormat('dd/MM/yyyy');
+        final s = f.format(picked);
+        controller.text = s;
+        onChanged(s);
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: cs.primary),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+                color: cs.onSurface.withOpacity(0.8),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          readOnly: true,
+          onTap: _pick,
+          decoration: InputDecoration(
+            hintText: 'dd/MM/yyyy',
+            prefixIcon: const Icon(Icons.calendar_today, size: 18),
+            filled: true,
+            fillColor: cs.surfaceVariant.withOpacity(0.3),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: cs.primary, width: 2),
+            ),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class CourseSessionsBulkImportPage extends StatefulWidget {
   final CourseModel course;
   const CourseSessionsBulkImportPage({super.key, required this.course});
@@ -89,7 +345,13 @@ class _CourseSessionsBulkImportPageState
       return;
 
     try {
-      final rows = await _parseSessionsXlsx(res.files.single.bytes!);
+      final rows = await _parseSessionsXlsx(
+        res.files.single.bytes!,
+      ); // Gán error/status để UI thấy lỗi ngay
+      for (final r in rows) {
+        r.error = _validateRow(r);
+        r.status = r.error == null ? _RowStatus.valid : _RowStatus.error;
+      }
       setState(() {
         _rows = rows;
         _fileName = res.files.single.name;
@@ -143,9 +405,9 @@ class _CourseSessionsBulkImportPageState
       if (valuesEmpty) continue;
 
       final title = _cellStr(row, idxOf('title')).trim();
-      final date = _cellStr(row, idxOf('date')).trim();
-      final startTime = _cellStr(row, idxOf('starttime')).trim();
-      final endTime = _cellStr(row, idxOf('endtime')).trim();
+      final date = _normalizeDate(row[idxOf('date')]?.value);
+      final startTime = _normalizeTime(row[idxOf('starttime')]?.value);
+      final endTime = _normalizeTime(row[idxOf('endtime')]?.value);
       final location = _cellStr(row, idxOf('location')).trim();
       final type = _cellStr(row, idxOf('type')).trim();
       final description = idxOf('description') >= 0
@@ -819,7 +1081,7 @@ class _RowCard extends StatelessWidget {
                         _reval(context);
                       },
                     ),
-                    _TField(
+                    _DateField(
                       label: 'Ngày (dd/MM/yyyy)',
                       value: row.date,
                       icon: Icons.calendar_today,
@@ -828,7 +1090,8 @@ class _RowCard extends StatelessWidget {
                         _reval(context);
                       },
                     ),
-                    _TField(
+
+                    _TimeField(
                       label: 'Bắt đầu (HH:mm)',
                       value: row.startTime,
                       icon: Icons.schedule,
@@ -837,7 +1100,8 @@ class _RowCard extends StatelessWidget {
                         _reval(context);
                       },
                     ),
-                    _TField(
+
+                    _TimeField(
                       label: 'Kết thúc (HH:mm)',
                       value: row.endTime,
                       icon: Icons.schedule_outlined,

@@ -1078,7 +1078,7 @@ class _CourseRowCard extends StatelessWidget {
               },
             ),
             _FormField(
-              label: 'Min sinh viên',
+              label: 'Số lượng sinh viên tối thiểu',
               value: '${row.minStudents}',
               icon: Icons.people_outline,
               keyboardType: TextInputType.number,
@@ -1089,7 +1089,7 @@ class _CourseRowCard extends StatelessWidget {
               },
             ),
             _FormField(
-              label: 'Max sinh viên',
+              label: 'Số lượng sinh viên tối đa',
               value: '${row.maxStudents}',
               icon: Icons.people,
               keyboardType: TextInputType.number,
@@ -1100,7 +1100,7 @@ class _CourseRowCard extends StatelessWidget {
               },
             ),
             _FormField(
-              label: 'Max vắng mặt',
+              label: 'Số buổi vắng mặt tối đa',
               value: '${row.maxAbsences}',
               icon: Icons.event_busy,
               keyboardType: TextInputType.number,
