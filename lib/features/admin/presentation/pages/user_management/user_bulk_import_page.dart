@@ -349,11 +349,7 @@ class _UserBulkImportPageState extends State<UserBulkImportPage> {
                           _StatusCard(
                             fileName: _fileName,
                             message: _message,
-                            colorScheme:
-                                _message.toLowerCase().contains('lỗi') ||
-                                    _message.toLowerCase().contains('thất bại')
-                                ? Colors.red
-                                : colorScheme,
+                            colorScheme: colorScheme,
                           ),
                         ],
                       ],
@@ -480,14 +476,18 @@ class _StatusCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  message!.startsWith('Lỗi') || message!.contains('Có lỗi')
+                  message!.toLowerCase().contains('lỗi') ||
+                          message!.toLowerCase().contains('có lỗi') ||
+                          message!.toLowerCase().contains('thất bại')
                       ? Icons.error_outline
                       : message!.contains('Hoàn tất')
                       ? Icons.check_circle_outline
                       : Icons.info_outline,
                   size: 16,
                   color:
-                      message!.startsWith('Lỗi') || message!.contains('Có lỗi')
+                      message!.toLowerCase().contains('lỗi') ||
+                          message!.toLowerCase().contains('có lỗi') ||
+                          message!.toLowerCase().contains('thất bại')
                       ? colorScheme.error
                       : message!.contains('Hoàn tất')
                       ? Colors.green
@@ -499,8 +499,9 @@ class _StatusCard extends StatelessWidget {
                     message!,
                     style: TextStyle(
                       color:
-                          message!.startsWith('Lỗi') ||
-                              message!.contains('Có lỗi')
+                          message!.toLowerCase().contains('lỗi') ||
+                              message!.toLowerCase().contains('có lỗi') ||
+                              message!.toLowerCase().contains('thất bại')
                           ? colorScheme.error
                           : message!.contains('Hoàn tất')
                           ? Colors.green
