@@ -1,5 +1,4 @@
 // lib/features/admin/presentation/pages/admin_profile.dart
-import 'package:attendify/features/auth/presentation/pages/reset_password_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -64,9 +63,13 @@ class _StudentProfileState extends State<StudentProfilePage>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final auth = context.watch<AuthProvider>();
-    final user = auth.user;
 
+    final displayName =
+        context.select<AuthProvider, String?>(
+          (p) => p.displayNameFromProfile,
+        ) ??
+        context.select<AuthProvider, String?>((p) => p.user?.displayName);
+    final email = context.select<AuthProvider, String?>((p) => p.user?.email);
     return Scaffold(
       body: Stack(
         children: [
@@ -107,7 +110,7 @@ class _StudentProfileState extends State<StudentProfilePage>
                       ),
                       child: Opacity(
                         opacity: _cardAnimations[0].value.clamp(0.0, 1.0),
-                        child: _buildProfileHeader(theme, user),
+                        child: _buildProfileHeader(theme, displayName),
                       ),
                     );
                   },
@@ -130,7 +133,10 @@ class _StudentProfileState extends State<StudentProfilePage>
                           ),
                           child: Opacity(
                             opacity: _cardAnimations[1].value.clamp(0.0, 1.0),
-                            child: _buildPersonalInfoSection(theme, user),
+                            child: _buildPersonalInfoSection(
+                              theme,
+                              displayName,
+                            ),
                           ),
                         );
                       },
@@ -316,15 +322,14 @@ class _StudentProfileState extends State<StudentProfilePage>
           subtitle: user?.displayName ?? 'Chưa có tên',
           trailing: Icons.edit_outlined,
           onTap: () async {
-            await Navigator.push(
+            final updated = await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => EditAccountPage(
-                  currentName: user?.displayName ?? '',
-                  currentPhotoUrl: user?.photoURL,
-                ),
+                builder: (_) =>
+                    EditAccountPage(currentName: user?.displayName ?? ''),
               ),
             );
+            if (updated == true) context.read<AuthProvider>().refreshUser();
           },
         ),
         _buildInfoTile(

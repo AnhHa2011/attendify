@@ -145,6 +145,8 @@ class FirebaseAuthService {
 
   Stream<User?> authStateChanges() => _auth.authStateChanges();
 
+  Stream<User?> userChanges() => _auth.userChanges();
+  // ===================== EMAIL/PASSWORD =====================
   Future<String> getEmailSupport() async {
     await remoteConfig.fetchAndActivate();
     final supportEmail = remoteConfig.getString('support_email');

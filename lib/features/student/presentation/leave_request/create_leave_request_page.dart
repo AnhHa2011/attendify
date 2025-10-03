@@ -505,10 +505,7 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('Xin nghỉ'),
-      ),
+      appBar: AppBar(title: const Text('Xin nghỉ')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

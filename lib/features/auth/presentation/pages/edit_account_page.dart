@@ -1,19 +1,13 @@
 // lib/presentation/pages/common/edit_account_page.dart
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/services/account_service.dart';
 
 class EditAccountPage extends StatefulWidget {
   final String currentName;
-  final String? currentPhotoUrl;
-  const EditAccountPage({
-    super.key,
-    required this.currentName,
-    this.currentPhotoUrl,
-  });
+  const EditAccountPage({super.key, required this.currentName});
 
   @override
   State<EditAccountPage> createState() => _EditAccountPageState();
@@ -36,24 +30,6 @@ class _EditAccountPageState extends State<EditAccountPage> {
   void initState() {
     super.initState();
     _nameCtrl.text = widget.currentName;
-    _previewUrl = widget.currentPhotoUrl;
-  }
-
-  Future<void> _pickAvatar() async {
-    final res = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
-      withData: true,
-    );
-    if (res == null || res.files.isEmpty || res.files.first.bytes == null) {
-      return;
-    }
-
-    setState(() {
-      _pickedBytes = res.files.first.bytes;
-      _pickedName = res.files.first.name;
-      _previewUrl = null; // ưu tiên preview bằng bytes vừa chọn
-    });
   }
 
   Future<void> _save() async {
@@ -63,15 +39,6 @@ class _EditAccountPageState extends State<EditAccountPage> {
       final name = _nameCtrl.text.trim();
       if (name.isNotEmpty) {
         await _svc.updateDisplayName(name);
-      }
-
-      // 2) upload avatar nếu có chọn ảnh mới
-      if (_pickedBytes != null && _pickedName != null) {
-        final url = await _svc.uploadAvatarAndSave(
-          bytes: _pickedBytes!,
-          fileName: _pickedName!,
-        );
-        setState(() => _previewUrl = url);
       }
 
       if (mounted) {
@@ -126,18 +93,6 @@ class _EditAccountPageState extends State<EditAccountPage> {
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
-            // // Avatar
-            // Center(child: avatarWidget),
-            // const SizedBox(height: 8),
-            // Center(
-            //   child: OutlinedButton.icon(
-            //     onPressed: _loading ? null : _pickAvatar,
-            //     icon: const Icon(Icons.upload),
-            //     label: const Text('Chọn ảnh đại diện'),
-            //   ),
-            // ),
-            // const SizedBox(height: 16),
-
             // Tên hiển thị
             TextField(
               controller: _nameCtrl,
@@ -146,47 +101,6 @@ class _EditAccountPageState extends State<EditAccountPage> {
                 prefixIcon: Icon(Icons.person_outline),
               ),
             ),
-
-            const SizedBox(height: 24),
-            const Text(
-              'Đổi mật khẩu',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-
-            // Mật khẩu hiện tại
-            TextField(
-              controller: _oldPwdCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Mật khẩu hiện tại',
-                prefixIcon: Icon(Icons.lock_outline),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Mật khẩu mới
-            TextField(
-              controller: _newPwdCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Mật khẩu mới (>= 6 ký tự)',
-                prefixIcon: Icon(Icons.lock),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Xác nhận mật khẩu mới
-            TextField(
-              controller: _confirmPwdCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Xác nhận mật khẩu mới',
-                prefixIcon: Icon(Icons.lock),
-              ),
-            ),
-            const SizedBox(height: 24),
-
             ElevatedButton.icon(
               onPressed: _loading ? null : _save,
               icon: _loading

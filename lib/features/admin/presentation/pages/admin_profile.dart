@@ -63,9 +63,14 @@ class _AdminProfileState extends State<AdminProfile>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final auth = context.watch<AuthProvider>();
-    final user = auth.user;
 
+    final displayName =
+        context.select<AuthProvider, String?>(
+          (p) => p.displayNameFromProfile,
+        ) ??
+        context.select<AuthProvider, String?>((p) => p.user?.displayName) ??
+        '';
+    final email = context.select<AuthProvider, String?>((p) => p.user?.email);
     return Scaffold(
       body: Stack(
         children: [
@@ -106,7 +111,7 @@ class _AdminProfileState extends State<AdminProfile>
                       ),
                       child: Opacity(
                         opacity: _cardAnimations[0].value.clamp(0.0, 1.0),
-                        child: _buildProfileHeader(theme, user),
+                        child: _buildProfileHeader(theme, displayName, email),
                       ),
                     );
                   },
@@ -129,7 +134,11 @@ class _AdminProfileState extends State<AdminProfile>
                           ),
                           child: Opacity(
                             opacity: _cardAnimations[1].value.clamp(0.0, 1.0),
-                            child: _buildPersonalInfoSection(theme, user),
+                            child: _buildPersonalInfoSection(
+                              theme,
+                              displayName,
+                              email,
+                            ),
                           ),
                         );
                       },
@@ -165,7 +174,7 @@ class _AdminProfileState extends State<AdminProfile>
     );
   }
 
-  Widget _buildProfileHeader(ThemeData theme, user) {
+  Widget _buildProfileHeader(ThemeData theme, displayName, email) {
     return Container(
       margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.all(32),
@@ -234,7 +243,6 @@ class _AdminProfileState extends State<AdminProfile>
             duration: const Duration(milliseconds: 1500),
             tween: Tween<double>(begin: 0, end: 1),
             builder: (context, double value, child) {
-              final displayName = user?.displayName ?? 'System Administrator';
               final visibleLength = (displayName.length * value).round();
               return Column(
                 children: [
@@ -292,7 +300,7 @@ class _AdminProfileState extends State<AdminProfile>
 
           const SizedBox(height: 12),
           Text(
-            user?.email ?? 'admin@attendify.com',
+            email ?? 'Không tìm thấy email',
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurface.withOpacity(0.7),
             ),
@@ -302,7 +310,7 @@ class _AdminProfileState extends State<AdminProfile>
     );
   }
 
-  Widget _buildPersonalInfoSection(ThemeData theme, user) {
+  Widget _buildPersonalInfoSection(ThemeData theme, displayName, email) {
     return _buildGlassCard(
       theme: theme,
       title: 'Thông tin cá nhân',
@@ -312,25 +320,23 @@ class _AdminProfileState extends State<AdminProfile>
           theme: theme,
           icon: Icons.account_circle_outlined,
           title: 'Tên hiển thị',
-          subtitle: user?.displayName ?? 'Chưa có tên',
+          subtitle: displayName ?? 'Chưa có tên',
           trailing: Icons.edit_outlined,
           onTap: () async {
-            await Navigator.push(
+            final updated = await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => EditAccountPage(
-                  currentName: user?.displayName ?? '',
-                  currentPhotoUrl: user?.photoURL,
-                ),
+                builder: (_) => EditAccountPage(currentName: displayName ?? ''),
               ),
             );
+            if (updated == true) context.read<AuthProvider>().refreshUser();
           },
         ),
         _buildInfoTile(
           theme: theme,
           icon: Icons.email_outlined,
           title: 'Email',
-          subtitle: user?.email ?? 'Chưa có email',
+          subtitle: email ?? 'Chưa có email',
           trailing: Icons.verified_rounded,
           trailingColor: Colors.green,
         ),

@@ -10,9 +10,13 @@ class DrawerHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final auth = context.watch<AuthProvider>();
-    final user = auth.user;
 
+    final displayName =
+        context.select<AuthProvider, String?>(
+          (p) => p.displayNameFromProfile,
+        ) ??
+        context.select<AuthProvider, String?>((p) => p.user?.displayName);
+    final email = context.select<AuthProvider, String?>((p) => p.user?.email);
     return Container(
       height: 160,
       margin: const EdgeInsets.only(bottom: 8),
@@ -59,7 +63,7 @@ class DrawerHeader extends StatelessWidget {
                 ),
               ),
               Text(
-                user?.displayName ?? 'Administrator',
+                displayName ?? 'Administrator',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onPrimaryContainer.withOpacity(0.8),
                 ),

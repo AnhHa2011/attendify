@@ -1,17 +1,21 @@
-//  Profile Widget
-import 'package:attendify/features/auth/presentation/pages/edit_account_page.dart';
+// lib/features/.../profile_widget.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../../../app/providers/auth_provider.dart';
+import '../../../features/auth/presentation/pages/edit_account_page.dart';
 
 class ProfileWidget extends StatelessWidget {
   const ProfileWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final user = auth.user;
+    // Lấy riêng từng field để rebuild tối thiểu
+    final displayName =
+        context.select<AuthProvider, String?>(
+          (p) => p.displayNameFromProfile,
+        ) ??
+        context.select<AuthProvider, String?>((p) => p.user?.displayName);
+    final email = context.select<AuthProvider, String?>((p) => p.user?.email);
 
     return Scaffold(
       body: Padding(
@@ -26,7 +30,6 @@ class ProfileWidget extends StatelessWidget {
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
-
             Card(
               child: ListTile(
                 leading: CircleAvatar(
@@ -34,8 +37,8 @@ class ProfileWidget extends StatelessWidget {
                     context,
                   ).colorScheme.primaryContainer,
                   child: Text(
-                    (user?.displayName?.isNotEmpty == true)
-                        ? user!.displayName![0].toUpperCase()
+                    (displayName?.isNotEmpty == true)
+                        ? displayName!.characters.first.toUpperCase()
                         : 'A',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onPrimaryContainer,
@@ -43,27 +46,27 @@ class ProfileWidget extends StatelessWidget {
                     ),
                   ),
                 ),
-                title: Text(user?.displayName ?? 'Administrator'),
-                subtitle: Text(user?.email ?? 'admin@attendify.com'),
+                title: Text(displayName ?? 'Administrator'),
+                subtitle: Text(email ?? 'admin@attendify.com'),
                 trailing: IconButton(
                   icon: const Icon(Icons.edit),
                   onPressed: () async {
-                    await Navigator.push(
+                    final updated = await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => EditAccountPage(
-                          currentName: user?.displayName ?? '',
-                          currentPhotoUrl: user?.photoURL,
-                        ),
+                        builder: (_) =>
+                            EditAccountPage(currentName: displayName ?? ''),
                       ),
                     );
+                    if (updated == true) {
+                      // Kéo lại user ngay
+                      await context.read<AuthProvider>().refreshUser();
+                    }
                   },
                 ),
               ),
             ),
-
             const SizedBox(height: 12),
-
             Card(
               child: ListTile(
                 leading: Icon(

@@ -11,12 +11,18 @@ class UserManagementPage extends StatefulWidget {
   State<UserManagementPage> createState() => _UserManagementPageState();
 }
 
+enum _SortKey { name, email }
+
 class _UserManagementPageState extends State<UserManagementPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final adminService = AdminService();
   final _searchController = TextEditingController();
   String _searchQuery = '';
+
+  // ==== Sort state ====
+  _SortKey _sortKey = _SortKey.name;
+  bool _sortAsc = true;
 
   @override
   void initState() {
@@ -34,6 +40,58 @@ class _UserManagementPageState extends State<UserManagementPage>
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  String get _sortLabel {
+    switch (_sortKey) {
+      case _SortKey.name:
+        return _sortAsc ? 'Tên (A→Z)' : 'Tên (Z→A)';
+      case _SortKey.email:
+        return _sortAsc ? 'Email (A→Z)' : 'Email (Z→A)';
+    }
+  }
+
+  void _changeSort(String value) {
+    setState(() {
+      switch (value) {
+        case 'name_asc':
+          _sortKey = _SortKey.name;
+          _sortAsc = true;
+          break;
+        case 'name_desc':
+          _sortKey = _SortKey.name;
+          _sortAsc = false;
+          break;
+        case 'email_asc':
+          _sortKey = _SortKey.email;
+          _sortAsc = true;
+          break;
+        case 'email_desc':
+          _sortKey = _SortKey.email;
+          _sortAsc = false;
+          break;
+      }
+    });
+  }
+
+  List<UserModel> _applySort(List<UserModel> list) {
+    final out = List<UserModel>.from(list);
+    int cmp(String a, String b) => a.toLowerCase().compareTo(b.toLowerCase());
+
+    out.sort((a, b) {
+      // fallback nếu trống để tránh crash
+      final nameA = (a.displayName.isNotEmpty ? a.displayName : a.email);
+      final nameB = (b.displayName.isNotEmpty ? b.displayName : b.email);
+
+      int c;
+      if (_sortKey == _SortKey.name) {
+        c = cmp(nameA, nameB);
+      } else {
+        c = cmp(a.email, b.email);
+      }
+      return _sortAsc ? c : -c;
+    });
+    return out;
   }
 
   @override
@@ -55,14 +113,25 @@ class _UserManagementPageState extends State<UserManagementPage>
                     icon: const Icon(Icons.clear),
                     onPressed: () {
                       _searchController.clear();
-                      setState(() {
-                        _searchQuery = '';
-                      });
+                      setState(() => _searchQuery = '');
                     },
                   )
                 : null,
           ),
         ),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Sắp xếp',
+            icon: const Icon(Icons.sort),
+            onSelected: _changeSort,
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'name_asc', child: Text('Tên (A→Z)')),
+              PopupMenuItem(value: 'name_desc', child: Text('Tên (Z→A)')),
+              PopupMenuItem(value: 'email_asc', child: Text('Email (A→Z)')),
+              PopupMenuItem(value: 'email_desc', child: Text('Email (Z→A)')),
+            ],
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -87,9 +156,19 @@ class _UserManagementPageState extends State<UserManagementPage>
               context,
             ).push(MaterialPageRoute(builder: (_) => const UserFormPage()));
           } else if (value == 'bulk') {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const UserBulkImportPage()),
-            );
+            Navigator.of(context)
+                .push(
+                  MaterialPageRoute(builder: (_) => const UserBulkImportPage()),
+                )
+                .then((changed) {
+                  if (changed == true && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Đã nhập danh sách người dùng'),
+                      ),
+                    );
+                  }
+                });
           }
         },
         itemBuilder: (context) => const [
@@ -132,20 +211,20 @@ class _UserManagementPageState extends State<UserManagementPage>
         final allUsers = snapshot.data!;
 
         // Apply search filter
-        final filteredUsers = _searchQuery.isEmpty
+        final filtered = _searchQuery.isEmpty
             ? allUsers
             : allUsers.where((user) {
-                final searchLower = _searchQuery.toLowerCase();
-                return user.displayName.toLowerCase().contains(searchLower) ||
-                    user.email.toLowerCase().contains(searchLower) ||
-                    user.role.name.toLowerCase().contains(searchLower);
+                final q = _searchQuery;
+                return user.displayName.toLowerCase().contains(q) ||
+                    user.email.toLowerCase().contains(q) ||
+                    user.role.name.toLowerCase().contains(q);
               }).toList();
 
         if (allUsers.isEmpty) {
           return const Center(child: Text('Chưa có người dùng'));
         }
 
-        if (filteredUsers.isEmpty && _searchQuery.isNotEmpty) {
+        if (filtered.isEmpty && _searchQuery.isNotEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -153,7 +232,7 @@ class _UserManagementPageState extends State<UserManagementPage>
                 const Icon(Icons.search_off, size: 64, color: Colors.grey),
                 const SizedBox(height: 16),
                 Text(
-                  'Không tìm thấy người dùng nào\nphù hợp với "${_searchQuery}"',
+                  'Không tìm thấy người dùng nào\nphù hợp với "$_searchQuery"',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.grey, fontSize: 16),
                 ),
@@ -161,9 +240,7 @@ class _UserManagementPageState extends State<UserManagementPage>
                 TextButton(
                   onPressed: () {
                     _searchController.clear();
-                    setState(() {
-                      _searchQuery = '';
-                    });
+                    setState(() => _searchQuery = '');
                   },
                   child: const Text('Xóa bộ lọc'),
                 ),
@@ -172,31 +249,59 @@ class _UserManagementPageState extends State<UserManagementPage>
           );
         }
 
+        // Apply sort
+        final users = _applySort(filtered);
+
         return Column(
           children: [
-            // Search result info
-            if (_searchQuery.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                color: Theme.of(context).colorScheme.surfaceVariant,
-                child: Text(
-                  'Tìm thấy ${filteredUsers.length} kết quả cho "${_searchQuery}"',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+            // Top info bar: search result + current sort
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(
+                (_searchQuery.isNotEmpty) ? 1 : 0.6,
               ),
+              child: Row(
+                children: [
+                  if (_searchQuery.isNotEmpty)
+                    Text(
+                      'Tìm thấy ${users.length} kết quả cho "$_searchQuery"',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    )
+                  else
+                    Text(
+                      'Tổng: ${users.length} người dùng',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      const Icon(Icons.sort, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        _sortLabel,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
 
             // User list
             Expanded(
               child: ListView.builder(
-                itemCount: filteredUsers.length,
-                itemBuilder: (context, index) {
-                  final user = filteredUsers[index];
-                  return _buildUserTile(user);
-                },
+                itemCount: users.length,
+                itemBuilder: (context, index) => _buildUserTile(users[index]),
               ),
             ),
           ],
@@ -212,7 +317,9 @@ class _UserManagementPageState extends State<UserManagementPage>
           user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',
         ),
       ),
-      title: _highlightSearchText(user.displayName),
+      title: _highlightSearchText(
+        user.displayName.isNotEmpty ? user.displayName : user.email,
+      ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -313,16 +420,12 @@ class _UserManagementPageState extends State<UserManagementPage>
   }
 
   Widget _highlightSearchText(String text) {
-    if (_searchQuery.isEmpty) {
-      return Text(text);
-    }
+    if (_searchQuery.isEmpty) return Text(text);
 
     final searchLower = _searchQuery.toLowerCase();
     final textLower = text.toLowerCase();
 
-    if (!textLower.contains(searchLower)) {
-      return Text(text);
-    }
+    if (!textLower.contains(searchLower)) return Text(text);
 
     final startIndex = textLower.indexOf(searchLower);
     final endIndex = startIndex + searchLower.length;
@@ -414,7 +517,6 @@ class _UserManagementPageState extends State<UserManagementPage>
       return;
     }
 
-    // xác nhận trước khi gửi
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../app/providers/auth_provider.dart';
@@ -79,10 +80,17 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+
     final theme = Theme.of(context);
     final w = MediaQuery.of(context).size.width;
     final isMobile = w < widget.mobileBreakpoint;
 
+    final displayName =
+        context.select<AuthProvider, String?>(
+          (p) => p.displayNameFromProfile,
+        ) ??
+        context.select<AuthProvider, String?>((p) => p.user?.displayName);
+    final email = context.select<AuthProvider, String?>((p) => p.user?.email);
     final pages = widget.pages;
 
     if (isMobile) {
@@ -131,7 +139,7 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
                 offset: Offset(-80 * (1 - _sidebarAnimation.value), 0),
                 child: Opacity(
                   opacity: _sidebarAnimation.value,
-                  child: _buildSidebar(theme, auth.user),
+                  child: _buildSidebar(theme, displayName),
                 ),
               );
             },
@@ -171,7 +179,9 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
   }
 
   // ===== Sidebar =====
-  Widget _buildSidebar(ThemeData theme, user) {
+  Widget _buildSidebar(ThemeData theme, displayName) {
+    // Lấy firstName từ Provider (tự rebuild khi user thay đổi)
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       width: _isExpanded ? 280 : 80,
@@ -194,7 +204,7 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
       ),
       child: Column(
         children: [
-          _buildSidebarHeader(theme, user),
+          _buildSidebarHeader(theme, displayName),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -212,7 +222,7 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildSidebarHeader(ThemeData theme, user) {
+  Widget _buildSidebarHeader(ThemeData theme, displayName) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
       child: Row(
@@ -246,7 +256,7 @@ class _RoleLayoutState extends State<RoleLayout> with TickerProviderStateMixin {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    user?.displayName?.split(' ').first ?? 'User',
+                    displayName ?? 'User',
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
