@@ -242,13 +242,74 @@ class _UserManagementPageState extends State<UserManagementPage>
                 _resetPasswordAsAdmin(context, adminService, user.email),
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red),
-            tooltip: 'Xoá',
-            onPressed: () => _deleteUser(context, adminService, user),
+            icon: const Icon(
+              Icons.block,
+              color: Colors.red,
+            ), // Đổi icon cho phù hợp hơn
+            tooltip: 'Vô hiệu hoá', // <-- Sửa tooltip
+            onPressed: () =>
+                _deactivateUser(context, adminService, user), // <-- Gọi hàm mới
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _deactivateUser(
+    BuildContext context,
+    AdminService adminService,
+    UserModel user,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Vô hiệu hoá người dùng'), // <-- Sửa tiêu đề
+        content: Text(
+          'Bạn có chắc muốn vô hiệu hoá tài khoản "${user.email}"?\n\nNgười dùng này sẽ không thể đăng nhập được nữa.',
+        ), // <-- Sửa nội dung
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Huỷ'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red, // Làm nổi bật nút nguy hiểm
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Vô hiệu hoá'), // <-- Sửa nút
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final uid = user.uid;
+      if (uid.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Không xác định được UID người dùng')),
+          );
+        }
+        return;
+      }
+
+      try {
+        // Gọi hàm service đã được cập nhật
+        await adminService.deactivateUser(uid);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã vô hiệu hoá tài khoản')),
+          ); // <-- Sửa thông báo
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Lỗi vô hiệu hoá người dùng: $e')),
+          ); // <-- Sửa thông báo lỗi
+        }
+      }
+    }
   }
 
   Widget _highlightSearchText(String text) {

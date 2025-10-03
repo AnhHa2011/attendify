@@ -1,3 +1,5 @@
+// lib/features/admin/data/services/admin_service.dart
+
 import 'package:attendify/core/data/models/class_enrollment_model.dart';
 
 import '../../../../app_imports.dart';
@@ -50,16 +52,38 @@ class AdminService {
   }
 
   /// Hàm này trả về đúng kiểu List<UserModel>.
+  // Stream<List<UserModel>> getUsersStreamByRole(UserRole role) {
+  //   return _db
+  //       .collection('users')
+  //       .where('role', isEqualTo: role.toKey())
+  //       .snapshots()
+  //       .map(
+  //         (snapshot) =>
+  //             // Chuyển đổi mỗi document thành một đối tượng UserModel
+  //             snapshot.docs.map((doc) => UserModel.fromDoc(doc)).toList(),
+  //       );
+  // }
+
+  /// Lấy danh sách người dùng đang hoạt động theo vai trò.
   Stream<List<UserModel>> getUsersStreamByRole(UserRole role) {
     return _db
         .collection('users')
         .where('role', isEqualTo: role.toKey())
+        .where('isActive', isEqualTo: true) // <-- THÊM DÒNG NÀY
         .snapshots()
         .map(
           (snapshot) =>
-              // Chuyển đổi mỗi document thành một đối tượng UserModel
               snapshot.docs.map((doc) => UserModel.fromDoc(doc)).toList(),
         );
+  }
+
+  /// Vô hiệu hoá người dùng bằng cách đặt cờ 'isActive' thành false.
+  Future<void> deactivateUser(String uid) {
+    return _db.collection('users').doc(uid).update({
+      'isActive': false,
+      'updatedAt':
+          FieldValue.serverTimestamp(), // Cập nhật thời gian cho tiện theo dõi
+    });
   }
 
   Future<List<UserModel>> getUsersByRole(UserRole role) async {
