@@ -1,66 +1,52 @@
-// lib/features/admin/presentation/pages/class_bulk_import_page.dart
-import 'dart:typed_data';
+import 'package:attendify/app_imports.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import '../../../../../core/data/models/class_model.dart';
+import '../../../../../core/data/models/class_enrollment_model.dart';
 import '../../../../../core/utils/template_downloader.dart';
-import '../../../data/services/admin_service.dart';
 
-/// Header mong đợi trong file Excel (không phân biệt hoa/thường)
-const _expectedHeaders = <String>[
-  'classCode',
-  'className',
-  'minStudents',
-  'maxStudents',
-  'startYear',
-  'endYear',
-  'description',
-];
+/// Import theo 1 lớp cố định (widget.classModel.classCode) → chỉ cần cột studentEmail
+const _expectedHeaders = <String>['studentEmail'];
 
-class _RowState {
+class _EnrollmentRowState {
   final int rowIndex;
-  String classCode;
-  String className;
-  int minStudents;
-  int maxStudents;
-  int startYear;
-  int endYear;
-  String? description;
+  String studentEmail;
 
-  /// Lỗi validate hiển thị dưới dòng
-  String? error;
+  String? studentId; // uid sinh viên
+  String? error; // lỗi hiển thị
 
-  _RowState({
-    required this.rowIndex,
-    required this.classCode,
-    required this.className,
-    required this.minStudents,
-    required this.maxStudents,
-    required this.startYear,
-    required this.endYear,
-    this.description,
-    this.error,
-  });
+  _EnrollmentRowState({required this.rowIndex, required this.studentEmail});
 }
 
-class ClassBulkImportPage extends StatefulWidget {
-  const ClassBulkImportPage({super.key});
+class ClassEnrollmentBulkImportPage extends StatefulWidget {
+  final ClassModel classModel;
+  const ClassEnrollmentBulkImportPage({super.key, required this.classModel});
 
   @override
-  State<ClassBulkImportPage> createState() => _ClassBulkImportPageState();
+  State<ClassEnrollmentBulkImportPage> createState() =>
+      _EnrollmentBulkImportPageState();
 }
 
-class _ClassBulkImportPageState extends State<ClassBulkImportPage> {
-  List<_RowState> _rows = [];
+class _EnrollmentBulkImportPageState
+    extends State<ClassEnrollmentBulkImportPage> {
+  List<_EnrollmentRowState> _rows = [];
   String? _fileName;
   String? _message;
   bool _submitting = false;
 
-  /// ====== Helpers ======
+  @override
+  void dispose() {
+    super.dispose();
+  }
 
+  // ---------- Helpers (Excel) ----------
+  static String _cellStr(List<Data?> row, int col) {
+    if (col < 0 || col >= row.length) return '';
+    final v = row[col]?.value;
+    return v == null ? '' : v.toString();
+  }
+
+  // ---------- File picker & parser ----------
   Future<void> _pickFile() async {
     setState(() {
       _rows = [];
@@ -78,8 +64,7 @@ class _ClassBulkImportPageState extends State<ClassBulkImportPage> {
     }
 
     try {
-      final bytes = res.files.single.bytes!;
-      final rows = await _parseClassesXlsx(bytes);
+      final rows = await _parseEnrollmentsXlsx(res.files.single.bytes!);
       setState(() {
         _rows = rows;
         _fileName = res.files.single.name;
@@ -89,17 +74,19 @@ class _ClassBulkImportPageState extends State<ClassBulkImportPage> {
     }
   }
 
-  Future<List<_RowState>> _parseClassesXlsx(Uint8List bytes) async {
+  Future<List<_EnrollmentRowState>> _parseEnrollmentsXlsx(
+    Uint8List bytes,
+  ) async {
     final excel = Excel.decodeBytes(bytes);
     if (excel.tables.isEmpty) {
       throw Exception('File không có sheet nào.');
     }
 
-    // Ưu tiên sheet "classes" / "class"
+    // ưu tiên sheet "enrollments" / "enrollment"
     Sheet? tb = excel.tables.values.first;
     for (final key in excel.tables.keys) {
       final lk = key.toLowerCase().trim();
-      if (lk == 'classes' || lk == 'class') {
+      if (lk == 'enrollments' || lk == 'enrollment') {
         tb = excel.tables[key];
         break;
       }
@@ -120,110 +107,118 @@ class _ClassBulkImportPageState extends State<ClassBulkImportPage> {
     }
 
     int idxOf(String key) => headerLower.indexOf(key.toLowerCase());
-    String cellStr(List<Data?> row, int col) => (col >= 0 && col < row.length)
-        ? (row[col]?.value?.toString() ?? '')
-        : '';
 
-    final out = <_RowState>[];
-    final seenClassCodes = <String>{}; // Để check trùng lặp trong file
+    final out = <_EnrollmentRowState>[];
+    final seenPairs = <String>{}; // studentEmail|classCode trùng trong file
 
     for (var i = 1; i < tb.rows.length; i++) {
       final row = tb.rows[i];
       if (row.every((c) => (c?.value?.toString().trim() ?? '').isEmpty)) {
-        continue; // bỏ dòng trống
+        continue;
       }
 
-      final classCode = cellStr(row, idxOf('classCode')).trim().toUpperCase();
-      final className = cellStr(row, idxOf('className')).trim();
-      final minStr = cellStr(row, idxOf('minStudents')).trim();
-      final maxStr = cellStr(row, idxOf('maxStudents')).trim();
-      final syStr = cellStr(row, idxOf('startYear')).trim();
-      final eyStr = cellStr(row, idxOf('endYear')).trim();
-      final desc = cellStr(row, idxOf('description')).trim();
+      final studentEmail = _cellStr(row, idxOf('studentEmail')).trim();
 
-      if (classCode.isEmpty || className.isEmpty) continue;
-
-      // Kiểm tra trùng lặp classCode trong file
-      if (seenClassCodes.contains(classCode)) {
-        throw Exception(
-          'Mã lớp "$classCode" bị trùng lặp trong file (dòng ${i + 1})',
-        );
+      if (studentEmail.isEmpty || widget.classModel.id.isEmpty) {
+        continue; // thiếu dữ liệu cơ bản → bỏ qua dòng
       }
-      seenClassCodes.add(classCode);
 
-      out.add(
-        _RowState(
-          rowIndex: i,
-          classCode: classCode,
-          className: className,
-          minStudents: int.tryParse(minStr) ?? 0,
-          maxStudents: int.tryParse(maxStr) ?? 0,
-          startYear: int.tryParse(syStr) ?? 0,
-          endYear: int.tryParse(eyStr) ?? 0,
-          description: desc.isEmpty ? null : desc,
-        ),
-      );
+      final key = '${studentEmail.toLowerCase()}|${widget.classModel.id}';
+      if (seenPairs.contains(key)) {
+        throw Exception('(studentEmail) bị trùng trong file ở dòng ${i + 1}');
+      }
+      seenPairs.add(key);
+
+      out.add(_EnrollmentRowState(rowIndex: i, studentEmail: studentEmail));
     }
     return out;
   }
 
-  String? _validateRow(_RowState r, List<ClassModel> existingClasses) {
-    if (r.classCode.trim().isEmpty) return 'Thiếu classCode';
-    if (r.className.trim().isEmpty) return 'Thiếu className';
-    if (r.minStudents <= 0) return 'minStudents phải > 0';
-    if (r.maxStudents <= 0) return 'maxStudents phải > 0';
-    if (r.maxStudents <= r.minStudents) {
-      return 'maxStudents phải > minStudents';
+  // ---------- Validate ----------
+  String? _validateRow(
+    _EnrollmentRowState r,
+    List<UserModel> students,
+    List<ClassEnrollmentModel> enrollments,
+  ) {
+    if (r.studentEmail.trim().isEmpty) return 'Thiếu email sinh viên';
+
+    if (r.studentId == null || r.studentId!.isEmpty) {
+      return 'Chưa chọn sinh viên';
     }
-    if (r.startYear <= 0) return 'startYear không hợp lệ';
-    if (r.endYear <= 0) return 'endYear không hợp lệ';
-    if (r.endYear < r.startYear) return 'endYear phải ≥ startYear';
 
-    // Kiểm tra trùng lặp với lớp đã tồn tại
-    final existingClass = existingClasses.firstWhere(
-      (c) =>
-          c.classCode.toUpperCase().trim() == r.classCode.toUpperCase().trim(),
-      orElse: () => ClassModel(
-        id: '',
-        classCode: '',
-        className: '',
-        minStudents: 0,
-        maxStudents: 0,
-        startYear: 0,
-        endYear: 0,
-        isArchived: false,
-      ),
+    // trùng với DB (đã ghi danh)
+    final isDup = enrollments.any(
+      (e) =>
+          e.classCode.toUpperCase().trim() ==
+              widget.classModel.id.toUpperCase().trim() &&
+          e.studentId == r.studentId,
     );
-
-    if (existingClass.id.isNotEmpty) {
-      return 'Mã lớp "${r.classCode}" đã tồn tại trong hệ thống';
+    if (isDup) {
+      return 'SV đã ghi danh lớp "${widget.classModel.className}"';
     }
 
     return null;
   }
 
-  bool _allValid(List<ClassModel> existingClasses) =>
+  bool _allValid(
+    List<UserModel> students,
+    List<ClassEnrollmentModel> enrollments,
+  ) =>
       _rows.isNotEmpty &&
-      _rows.every((e) => _validateRow(e, existingClasses) == null);
+      _rows.every((e) => _validateRow(e, students, enrollments) == null);
+  int _remainingSeats(List<ClassEnrollmentModel> enrollments) {
+    final max = widget.classModel.maxStudents;
+    final current = enrollments.length;
+    final remain = max - current;
+    return remain < 0 ? 0 : remain;
+  }
 
-  Future<void> _submit(List<ClassModel> allClasses) async {
+  int _countImportable(
+    List<UserModel> students,
+    List<ClassEnrollmentModel> enrollments,
+  ) {
+    int count = 0;
+    for (final r in _rows) {
+      final err = _validateRow(r, students, enrollments);
+      if (err == null) count++;
+    }
+    return count;
+  }
+
+  // ---------- Submit ----------
+  Future<void> _submit(
+    List<UserModel> students,
+    List<ClassEnrollmentModel> enrollments,
+  ) async {
     if (_rows.isEmpty) return;
 
-    // Validate lần cuối
     bool hasError = false;
     for (final r in _rows) {
-      r.error = _validateRow(r, allClasses);
+      r.error = _validateRow(r, students, enrollments);
       if (r.error != null) hasError = true;
     }
-
     setState(() {});
-
     if (hasError) {
-      setState(
-        () => _message = 'Có lỗi trong dữ liệu. Vui lòng kiểm tra và sửa lại.',
-      );
+      setState(() => _message = 'Có lỗi trong dữ liệu. Vui lòng kiểm tra.');
       return;
     }
+    // ====== NEW: Kiểm tra sức chứa lớp trước khi import ======
+    final remaining = _remainingSeats(enrollments);
+    final importable = _countImportable(students, enrollments);
+    final inFile = _rows.length;
+
+    if (importable > remaining) {
+      setState(() {
+        _message =
+            'Vượt sức chứa lớp.\n'
+            'Số chỗ còn lại: $remaining.\n'
+            'Số sinh viên có trong file: $inFile.\n'
+            'Số sinh viên hợp lệ có thể import: $remaining.\n'
+            'Vui lòng bớt số lượng hoặc chia file.';
+      });
+      return;
+    }
+    // ==========================================================
 
     setState(() {
       _submitting = true;
@@ -231,39 +226,30 @@ class _ClassBulkImportPageState extends State<ClassBulkImportPage> {
     });
 
     final admin = context.read<AdminService>();
+
     try {
       int created = 0;
-
       for (final r in _rows) {
-        await admin.createClass(
-          classCode: r.classCode.trim().toUpperCase(),
-          className: r.className.trim(),
-          minStudents: r.minStudents,
-          maxStudents: r.maxStudents,
-          startYear: r.startYear,
-          endYear: r.endYear,
-          description: r.description,
+        await admin.enrollClassSingleStudent(
+          widget.classModel.id,
+          r.studentId!,
         );
         created++;
       }
 
       setState(() {
-        _message = 'Thành công! Đã tạo mới $created lớp học.';
-        _rows = []; // Clear data sau khi import thành công
+        _message = 'Thành công! Đã ghi danh $created lượt.';
+        _rows = [];
         _fileName = null;
       });
     } catch (e) {
-      setState(
-        () =>
-            _message = 'Lỗi:: ${e.toString().replaceFirst("Exception: ", "")}',
-      );
+      setState(() => _message = 'Lỗi: $e');
     } finally {
       setState(() => _submitting = false);
     }
   }
 
-  /// ====== UI ======
-
+  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -273,124 +259,222 @@ class _ClassBulkImportPageState extends State<ClassBulkImportPage> {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Nhập lớp từ Excel'),
+        title: Text('Nhập ghi danh từ Excel — ${widget.classModel.className}'),
         elevation: 0,
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
       ),
       body: SafeArea(
-        child: StreamBuilder<List<ClassModel>>(
-          stream: context.read<AdminService>().getAllClassStream(),
-          builder: (context, snapshot) {
-            final all = snapshot.data ?? [];
+        child: StreamBuilder<List<UserModel>>(
+          stream: context.read<AdminService>().getAllStudentsStream(),
+          builder: (_, stuSnap) {
+            if (stuSnap.hasError) {
+              return _buildFatalError(
+                'Lỗi tải danh sách sinh viên: ${stuSnap.error}',
+              );
+            }
+            final students = stuSnap.data ?? [];
 
-            return Column(
-              children: [
-                // Header Section with Actions
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(isWideScreen ? 24 : 16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.shadow.withOpacity(0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            return StreamBuilder<List<ClassEnrollmentModel>>(
+              stream: context.read<AdminService>().getAllClassEnrollmentsStream(
+                classCode: widget.classModel.id,
+              ),
+              builder: (_, enrSnap) {
+                if (enrSnap.hasError) {
+                  // Hiển thị lỗi stream để không crash
+                  return Column(
                     children: [
-                      Text(
-                        'Tải lên file Excel để nhập hàng loạt',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      _buildHeader(
+                        theme,
+                        colorScheme,
+                        isWideScreen,
+                        enableSubmit: false,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Lưu ý: Mã lớp không được trùng lặp trong file và không được trùng với lớp đã có trong hệ thống',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurface.withOpacity(0.7),
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Action Buttons
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          _ActionButton(
-                            icon: Icons.download_outlined,
-                            label: 'Tải template',
-                            onPressed: () =>
-                                TemplateDownloader.download('class'),
-                            variant: _ButtonVariant.outlined,
-                          ),
-                          _ActionButton(
-                            icon: Icons.upload_file_outlined,
-                            label: 'Chọn file Excel',
-                            onPressed: _pickFile,
-                            variant: _ButtonVariant.filled,
-                          ),
-                          _ActionButton(
-                            icon: _submitting
-                                ? Icons.hourglass_empty
-                                : Icons.cloud_upload_outlined,
-                            label: _submitting
-                                ? 'Đang xử lý...'
-                                : 'Thực hiện nhập',
-                            onPressed: (_allValid(all) && !_submitting)
-                                ? () => _submit(all)
-                                : null,
-                            variant: _ButtonVariant.primary,
-                          ),
-                        ],
-                      ),
-
-                      // File and Status Info
-                      if (_fileName != null || _message != null) ...[
-                        const SizedBox(height: 16),
-                        _StatusCard(
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: _StatusCard(
                           fileName: _fileName,
-                          message: _message,
+                          message:
+                              'Lỗi tải enrollments (${widget.classModel.classCode}): ${enrSnap.error}',
                           colorScheme: colorScheme,
                         ),
-                      ],
+                      ),
                     ],
-                  ),
-                ),
+                  );
+                }
 
-                // Content Area
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(isWideScreen ? 24 : 16),
-                    child: _rows.isEmpty
-                        ? _EmptyState(colorScheme: colorScheme)
-                        : _DataList(
-                            rows: _rows,
-                            allClasses: all,
-                            isWideScreen: isWideScreen,
-                            onChanged: () => setState(() {}),
-                          ),
-                  ),
-                ),
-              ],
+                final enrollments = enrSnap.data ?? [];
+
+                // auto-match student theo email
+                for (final r in _rows) {
+                  if (r.studentId == null) {
+                    final i = students.indexWhere(
+                      (u) =>
+                          u.email.toLowerCase().trim() ==
+                          r.studentEmail.toLowerCase().trim(),
+                    );
+                    if (i >= 0) r.studentId = students[i].uid;
+                  }
+                }
+
+                final remaining = _remainingSeats(enrollments);
+                final importable = _countImportable(students, enrollments);
+                final inFile = _rows.length;
+
+                final canSubmit =
+                    _rows.isNotEmpty &&
+                    !_submitting &&
+                    importable > 0 &&
+                    importable <= remaining;
+
+                return Column(
+                  children: [
+                    _buildHeader(
+                      theme,
+                      colorScheme,
+                      isWideScreen,
+                      enableSubmit: canSubmit,
+                      onSubmit: () => _submit(students, enrollments),
+                      remaining: remaining,
+                      importable: importable,
+                      inFile: inFile,
+                    ),
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(isWideScreen ? 24 : 16),
+                        child: _rows.isEmpty
+                            ? _EmptyState(colorScheme: colorScheme)
+                            : _DataList(
+                                rows: _rows,
+                                allStudents: students,
+                                allEnrollments: enrollments,
+                                isWideScreen: isWideScreen,
+                                onChanged: () => setState(() {}),
+                              ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             );
           },
         ),
       ),
     );
   }
+
+  Widget _buildHeader(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    bool isWideScreen, {
+    bool enableSubmit = false,
+    VoidCallback? onSubmit,
+    int remaining = 0,
+    int importable = 0,
+    int inFile = 0,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isWideScreen ? 24 : 16),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Tải lên file Excel để ghi danh hàng loạt cho lớp ${widget.classModel.className}',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Yêu cầu cột: `studentEmail`. Lớp cố định: ${widget.classModel.className}.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.7),
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.info_outline, size: 16, color: colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                'Chỗ còn lại: $remaining • Trong file: $inFile',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: remaining >= inFile
+                      ? colorScheme.onSurface.withOpacity(0.7)
+                      : Colors.red,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _ActionButton(
+                icon: Icons.download_outlined,
+                label: 'Tải template',
+                onPressed: () => TemplateDownloader.download('enrollment'),
+                variant: _ButtonVariant.outlined,
+              ),
+              _ActionButton(
+                icon: Icons.upload_file_outlined,
+                label: 'Chọn file Excel',
+                onPressed: _pickFile,
+                variant: _ButtonVariant.filled,
+              ),
+              _ActionButton(
+                icon: _submitting
+                    ? Icons.hourglass_empty
+                    : Icons.cloud_upload_outlined,
+                label: _submitting ? 'Đang xử lý...' : 'Thực hiện nhập',
+                onPressed: enableSubmit ? onSubmit : null,
+                variant: _ButtonVariant.primary,
+              ),
+            ],
+          ),
+          if (_fileName != null || _message != null) ...[
+            const SizedBox(height: 16),
+            _StatusCard(
+              fileName: _fileName,
+              message: _message,
+              colorScheme: colorScheme,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFatalError(String msg) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: _StatusCard(
+        fileName: _fileName,
+        message: msg,
+        colorScheme: colorScheme,
+      ),
+    );
+  }
 }
 
-// Action Button Component
+// ====== Reuse components ======
+
 enum _ButtonVariant { outlined, filled, primary }
 
 class _ActionButton extends StatelessWidget {
@@ -444,7 +528,6 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-// Status Card Component
 class _StatusCard extends StatelessWidget {
   final String? fileName;
   final String? message;
@@ -521,7 +604,6 @@ class _StatusCard extends StatelessWidget {
   }
 }
 
-// Empty State Component
 class _EmptyState extends StatelessWidget {
   final ColorScheme colorScheme;
 
@@ -554,16 +636,19 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// Data List Component
+// ====== Data list & row card ======
+
 class _DataList extends StatelessWidget {
-  final List<_RowState> rows;
-  final List<ClassModel> allClasses;
+  final List<_EnrollmentRowState> rows;
+  final List<UserModel> allStudents;
+  final List<ClassEnrollmentModel> allEnrollments;
   final bool isWideScreen;
   final VoidCallback onChanged;
 
   const _DataList({
     required this.rows,
-    required this.allClasses,
+    required this.allStudents,
+    required this.allEnrollments,
     required this.isWideScreen,
     required this.onChanged,
   });
@@ -573,13 +658,12 @@ class _DataList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
         Row(
           children: [
             Icon(Icons.preview, color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 8),
             Text(
-              'Xem trước dữ liệu (${rows.length} lớp)',
+              'Xem trước dữ liệu (${rows.length} ghi danh)',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
@@ -587,19 +671,29 @@ class _DataList extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-
-        // List
         Expanded(
           child: ListView.separated(
             itemCount: rows.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (_, index) {
-              return _RowCard(
+              return _EnrollmentRowCard(
                 row: rows[index],
-                allClasses: allClasses,
+                allStudents: allStudents,
+                allEnrollments: allEnrollments,
                 isWideScreen: isWideScreen,
                 onChanged: () {
                   rows[index].error = null;
+                  final parent = context
+                      .findAncestorStateOfType<
+                        _EnrollmentBulkImportPageState
+                      >();
+                  if (parent != null) {
+                    rows[index].error = parent._validateRow(
+                      rows[index],
+                      allStudents,
+                      allEnrollments,
+                    );
+                  }
                   onChanged();
                 },
               );
@@ -611,58 +705,41 @@ class _DataList extends StatelessWidget {
   }
 }
 
-// Simplified Row Card (removed matching dropdown and create new checkbox)
-class _RowCard extends StatelessWidget {
-  final _RowState row;
-  final List<ClassModel> allClasses;
+class _EnrollmentRowCard extends StatelessWidget {
+  final _EnrollmentRowState row;
+  final List<UserModel> allStudents;
+  final List<ClassEnrollmentModel> allEnrollments;
   final bool isWideScreen;
   final VoidCallback onChanged;
 
-  const _RowCard({
+  const _EnrollmentRowCard({
     required this.row,
-    required this.allClasses,
+    required this.allStudents,
+    required this.allEnrollments,
     required this.isWideScreen,
     required this.onChanged,
   });
-
-  String? _validateRow(_RowState r, List<ClassModel> existingClasses) {
-    if (r.classCode.trim().isEmpty) return 'Thiếu mã lớp';
-    if (r.className.trim().isEmpty) return 'Thiếu tên lớp';
-    if (r.minStudents <= 0) return 'Số sinh viên tối thiểu phải > 0';
-    if (r.maxStudents <= 0) return 'Số sinh viên tối đa phải > 0';
-    if (r.maxStudents <= r.minStudents) return 'Số tối đa phải > số tối thiểu';
-    if (r.startYear <= 0) return 'Năm bắt đầu không hợp lệ';
-    if (r.endYear <= 0) return 'Năm kết thúc không hợp lệ';
-    if (r.endYear < r.startYear) return 'Năm kết thúc phải ≥ năm bắt đầu';
-
-    // Kiểm tra trùng lặp với lớp đã tồn tại
-    final existingClass = existingClasses.firstWhere(
-      (c) =>
-          c.classCode.toUpperCase().trim() == r.classCode.toUpperCase().trim(),
-      orElse: () => ClassModel(
-        id: '',
-        classCode: '',
-        className: '',
-        minStudents: 0,
-        maxStudents: 0,
-        startYear: 0,
-        endYear: 0,
-        isArchived: false,
-      ),
-    );
-
-    if (existingClass.id.isNotEmpty) {
-      return 'Mã lớp "${r.classCode}" đã tồn tại trong hệ thống';
-    }
-
-    return null;
-  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final error = _validateRow(row, allClasses);
+
+    final student = (row.studentId != null && row.studentId!.isNotEmpty)
+        ? allStudents.firstWhere(
+            (u) => u.uid == row.studentId,
+            orElse: () => UserModel.empty(),
+          )
+        : allStudents.firstWhere(
+            (u) =>
+                u.email.toLowerCase().trim() ==
+                row.studentEmail.toLowerCase().trim(),
+            orElse: () => UserModel.empty(),
+          );
+
+    final error = context
+        .findAncestorStateOfType<_EnrollmentBulkImportPageState>()
+        ?._validateRow(row, allStudents, allEnrollments);
     final hasError = error != null;
 
     return Container(
@@ -706,7 +783,7 @@ class _RowCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
-                    hasError ? Icons.error_outline : Icons.class_outlined,
+                    hasError ? Icons.error_outline : Icons.person_add_alt_1,
                     color: hasError
                         ? colorScheme.onError
                         : colorScheme.onPrimary,
@@ -719,15 +796,22 @@ class _RowCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${row.classCode} — ${row.className}',
+                        row.studentEmail,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: colorScheme.onSurface,
                         ),
                       ),
+                      if (student.uid.isNotEmpty)
+                        Text(
+                          'SV: ${student.displayName} (${student.email})',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                        ),
                       if (hasError)
                         Text(
-                          error,
+                          error!,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.error,
                             fontWeight: FontWeight.w500,
@@ -736,7 +820,6 @@ class _RowCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Status Chip
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -754,7 +837,7 @@ class _RowCard extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    hasError ? 'Lỗi' : 'Tạo mới',
+                    hasError ? 'Lỗi' : 'Ghi danh',
                     style: TextStyle(
                       color: hasError
                           ? colorScheme.error
@@ -781,7 +864,11 @@ class _RowCard extends StatelessWidget {
   Widget _buildFormGrid(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth > 600 ? 3 : 2;
+        final crossAxisCount = constraints.maxWidth > 900
+            ? 4
+            : constraints.maxWidth > 600
+            ? 3
+            : 2;
 
         return GridView.count(
           shrinkWrap: true,
@@ -789,63 +876,36 @@ class _RowCard extends StatelessWidget {
           crossAxisCount: crossAxisCount,
           crossAxisSpacing: 16,
           mainAxisSpacing: 4,
-          childAspectRatio: 6,
+          childAspectRatio: crossAxisCount == 4 ? 5 : 6,
           children: [
             _FormField(
-              label: 'Mã lớp',
-              value: row.classCode,
-              icon: Icons.tag,
+              label: 'Email sinh viên',
+              value: row.studentEmail,
+              icon: Icons.alternate_email,
               onChanged: (v) {
-                row.classCode = v.trim().toUpperCase();
+                row.studentEmail = v.trim();
+                row.error = null;
                 onChanged();
               },
             ),
-            _FormField(
-              label: 'Tên lớp',
-              value: row.className,
-              icon: Icons.class_outlined,
-              onChanged: (v) {
-                row.className = v.trim();
-                onChanged();
-              },
-            ),
-            _FormField(
-              label: 'Số lượng sinh viên tối thiểu',
-              value: '${row.minStudents}',
-              icon: Icons.people_outline,
-              keyboardType: TextInputType.number,
-              onChanged: (v) {
-                row.minStudents = int.tryParse(v) ?? 0;
-                onChanged();
-              },
-            ),
-            _FormField(
-              label: 'Số lượng sinh viên tối đa',
-              value: '${row.maxStudents}',
-              icon: Icons.people,
-              keyboardType: TextInputType.number,
-              onChanged: (v) {
-                row.maxStudents = int.tryParse(v) ?? 0;
-                onChanged();
-              },
-            ),
-            _FormField(
-              label: 'Năm bắt đầu',
-              value: '${row.startYear}',
-              icon: Icons.calendar_today,
-              keyboardType: TextInputType.number,
-              onChanged: (v) {
-                row.startYear = int.tryParse(v) ?? 0;
-                onChanged();
-              },
-            ),
-            _FormField(
-              label: 'Năm kết thúc',
-              value: '${row.endYear}',
-              icon: Icons.event,
-              keyboardType: TextInputType.number,
-              onChanged: (v) {
-                row.endYear = int.tryParse(v) ?? 0;
+            _StudentDropdownField(
+              label: 'Chọn sinh viên',
+              value: row.studentId,
+              students: allStudents,
+              suggestedEmail: row.studentEmail,
+              onChanged: (studentId) {
+                row.studentId = (studentId ?? '').trim();
+                final parent = context
+                    .findAncestorStateOfType<_EnrollmentBulkImportPageState>();
+                if (parent != null) {
+                  row.error = parent._validateRow(
+                    row,
+                    allStudents,
+                    allEnrollments,
+                  );
+                } else {
+                  row.error = null;
+                }
                 onChanged();
               },
             ),
@@ -856,12 +916,12 @@ class _RowCard extends StatelessWidget {
   }
 }
 
-// Form Field Component
 class _FormField extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
   final TextInputType? keyboardType;
+  final int? maxLines;
   final ValueChanged<String> onChanged;
 
   const _FormField({
@@ -870,6 +930,7 @@ class _FormField extends StatelessWidget {
     required this.icon,
     required this.onChanged,
     this.keyboardType,
+    this.maxLines = 1,
   });
 
   @override
@@ -897,6 +958,7 @@ class _FormField extends StatelessWidget {
           initialValue: value,
           onChanged: onChanged,
           keyboardType: keyboardType,
+          maxLines: maxLines,
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
@@ -917,6 +979,123 @@ class _FormField extends StatelessWidget {
             ),
             isDense: true,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StudentDropdownField extends StatelessWidget {
+  final String label;
+  final String? value;
+  final List<UserModel> students;
+  final String suggestedEmail;
+  final ValueChanged<String?> onChanged;
+
+  const _StudentDropdownField({
+    required this.label,
+    required this.value,
+    required this.students,
+    required this.suggestedEmail,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // sort students by displayName/email
+    final sorted = [...students]
+      ..sort((a, b) {
+        final ka =
+            (a.displayName?.trim().isNotEmpty == true
+                    ? a.displayName!
+                    : a.email)
+                .toLowerCase();
+        final kb =
+            (b.displayName?.trim().isNotEmpty == true
+                    ? b.displayName!
+                    : b.email)
+                .toLowerCase();
+        return ka.compareTo(kb);
+      });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.person_outline, size: 16, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+                color: colorScheme.onSurface.withOpacity(0.8),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String?>(
+          value:
+              (value != null &&
+                  value!.isNotEmpty &&
+                  sorted.any((s) => s.uid == value))
+              ? value
+              : null,
+          isExpanded: true,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: colorScheme.primary, width: 2),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+            isDense: true,
+          ),
+          hint: Text(
+            suggestedEmail.isNotEmpty
+                ? 'Gợi ý: $suggestedEmail'
+                : 'Chọn sinh viên...',
+            style: TextStyle(
+              color: colorScheme.onSurface.withOpacity(0.6),
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('— Chọn sinh viên —'),
+            ),
+            ...sorted.map(
+              (s) => DropdownMenuItem<String?>(
+                value: s.uid,
+                child: Text(
+                  '${s.displayName} (${s.email})',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight:
+                        s.email.toLowerCase() == suggestedEmail.toLowerCase()
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    color: s.email.toLowerCase() == suggestedEmail.toLowerCase()
+                        ? colorScheme.primary
+                        : null,
+                  ),
+                ),
+              ),
+            ),
+          ],
+          onChanged: onChanged,
         ),
       ],
     );

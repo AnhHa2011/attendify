@@ -26,7 +26,6 @@
 //   String? lecturerId;
 
 //   bool createClass = false;
-//   bool createCourse = false;
 //   bool createLecturer = false;
 //   String? error;
 

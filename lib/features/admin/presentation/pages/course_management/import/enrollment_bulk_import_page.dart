@@ -422,9 +422,11 @@ class _CourseEnrollmentBulkImportPageState
               Icon(Icons.info_outline, size: 16, color: colorScheme.primary),
               const SizedBox(width: 6),
               Text(
-                'Chỗ còn lại: $remaining • Hợp lệ để import: $importable • Trong file: $inFile',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.7),
+                'Chỗ còn lại: $remaining • Trong file: $inFile',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: remaining >= inFile
+                      ? colorScheme.onSurface.withOpacity(0.7)
+                      : Colors.red,
                 ),
               ),
             ],
