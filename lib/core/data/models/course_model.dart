@@ -1,3 +1,5 @@
+// lib/core/data/models/course_model.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'course_schedule_model.dart';
 
