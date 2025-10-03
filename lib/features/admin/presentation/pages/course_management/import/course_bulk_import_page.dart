@@ -67,12 +67,14 @@ class _CourseRowState {
 class _DatePickerField extends StatelessWidget {
   final String label;
   final DateTime? value;
+  final DateTime? firstSelectableDate; // THÊM DÒNG NÀY
   final ValueChanged<DateTime?> onChanged;
 
   const _DatePickerField({
     required this.label,
     required this.value,
     required this.onChanged,
+    this.firstSelectableDate, // THÊM DÒNG NÀY
   });
 
   @override
@@ -100,8 +102,9 @@ class _DatePickerField extends StatelessWidget {
           onTap: () async {
             final date = await showDatePicker(
               context: context,
-              initialDate: value ?? DateTime.now(),
-              firstDate: DateTime(2020),
+              initialDate: value ?? firstSelectableDate ?? DateTime.now(),
+              // SỬA DÒNG NÀY: Ưu tiên ngày có thể chọn, fallback về ngày mặc định
+              firstDate: firstSelectableDate ?? DateTime(2020),
               lastDate: DateTime(2035),
               builder: (context, child) {
                 return Theme(
@@ -361,8 +364,9 @@ class _CourseBulkImportPageState extends State<CourseBulkImportPage> {
     if (r.maxAbsences < 0) return 'Số buổi vắng tối đa không hợp lệ';
     if (r.startDate == null) return 'Thiếu ngày bắt đầu';
     if (r.endDate == null) return 'Thiếu ngày kết thúc';
-    if (r.endDate!.isBefore(r.startDate!)) {
-      return 'Ngày kết thúc phải ≥ ngày bắt đầu';
+
+    if (!r.endDate!.isAfter(r.startDate!)) {
+      return 'Ngày kết thúc phải sau ngày bắt đầu';
     }
 
     // Trùng với DB
@@ -1112,17 +1116,23 @@ class _CourseRowCard extends StatelessWidget {
               value: row.startDate,
               onChanged: (date) {
                 row.startDate = date;
-                row.error = null;
-                onChanged();
+                // Cải tiến UX: Nếu ngày kết thúc không còn hợp lệ, xóa nó đi
+                if (row.endDate != null && date != null) {
+                  if (!row.endDate!.isAfter(date)) {
+                    row.endDate = null;
+                  }
+                }
+                onChanged(); // Gọi onChanged để cập nhật UI và validate lại
               },
             ),
             _DatePickerField(
               label: 'Ngày kết thúc (bắt buộc)',
               value: row.endDate,
+              // Cải tiến UX: Chặn chọn ngày không hợp lệ
+              firstSelectableDate: row.startDate?.add(const Duration(days: 1)),
               onChanged: (date) {
                 row.endDate = date;
-                row.error = null;
-                onChanged();
+                onChanged(); // Gọi onChanged để cập nhật UI và validate lại
               },
             ),
             // Description spans full width
