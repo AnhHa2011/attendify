@@ -1,4 +1,4 @@
-// lib/presentation/pages/admin/course_form_page.dart
+// lib/features/admin/presentation/pages/course_management/course_form_page.dart
 
 import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
@@ -228,15 +228,61 @@ class _CourseFormPageState extends State<CourseFormPage> {
   //   return out;
   // }
 
+  // Hàm helper để hiển thị dialog xác nhận
+  Future<bool?> _showPastDateConfirmationDialog() {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // Người dùng phải chọn một hành động
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Cảnh báo'),
+          content: const Text(
+            'Ngày bắt đầu nằm trong quá khứ. Bạn có chắc chắn muốn lưu không?',
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Hủy bỏ'),
+              onPressed: () {
+                Navigator.of(context).pop(false); // Trả về false
+              },
+            ),
+            FilledButton(
+              child: const Text('Vẫn lưu'),
+              onPressed: () {
+                Navigator.of(context).pop(true); // Trả về true
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Check lecturer chosen
     if (_selectedLecturerId == null || _selectedLecturerId!.isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Vui lòng chọn giảng viên')));
       return;
+    }
+
+    // --- START: THÊM LOGIC KIỂM TRA NGÀY TRONG QUÁ KHỨ ---
+
+    final startDate = _dateFormat.parseStrict(_startDateCtrl.text);
+    final now = DateTime.now();
+    // Tạo một đối tượng DateTime cho ngày hôm nay lúc 00:00:00 để so sánh
+    final today = DateTime(now.year, now.month, now.day);
+
+    // Nếu ngày bắt đầu là một ngày trước ngày hôm nay
+    if (startDate.isBefore(today)) {
+      final shouldProceed = await _showPastDateConfirmationDialog();
+
+      // Nếu người dùng chọn "Hủy bỏ" hoặc đóng dialog, dừng quá trình
+      if (shouldProceed != true) {
+        return;
+      }
     }
 
     // // Validate slots (nếu cần bắt buộc có ít nhất 1 buổi thì kiểm tra ở đây)
@@ -260,10 +306,9 @@ class _CourseFormPageState extends State<CourseFormPage> {
     final semester = _semesterCtrl.text.trim();
     final joinCode = _joinCodeCtrl.text.trim();
     final description = _descriptionCtrl.text.trim();
-    final startDate = _dateFormat.parseStrict(_startDateCtrl.text);
     final endDate = _dateFormat.parseStrict(_endDateCtrl.text);
+
     try {
-      // Kiểm tra trùng mã môn học
       final isTaken = await adminService.isCourseCodeTaken(
         courseCode,
         currentcourseCode: widget.courseModel?.id,
@@ -277,11 +322,12 @@ class _CourseFormPageState extends State<CourseFormPage> {
             ),
           );
         }
+        // Cần thêm return ở đây để dừng lại sau khi set loading=false
+        setState(() => _isLoading = false);
         return;
       }
 
       // Tạo/Cập nhật
-
       if (_isEditMode) {
         await adminService.updateCourse(
           id: widget.courseModel!.id,
@@ -294,7 +340,7 @@ class _CourseFormPageState extends State<CourseFormPage> {
           description: description,
           minStudents: minStudents,
           maxStudents: maxStudents,
-          startDate: startDate,
+          startDate: startDate, // Dùng biến đã parse
           endDate: endDate,
         );
       } else {
@@ -308,9 +354,9 @@ class _CourseFormPageState extends State<CourseFormPage> {
           description: description,
           minStudents: minStudents,
           maxStudents: maxStudents,
-          startDate: startDate,
-          endDate: endDate,
+          startDate: startDate, // Dùng biến đã parse
           totalStudents: 0,
+          endDate: endDate,
         );
       }
 
@@ -517,117 +563,110 @@ class _CourseFormPageState extends State<CourseFormPage> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.description_outlined),
                 ),
-                maxLines: 3, // Cho phép nhập nhiều dòng
-                // Không cần validator và inputFormatters để cho phép nhập tự do
+                maxLines: 3,
               ),
               const SizedBox(height: 16),
+
+              // =========== START: CẬP NHẬT TỪ ĐÂY ===========
+
+              // TextFormField cho NGÀY BẮT ĐẦU
               TextFormField(
                 controller: _startDateCtrl,
-                readOnly: true, // để chặn nhập tay
+                readOnly: true,
                 decoration: const InputDecoration(
                   labelText: 'Ngày bắt đầu',
                   border: OutlineInputBorder(),
                   suffixIcon: Icon(Icons.calendar_today),
                 ),
-                inputFormatters: [],
                 validator: (value) => (value == null || value.isEmpty)
                     ? 'Vui lòng chọn ngày'
                     : null,
                 onTap: () async {
                   final pickedDate = await showDatePicker(
                     context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2000),
+                    initialDate: _startDateCtrl.text.isNotEmpty
+                        ? _dateFormat.parseStrict(_startDateCtrl.text)
+                        : DateTime.now(),
+                    firstDate: DateTime(2020),
                     lastDate: DateTime(2100),
                   );
                   if (pickedDate != null) {
                     _startDateCtrl.text = _dateFormat.format(pickedDate);
+                    // UX Improvement: Nếu ngày kết thúc đã được chọn và bây giờ nó
+                    // không còn hợp lệ (trước hoặc bằng ngày bắt đầu mới), hãy xóa nó.
+                    if (_endDateCtrl.text.isNotEmpty) {
+                      final endDate = _dateFormat.parseStrict(
+                        _endDateCtrl.text,
+                      );
+                      if (!endDate.isAfter(pickedDate)) {
+                        _endDateCtrl.clear();
+                      }
+                    }
                   }
                 },
               ),
-              const SizedBox(height: 8),
-
+              const SizedBox(height: 16), // Tăng khoảng cách cho đẹp hơn
+              // TextFormField cho NGÀY KẾT THÚC
               TextFormField(
                 controller: _endDateCtrl,
-                readOnly: true, // để chặn nhập tay
+                readOnly: true,
                 decoration: const InputDecoration(
                   labelText: 'Ngày kết thúc',
                   border: OutlineInputBorder(),
                   suffixIcon: Icon(Icons.calendar_today),
                 ),
-                validator: (value) => (value == null || value.isEmpty)
-                    ? 'Vui lòng chọn ngày'
-                    : null,
+                validator: (value) {
+                  // 1. Kiểm tra rỗng
+                  if (value == null || value.isEmpty) {
+                    return 'Vui lòng chọn ngày';
+                  }
+                  // 2. Nếu ngày bắt đầu chưa được chọn, không cần validate thêm
+                  if (_startDateCtrl.text.isEmpty) {
+                    return null;
+                  }
+                  // 3. So sánh hai ngày
+                  try {
+                    final startDate = _dateFormat.parseStrict(
+                      _startDateCtrl.text,
+                    );
+                    final endDate = _dateFormat.parseStrict(value);
+                    if (!endDate.isAfter(startDate)) {
+                      return 'Ngày kết thúc phải sau ngày bắt đầu';
+                    }
+                  } catch (e) {
+                    // Xảy ra nếu định dạng ngày bị lỗi (khó xảy ra với date picker)
+                    return 'Định dạng ngày không hợp lệ';
+                  }
+                  return null; // Hợp lệ
+                },
                 onTap: () async {
+                  // Gợi ý ngày bắt đầu cho date picker là ngày bắt đầu của khóa học (nếu có)
+                  final initialPickerDate = _startDateCtrl.text.isNotEmpty
+                      ? _dateFormat
+                            .parseStrict(_startDateCtrl.text)
+                            .add(const Duration(days: 1))
+                      : DateTime.now();
+
                   final pickedDate = await showDatePicker(
                     context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2000),
+                    initialDate: initialPickerDate,
+                    // Ngày đầu tiên có thể chọn là ngày sau ngày bắt đầu
+                    firstDate: _startDateCtrl.text.isNotEmpty
+                        ? _dateFormat
+                              .parseStrict(_startDateCtrl.text)
+                              .add(const Duration(days: 1))
+                        : DateTime(2020),
                     lastDate: DateTime(2100),
                   );
                   if (pickedDate != null) {
                     _endDateCtrl.text = _dateFormat.format(pickedDate);
+                    // Kích hoạt lại việc validate của form sau khi chọn
+                    _formKey.currentState?.validate();
                   }
                 },
               ),
 
-              // const SizedBox(height: 8),
-
-              // ..._weekdaySlots.map((slot) {
-              //   final label = _weekdayLabel(slot.weekday);
-              //   return Card(
-              //     margin: const EdgeInsets.symmetric(vertical: 6),
-              //     child: Padding(
-              //       padding: const EdgeInsets.symmetric(
-              //         horizontal: 12,
-              //         vertical: 8,
-              //       ),
-              //       child: Column(
-              //         children: [
-              //           SwitchListTile(
-              //             dense: true,
-              //             contentPadding: EdgeInsets.zero,
-              //             title: Text(label),
-              //             value: slot.enabled,
-              //             onChanged: (v) => setState(() {
-              //               slot.enabled = v;
-              //               if (!v) {
-              //                 slot.start = null;
-              //                 slot.end = null;
-              //               }
-              //             }),
-              //           ),
-              //           if (slot.enabled)
-              //             Row(
-              //               children: [
-              //                 Expanded(
-              //                   child: OutlinedButton.icon(
-              //                     icon: const Icon(Icons.schedule, size: 18),
-              //                     onPressed: () =>
-              //                         _pickTime(slot: slot, isStart: true),
-              //                     label: Text(
-              //                       'Bắt đầu: ${_formatTime(slot.start)}',
-              //                     ),
-              //                   ),
-              //                 ),
-              //                 const SizedBox(width: 8),
-              //                 Expanded(
-              //                   child: OutlinedButton.icon(
-              //                     icon: const Icon(Icons.schedule, size: 18),
-              //                     onPressed: () =>
-              //                         _pickTime(slot: slot, isStart: false),
-              //                     label: Text(
-              //                       'Kết thúc: ${_formatTime(slot.end)}',
-              //                     ),
-              //                   ),
-              //                 ),
-              //               ],
-              //             ),
-              //         ],
-              //       ),
-              //     ),
-              //   );
-              // }).toList(),
+              // =========== END: CẬP NHẬT TỚI ĐÂY ===========
               const SizedBox(height: 28),
 
               FilledButton.icon(
