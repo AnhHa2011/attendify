@@ -349,7 +349,11 @@ class _UserBulkImportPageState extends State<UserBulkImportPage> {
                           _StatusCard(
                             fileName: _fileName,
                             message: _message,
-                            colorScheme: colorScheme,
+                            colorScheme:
+                                _message.toLowerCase().contains('lỗi') ||
+                                    _message.toLowerCase().contains('thất bại')
+                                ? Colors.red
+                                : colorScheme,
                           ),
                         ],
                       ],

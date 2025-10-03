@@ -9,6 +9,7 @@ import '../features/auth/presentation/pages/reset_password_page.dart';
 import '../features/admin/presentation/pages/admin_main.dart';
 import '../features/lecturer/presentation/pages/lecturer_main.dart';
 import '../app/providers/auth_provider.dart';
+import 'exit_on_back.dart';
 
 class RouteGenerator {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -18,22 +19,18 @@ class RouteGenerator {
         return _buildRoute(const _RootRedirectPage());
 
       case AppRoutes.login:
-        return _buildRoute(const LoginPage());
-
+        return _buildRoute(const ExitOnBack(child: LoginPage()));
+      case AppRoutes.adminMain:
+        return _buildRoute(const ExitOnBack(child: AdminMain()));
+      case AppRoutes.lecturerMain:
+        return _buildRoute(const ExitOnBack(child: LecturerMain()));
+      case AppRoutes.studentMain:
+        return _buildRoute(const ExitOnBack(child: StudentMain()));
       case AppRoutes.register:
-        return _buildRoute(const RegisterPage());
+        return _buildRoute(const ExitOnBack(child: RegisterPage()));
 
       case AppRoutes.resetPassword:
         return _buildRoute(const ResetPasswordPage());
-
-      case AppRoutes.adminMain:
-        return _buildRoute(const AdminMain());
-
-      case AppRoutes.lecturerMain:
-        return _buildRoute(const LecturerMain());
-
-      case AppRoutes.studentMain:
-        return _buildRoute(const StudentMain());
 
       default:
         return _errorRoute(settings.name);
