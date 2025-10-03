@@ -261,14 +261,41 @@ extension SessionModelExtension on SessionModel {
     }
   }
 
+  // String get statusDisplayName {
+  //   switch (status) {
+  //     case SessionStatus.scheduled:
+  //       return 'Đã lên lịch';
+  //     case SessionStatus.inProgress:
+  //       return 'Đang diễn ra';
+  //     case SessionStatus.completed:
+  //       return 'Đã kết thúc';
+  //     case SessionStatus.cancelled:
+  //       return 'Đã hủy';
+  //   }
+  // }
+
   String get statusDisplayName {
+    final now = DateTime.now(); // Lấy thời gian hiện tại
+
     switch (status) {
       case SessionStatus.scheduled:
+        // Cải tiến: Nếu đã qua giờ kết thúc mà vẫn là "scheduled" -> đã lỡ
+        if (endTime.isBefore(now)) {
+          return 'Đã qua';
+        }
         return 'Đã lên lịch';
+
       case SessionStatus.inProgress:
+        // === FIX LỖI TẠI ĐÂY ===
+        // Nếu trạng thái là "đang diễn ra" NHƯNG giờ kết thúc đã qua -> hiển thị là "Đã kết thúc"
+        if (endTime.isBefore(now)) {
+          return 'Đã kết thúc';
+        }
         return 'Đang diễn ra';
+
       case SessionStatus.completed:
         return 'Đã kết thúc';
+
       case SessionStatus.cancelled:
         return 'Đã hủy';
     }
