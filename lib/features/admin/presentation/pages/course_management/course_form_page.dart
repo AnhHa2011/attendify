@@ -309,22 +309,25 @@ class _CourseFormPageState extends State<CourseFormPage> {
     final endDate = _dateFormat.parseStrict(_endDateCtrl.text);
 
     try {
-      final isTaken = await adminService.isCourseCodeTaken(
-        courseCode,
-        currentcourseCode: widget.courseModel?.id,
-      );
-      if (isTaken) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Mã môn học "$courseCode" đã tồn tại.'),
-              backgroundColor: Colors.red,
-            ),
-          );
+      // Khi ở chế độ chỉnh sửa, không cần kiểm tra mã môn học đã tồn tại hay chưa
+      // vì mã này không thể thay đổi.
+      if (!_isEditMode) {
+        final isTaken = await adminService.isCourseCodeTaken(
+          courseCode,
+          currentcourseCode: widget.courseModel?.id,
+        );
+        if (isTaken) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Mã môn học "$courseCode" đã tồn tại.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          setState(() => _isLoading = false);
+          return;
         }
-        // Cần thêm return ở đây để dừng lại sau khi set loading=false
-        setState(() => _isLoading = false);
-        return;
       }
 
       // Tạo/Cập nhật
@@ -402,11 +405,16 @@ class _CourseFormPageState extends State<CourseFormPage> {
               // ====== course Code ======
               TextFormField(
                 controller: _codeCtrl,
-                decoration: const InputDecoration(
+                // Thêm thuộc tính `enabled`
+                enabled: !_isEditMode,
+                decoration: InputDecoration(
                   labelText: 'Mã môn học',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.tag),
-                  helperText: 'Ví dụ: IT4440. Sẽ tự động viết hoa.',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.tag),
+                  // Thay đổi helperText để người dùng hiểu rõ hơn
+                  helperText: _isEditMode
+                      ? 'Mã môn học không thể thay đổi.'
+                      : 'Ví dụ: IT4440. Sẽ tự động viết hoa.',
                 ),
                 inputFormatters: [
                   FilteringTextInputFormatter.deny(RegExp(r'\s')),
